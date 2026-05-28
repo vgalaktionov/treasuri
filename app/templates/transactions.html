@@ -6,6 +6,35 @@
   <section aria-labelledby="transactions-title">
     <p class="muted">{{ subtitle }}</p>
     <h1 id="transactions-title">{{ title }}</h1>
+    {% if show_filters %}
+      <form class="transaction-filters" method="get" action="/transactions">
+        <label>
+          Search
+          <input type="search" name="q" value="{{ filters.query }}" autocomplete="off">
+        </label>
+        <label>
+          Month
+          <input type="month" name="month" value="{{ filters.month }}">
+        </label>
+        <label>
+          Category
+          <select name="category">
+            <option value="">All</option>
+            {% for category in categories %}
+              <option value="{{ category }}" {% if category == filters.category %}selected{% endif %}>{{ category }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="needs_review" value="1" {% if filters.needs_review is true %}checked{% endif %}>
+          Review
+        </label>
+        <div class="filter-actions">
+          <button type="submit">Filter</button>
+          {% if filters.has_any %}<a role="button" class="secondary" href="/transactions">Clear</a>{% endif %}
+        </div>
+      </form>
+    {% endif %}
     {% if transactions %}
       <div class="transaction-list">
         {% for transaction in transactions %}

@@ -99,6 +99,32 @@ header nav ul {
   margin-block-end: 2rem;
 }
 
+.transaction-filters {
+  align-items: end;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(12rem, 2fr) minmax(9rem, 1fr) minmax(10rem, 1fr) auto auto;
+  margin-block: 0 1rem;
+}
+
+.transaction-filters label,
+.transaction-filters button,
+.transaction-filters a {
+  margin: 0;
+}
+
+.checkbox-label {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+  min-block-size: 3rem;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .transaction-card {
   border: 1px solid var(--treasuri-line);
   border-radius: 0.5rem;
@@ -313,6 +339,19 @@ header nav ul {
 
   .transaction-main {
     grid-template-columns: 1fr;
+  }
+
+  .transaction-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    flex-direction: column;
+  }
+
+  .filter-actions button,
+  .filter-actions a {
+    inline-size: 100%;
   }
 
   .transaction-main strong {

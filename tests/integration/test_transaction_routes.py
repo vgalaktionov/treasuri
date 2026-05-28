@@ -58,3 +58,28 @@ def test_review_route_only_renders_transactions_needing_review(sample_app) -> No
     assert b"Review inbox" in response.data
     assert b"Unknown Sample Merchant" in response.data
     assert b"Sample Supermarket" not in response.data
+
+
+def test_transactions_route_filters_by_search_and_category(sample_app) -> None:
+    client = sample_app.test_client()
+
+    search_response = client.get("/transactions?q=supermarket")
+    category_response = client.get("/transactions?category=Dog")
+    review_response = client.get("/transactions?needs_review=1")
+
+    assert search_response.status_code == 200
+    assert b"Sample Supermarket" in search_response.data
+    assert b"Sample Employer" not in search_response.data
+    assert category_response.status_code == 200
+    assert b"Sample Pet Care" in category_response.data
+    assert b"Sample Supermarket" not in category_response.data
+    assert review_response.status_code == 200
+    assert b"Unknown Sample Merchant" in review_response.data
+    assert b"Sample Supermarket" not in review_response.data
+
+
+def test_transactions_route_filters_by_month(sample_app) -> None:
+    response = sample_app.test_client().get("/transactions?month=2026-04")
+
+    assert response.status_code == 200
+    assert b"No transactions to show." in response.data

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import LiteralString, cast
 
 import psycopg
 
@@ -22,12 +23,38 @@ class TransactionListItem:
     flags: tuple[str, ...]
 
 
-def list_transactions(database_url: str, *, needs_review: bool | None = None) -> list[TransactionListItem]:
-    where_clause = "WHERE enriched_transactions.needs_review = %s" if needs_review is not None else ""
-    params = (needs_review,) if needs_review is not None else ()
+@dataclass(frozen=True)
+class TransactionFilters:
+    query: str = ""
+    month: str = ""
+    category: str = ""
+    needs_review: bool | None = None
+
+    @property
+    def has_any(self) -> bool:
+        return bool(self.query or self.month or self.category or self.needs_review is not None)
+
+
+def list_transactions(
+    database_url: str,
+    *,
+    needs_review: bool | None = None,
+    filters: TransactionFilters | None = None,
+) -> list[TransactionListItem]:
+    active_filters = filters or TransactionFilters(needs_review=needs_review)
+    if needs_review is not None:
+        active_filters = TransactionFilters(
+            query=active_filters.query,
+            month=active_filters.month,
+            category=active_filters.category,
+            needs_review=needs_review,
+        )
+    where_clause, params = _build_where_clause(active_filters)
     with psycopg.connect(database_url) as connection:
         rows = connection.execute(
-            f"""
+            cast(
+                LiteralString,
+                f"""
             SELECT
                 enriched_transactions.id,
                 raw_transactions.booking_date,
@@ -52,10 +79,40 @@ def list_transactions(database_url: str, *, needs_review: bool | None = None) ->
             ORDER BY raw_transactions.booking_date DESC, enriched_transactions.id DESC
             LIMIT 100
             """,
-            params,
+            ),
+            tuple(params),
         ).fetchall()
 
     return [_row_to_transaction(row) for row in rows]
+
+
+def _build_where_clause(filters: TransactionFilters) -> tuple[str, list[object]]:
+    clauses: list[str] = []
+    params: list[object] = []
+    if filters.needs_review is not None:
+        clauses.append("enriched_transactions.needs_review = %s")
+        params.append(filters.needs_review)
+    if filters.query:
+        clauses.append(
+            """
+            (
+                raw_transactions.description ILIKE %s
+                OR raw_transactions.counterparty_name ILIKE %s
+                OR merchants.name ILIKE %s
+            )
+            """
+        )
+        like_value = f"%{filters.query}%"
+        params.extend([like_value, like_value, like_value])
+    if filters.month:
+        clauses.append("to_char(raw_transactions.booking_date, 'YYYY-MM') = %s")
+        params.append(filters.month)
+    if filters.category:
+        clauses.append("categories.name = %s")
+        params.append(filters.category)
+    if not clauses:
+        return "", params
+    return "WHERE " + " AND ".join(clauses), params
 
 
 def _row_to_transaction(row: tuple[object, ...]) -> TransactionListItem:

@@ -22,7 +22,7 @@ from app.settings import (
     parse_forecast_settings,
     save_forecast_settings,
 )
-from app.transactions import list_transactions
+from app.transactions import TransactionFilters, list_transactions
 
 
 def create_app(config: AppConfig | None = None, overrides: dict[str, Any] | None = None) -> Flask:
@@ -62,13 +62,22 @@ def register_routes(app: Flask) -> None:
     @app.get("/transactions")
     def transactions() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]
-        transactions = list_transactions(app_config.database_url) if app_config.database_url else []
+        filters = TransactionFilters(
+            query=request.args.get("q", "").strip(),
+            month=request.args.get("month", "").strip(),
+            category=request.args.get("category", "").strip(),
+            needs_review=True if request.args.get("needs_review") == "1" else None,
+        )
+        transactions = list_transactions(app_config.database_url, filters=filters) if app_config.database_url else []
+        categories = list_category_names(app_config.database_url) if app_config.database_url else []
         return render_template(
             "transactions.html",
             title="Transactions",
             subtitle="Latest known activity",
             transactions=transactions,
-            categories=[],
+            categories=categories,
+            filters=filters,
+            show_filters=True,
             show_review_actions=False,
         )
 
@@ -83,6 +92,8 @@ def register_routes(app: Flask) -> None:
             subtitle="Transactions that can change the forecast",
             transactions=transactions,
             categories=categories,
+            filters=TransactionFilters(needs_review=True),
+            show_filters=False,
             show_review_actions=True,
         )
 
