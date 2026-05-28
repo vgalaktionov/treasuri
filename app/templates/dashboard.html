@@ -33,15 +33,32 @@
   <section class="insight-list" aria-label="What changed">
     <article>
       <strong>{{ summary.pace }}</strong>
-      <p>The sample forecast keeps expected income, upcoming fixed costs, target savings, and a safety buffer visible so the number can be explained.</p>
+      <p>Projected from the current month’s variable spend pace and the configured budget assumptions.</p>
     </article>
     <article>
       <strong>{{ summary.review_count }} transaction{% if summary.review_count != 1 %}s{% endif %} {% if summary.review_count == 1 %}needs{% else %}need{% endif %} review</strong>
-      <p>Unknown or low-confidence transactions will appear in the review inbox once the database slice is wired.</p>
+      <p>Unknown or low-confidence transactions stay visible until confirmed because they can change the forecast.</p>
     </article>
     <article>
       <strong>Last sync: {{ summary.last_sync }}</strong>
-      <p>This foundation uses deterministic sample values only. Real ABN sync comes behind the bank adapter boundary.</p>
+      <p>Imports, classification, recurring detection, and forecast updates run through the sync pipeline.</p>
+    </article>
+  </section>
+
+  <section class="dashboard-explanation" aria-labelledby="dashboard-explanation-title">
+    <p class="muted">Why this number</p>
+    <h2 id="dashboard-explanation-title">Forecast inputs</h2>
+    <dl class="breakdown-grid">
+      {% for metric in summary.breakdown %}
+        <div>
+          <dt>{{ metric.label }}</dt>
+          <dd>{{ metric.value }}</dd>
+        </div>
+      {% endfor %}
+    </dl>
+    <article class="formula-note">
+      <strong>Formula</strong>
+      <p>{{ summary.formula }}</p>
     </article>
   </section>
 {% endblock %}

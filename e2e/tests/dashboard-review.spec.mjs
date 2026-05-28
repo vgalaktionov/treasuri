@@ -37,6 +37,9 @@ test("dashboard answers the main money question on mobile without horizontal ove
   assert.match(bodyText, /Safe to spend\s+EUR 558/);
   assert.match(bodyText, /Safe per day\s+EUR 93\/day/);
   assert.match(bodyText, /Projected savings\s+EUR 1,558/);
+  assert.match(bodyText, /Forecast inputs/);
+  assert.match(bodyText, /Fixed costs upcoming\s+EUR 620/);
+  assert.match(bodyText, /Formula/);
   assert.match(bodyText, /1 transaction needs review/);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
