@@ -1,0 +1,39 @@
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def read_project_file(path: str) -> str:
+    return (PROJECT_ROOT / path).read_text(encoding="utf-8")
+
+
+def test_dockerfile_builds_single_uv_managed_runtime_image() -> None:
+    dockerfile = read_project_file("Dockerfile")
+
+    assert "FROM python:3.12-slim AS runtime" in dockerfile
+    assert "COPY --from=ghcr.io/astral-sh/uv:" in dockerfile
+    assert "uv sync --frozen --no-dev --no-install-project" in dockerfile
+    assert 'CMD ["python", "-m", "app.web"]' in dockerfile
+    assert "USER treasuri" in dockerfile
+    assert "HEALTHCHECK" in dockerfile
+    assert "gunicorn" not in dockerfile.lower()
+
+
+def test_compose_starts_local_runtime_shape_without_caddy_or_frontend_build() -> None:
+    compose = read_project_file("compose.yml")
+
+    for service in ("app", "worker", "migrate", "db", "llama"):
+        assert re.search(rf"^  {service}:\n", compose, flags=re.MULTILINE), service
+
+    assert "postgres:16-alpine" in compose
+    assert "ghcr.io/ggml-org/llama.cpp:server" in compose
+    assert "unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL" in compose
+    assert "postgresql://treasuri:treasuri@db:5432/treasuri" in compose
+    assert 'command: ["python", "-m", "app.web"]' in compose
+    assert 'command: ["python", "-m", "app.worker"]' in compose
+    assert 'command: ["python", "-m", "app.migrate"]' in compose
+    assert "caddy" not in compose.lower()
+    assert "npm" not in compose.lower()

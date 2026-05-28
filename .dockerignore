@@ -1,0 +1,12 @@
+.git
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+build
+dist
+wheels
+chrome-devtools-mcp-smoke.png

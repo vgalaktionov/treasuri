@@ -1,0 +1,95 @@
+services:
+  app:
+    build: .
+    image: treasuri:local
+    command: ["python", "-m", "app.web"]
+    environment:
+      APP_ENV: development
+      SECRET_KEY: dev-secret-change-me
+      DATABASE_URL: postgresql://treasuri:treasuri@db:5432/treasuri
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: "5000"
+      OIDC_ENABLED: "false"
+      OIDC_TESTING_PROFILE_JSON: '{"sub":"dev-user","nickname":"dev-user","email":"dev-user@example.test","groups":["finance-app"]}'
+      ALLOWED_EMAILS: dev-user@example.test
+      LLM_BASE_URL: http://llama:8080/v1
+      LLM_MODEL: unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL
+      BANK_PROVIDER: fake
+      ABN_ACCOUNT_IBAN: NL00FAKE0123456789
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      llama:
+        condition: service_started
+
+  worker:
+    image: treasuri:local
+    command: ["python", "-m", "app.worker"]
+    environment:
+      APP_ENV: development
+      SECRET_KEY: dev-secret-change-me
+      DATABASE_URL: postgresql://treasuri:treasuri@db:5432/treasuri
+      OIDC_ENABLED: "false"
+      OIDC_TESTING_PROFILE_JSON: '{"sub":"dev-worker","nickname":"dev-worker","email":"dev-user@example.test"}'
+      ALLOWED_EMAILS: dev-user@example.test
+      LLM_BASE_URL: http://llama:8080/v1
+      LLM_MODEL: unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL
+      BANK_PROVIDER: fake
+      ABN_ACCOUNT_IBAN: NL00FAKE0123456789
+    depends_on:
+      app:
+        condition: service_started
+      db:
+        condition: service_healthy
+
+  migrate:
+    image: treasuri:local
+    command: ["python", "-m", "app.migrate"]
+    environment:
+      APP_ENV: development
+      SECRET_KEY: dev-secret-change-me
+      DATABASE_URL: postgresql://treasuri:treasuri@db:5432/treasuri
+      OIDC_ENABLED: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: treasuri
+      POSTGRES_USER: treasuri
+      POSTGRES_PASSWORD: treasuri
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U treasuri -d treasuri"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command:
+      - -hf
+      - unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --temp
+      - "0"
+    ports:
+      - "8080:8080"
+    volumes:
+      - llama-cache:/root/.cache/llama.cpp
+
+volumes:
+  postgres-data:
+  llama-cache:
