@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import html
+
 from app.config import AppConfig
 from app.web import create_app
 
@@ -15,8 +17,18 @@ def test_dashboard_renders_for_allowed_test_profile(client) -> None:
     response = client.get("/")
 
     assert response.status_code == 200
+    html_text = html.unescape(response.get_data(as_text=True))
+    assert '<a class="brand" href="/" aria-label="💸 Treasuri">' in html_text
+    assert 'src="/static/icons/icon.svg"' in html_text
     assert b"Safe to spend" in response.data
     assert b"EUR 558" in response.data
+
+
+def test_pwa_icon_uses_flying_stack_of_bills(client) -> None:
+    response = client.get("/static/icons/icon.svg")
+
+    assert response.status_code == 200
+    assert 'aria-label="💸"'.encode() in response.data
 
 
 def test_app_route_rejects_disallowed_test_profile(test_config: AppConfig) -> None:

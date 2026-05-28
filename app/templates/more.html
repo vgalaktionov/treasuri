@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}More - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="more-title">
+    <h1 id="more-title">More</h1>
+    <div class="more-list">
+      <a href="/categories">
+        <strong>Categories</strong>
+        <span>Budget averages and current pace</span>
+      </a>
+      <a href="/rules">
+        <strong>Rules</strong>
+        <span>Reusable deterministic categorization</span>
+      </a>
+      <a href="/recurring">
+        <strong>Recurring</strong>
+        <span>Subscriptions and fixed commitments</span>
+      </a>
+      <a href="/export">
+        <strong>Export</strong>
+        <span>Budget workbook generation</span>
+      </a>
+      <a href="/settings">
+        <strong>Settings</strong>
+        <span>Forecast assumptions</span>
+      </a>
+      <a href="/status">
+        <strong>Status</strong>
+        <span>Runtime configuration</span>
+      </a>
+    </div>
+  </section>
+{% endblock %}

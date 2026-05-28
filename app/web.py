@@ -67,6 +67,10 @@ def register_routes(app: Flask) -> None:
         app_config: AppConfig = app.config["APP_CONFIG"]
         return render_template("status.html", config=app_config)
 
+    @app.get("/more")
+    def more() -> str:
+        return render_template("more.html")
+
     @app.get("/transactions")
     def transactions() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]

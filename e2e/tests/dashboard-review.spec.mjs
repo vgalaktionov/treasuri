@@ -46,6 +46,41 @@ test("dashboard answers the main money question on mobile without horizontal ove
   assert.equal(overflow <= 1, true, `mobile page overflows horizontally by ${overflow}px`);
 });
 
+test("mobile navigation uses a compact bottom tab bar", async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 320, height: 700, deviceScaleFactor: 1, isMobile: true });
+  await page.goto(baseUrl, { waitUntil: "networkidle0" });
+
+  const metrics = await page.evaluate(() => {
+    const header = document.querySelector("header");
+    const tabbar = document.querySelector(".mobile-tabbar");
+    const firstHeading = document.querySelector("h1");
+    return {
+      headerHeight: header?.getBoundingClientRect().height ?? 0,
+      headingTop: firstHeading?.getBoundingClientRect().top ?? 0,
+      tabbarBottom: tabbar ? Math.round(window.innerHeight - tabbar.getBoundingClientRect().bottom) : null,
+      tabbarLabels: tabbar?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+      tabbarIconCount: tabbar?.querySelectorAll("svg").length ?? 0,
+      desktopNavDisplay: getComputedStyle(document.querySelector(".desktop-nav")).display,
+    };
+  });
+  assert.equal(metrics.headerHeight < 60, true, `mobile header is too tall: ${metrics.headerHeight}px`);
+  assert.equal(metrics.headingTop < 130, true, `first heading starts too low: ${metrics.headingTop}px`);
+  assert.equal(metrics.tabbarBottom, 0);
+  assert.equal(metrics.tabbarLabels, "Today Month Txns Review More");
+  assert.equal(metrics.tabbarIconCount, 5);
+  assert.equal(metrics.desktopNavDisplay, "none");
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "networkidle0" }),
+    page.locator(".mobile-tabbar a[href='/more']").click(),
+  ]);
+  const moreText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(moreText, /More/);
+  assert.match(moreText, /Categories/);
+  assert.match(moreText, /Settings/);
+});
+
 test("month page explains forecast drivers on mobile without horizontal overflow", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
