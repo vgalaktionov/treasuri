@@ -21,6 +21,11 @@ body {
   text-decoration: none;
 }
 
+header nav ul {
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+}
+
 .muted {
   color: var(--treasuri-muted);
   margin-block-end: 0.25rem;
@@ -206,6 +211,10 @@ body {
     align-items: flex-start;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  header nav ul {
+    inline-size: 100%;
   }
 
   .status-list div {
