@@ -1,0 +1,20 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_ci_workflow_runs_checks_before_publishing_image() -> None:
+    workflow = (PROJECT_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert "uv sync --locked" in workflow
+    assert "uv run ruff format --check ." in workflow
+    assert "uv run ruff check ." in workflow
+    assert "uv run ty check" in workflow
+    assert "uv run pytest" in workflow
+    assert "npm test --prefix e2e" in workflow
+    assert "needs: checks" in workflow
+    assert "ghcr.io/${{ github.repository }}" in workflow
+    assert "push: ${{ github.event_name == 'push' }}" in workflow
+    assert "type=sha,prefix=sha-" in workflow

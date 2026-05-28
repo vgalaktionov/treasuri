@@ -85,6 +85,52 @@ Bank sync defaults to the deterministic fake provider. To use ABN AMRO, set `BAN
 
 Classification runs deterministic methods first. If `LLM_ENABLED=true`, uncategorized transactions can receive a local llama suggestion from the OpenAI-compatible endpoint, but they still stay in review until confirmed.
 
+## OCI Image
+
+CI builds the Docker image after formatting, lint, type, Python, and Puppeteer checks pass. Pushes to `main` and `v*` tags publish to GHCR with a git SHA tag; `main` also gets `latest`.
+
+Pull an image:
+
+```sh
+docker pull ghcr.io/<owner>/treasuri:sha-<git-sha>
+```
+
+Run one-off process types by overriding the command:
+
+```sh
+docker run --rm --env-file .env ghcr.io/<owner>/treasuri:sha-<git-sha> python -m app.migrate
+docker run --rm --env-file .env ghcr.io/<owner>/treasuri:sha-<git-sha> python -m app.web
+docker run --rm --env-file .env ghcr.io/<owner>/treasuri:sha-<git-sha> python -m app.worker
+docker run --rm --env-file .env ghcr.io/<owner>/treasuri:sha-<git-sha> python -m app.admin sync-now
+```
+
+Required runtime environment:
+
+```text
+SECRET_KEY
+DATABASE_URL
+ALLOWED_EMAILS
+OIDC_ENABLED
+OIDC_CLIENT_SECRETS when OIDC_ENABLED=true
+```
+
+Common optional environment:
+
+```text
+HTTP_HOST
+HTTP_PORT
+LLM_ENABLED
+LLM_BASE_URL
+LLM_MODEL
+LLM_TIMEOUT_SECONDS
+LLM_CLASSIFICATION_TEMPERATURE
+LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD
+BANK_PROVIDER
+ABN_ACCOUNT_IBAN
+ABN_CARD_NUMBER
+ABN_SOFT_TOKEN
+```
+
 ## Development Notes
 
 The dashboard can render deterministic sample values from Postgres after `load-sample-data`, or a no-database fallback for early smoke tests. This proves the runtime shape, mobile layout, local static assets, and OIDC test-profile route protection before real bank sync, review workflows, export, and worker slices are connected.
