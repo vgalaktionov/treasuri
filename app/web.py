@@ -11,8 +11,15 @@ from app.auth import init_auth, require_post_csrf
 from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
 from app.exports.xlsx import generate_budget_export, list_export_runs, load_export_file
+from app.forecast.service import update_monthly_forecast
 from app.review import ReviewCorrection, apply_review_correction, list_category_names
 from app.rules import create_rule, draft_rule_from_transaction, preview_rule
+from app.settings import (
+    DEFAULT_FORECAST_SETTINGS,
+    load_forecast_settings,
+    parse_forecast_settings,
+    save_forecast_settings,
+)
 from app.transactions import list_transactions
 
 
@@ -148,6 +155,36 @@ def register_routes(app: Flask) -> None:
                 "Content-Disposition": f'attachment; filename="{export_file.filename}"',
             },
         )
+
+    @app.get("/settings")
+    def settings() -> str:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        forecast_settings = (
+            load_forecast_settings(app_config.database_url).as_form_values()
+            if app_config.database_url
+            else DEFAULT_FORECAST_SETTINGS.as_form_values()
+        )
+        return render_template("settings.html", settings=forecast_settings)
+
+    @app.post("/settings")
+    @require_post_csrf
+    def update_settings():
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        forecast_settings = parse_forecast_settings(
+            {
+                "current_liquid_balance": request.form.get("current_liquid_balance", ""),
+                "target_monthly_savings": request.form.get("target_monthly_savings", ""),
+                "safety_buffer": request.form.get("safety_buffer", ""),
+                "fixed_costs_upcoming": request.form.get("fixed_costs_upcoming", ""),
+                "variable_baseline_3m": request.form.get("variable_baseline_3m", ""),
+                "variable_baseline_6m": request.form.get("variable_baseline_6m", ""),
+            }
+        )
+        save_forecast_settings(app_config.database_url, forecast_settings)
+        update_monthly_forecast(app_config.database_url)
+        return redirect(url_for("dashboard"))
 
 
 def main() -> None:

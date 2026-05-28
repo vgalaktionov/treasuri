@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="settings-title">
+    <p class="muted">Forecast assumptions</p>
+    <h1 id="settings-title">Settings</h1>
+
+    <form method="post" action="/settings" class="settings-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        Current liquid balance
+        <input name="current_liquid_balance" inputmode="decimal" value="{{ settings.current_liquid_balance }}" required>
+      </label>
+      <label>
+        Target monthly savings
+        <input name="target_monthly_savings" inputmode="decimal" value="{{ settings.target_monthly_savings }}" required>
+      </label>
+      <label>
+        Safety buffer
+        <input name="safety_buffer" inputmode="decimal" value="{{ settings.safety_buffer }}" required>
+      </label>
+      <label>
+        Fixed costs upcoming
+        <input name="fixed_costs_upcoming" inputmode="decimal" value="{{ settings.fixed_costs_upcoming }}" required>
+      </label>
+      <label>
+        3M variable baseline
+        <input name="variable_baseline_3m" inputmode="decimal" value="{{ settings.variable_baseline_3m }}" required>
+      </label>
+      <label>
+        6M variable baseline
+        <input name="variable_baseline_6m" inputmode="decimal" value="{{ settings.variable_baseline_6m }}" required>
+      </label>
+      <button type="submit">Save and recalculate</button>
+    </form>
+  </section>
+{% endblock %}

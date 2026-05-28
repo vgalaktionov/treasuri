@@ -10,6 +10,7 @@ import psycopg
 from psycopg import Connection
 
 from app.forecast.service import update_monthly_forecast_in_connection
+from app.settings import ForecastSettings, save_forecast_settings_in_connection
 
 SAMPLE_YEAR_MONTH = "2026-05"
 SAMPLE_FORECAST_DATE = date(2026, 5, 26)
@@ -272,24 +273,17 @@ def _upsert_sample_transaction(
 
 
 def _upsert_sample_settings(connection: Connection[tuple[object, ...]]) -> None:
-    sample_settings = {
-        "current_liquid_balance": "3215.77",
-        "target_monthly_savings": "1000.00",
-        "safety_buffer": "1000.00",
-        "fixed_costs_upcoming": "620.00",
-        "variable_baseline_3m": "0.00",
-        "variable_baseline_6m": "0.00",
-    }
-    for key, value in sample_settings.items():
-        connection.execute(
-            """
-            INSERT INTO app_settings (key, value_json)
-            VALUES (%s, %s::jsonb)
-            ON CONFLICT (key)
-            DO UPDATE SET value_json = EXCLUDED.value_json, updated_at = now()
-            """,
-            (key, value),
-        )
+    save_forecast_settings_in_connection(
+        connection,
+        ForecastSettings(
+            current_liquid_balance=Decimal("3215.77"),
+            target_monthly_savings=Decimal("1000.00"),
+            safety_buffer=Decimal("1000.00"),
+            fixed_costs_upcoming=Decimal("620.00"),
+            variable_baseline_3m=Decimal("0.00"),
+            variable_baseline_6m=Decimal("0.00"),
+        ),
+    )
 
 
 def _upsert_sample_sync_run(connection: Connection[tuple[object, ...]]) -> None:
