@@ -10,6 +10,7 @@ import psycopg
 from app.bank.fake import FakeBankAdapter
 from app.bank.sync import sync_bank_transactions
 from app.categories import DEFAULT_CATEGORIES
+from app.classify.service import classify_transactions
 from app.config import AppConfig, load_config
 from app.normalize import normalize_raw_transactions
 from app.sample_data import load_sample_data
@@ -34,11 +35,13 @@ def sync_now(config: AppConfig) -> None:
     account_iban = config.abn_account_iban or "NL00FAKE0123456789"
     result = sync_bank_transactions(config.database_url, FakeBankAdapter(), account_iban=account_iban)
     normalize_result = normalize_raw_transactions(config.database_url)
+    classify_result = classify_transactions(config.database_url)
     print(
         "Synced "
         f"{result.provider}: {result.new_transaction_count} new, "
         f"{result.updated_transaction_count} updated, "
-        f"{normalize_result.created_count} normalized"
+        f"{normalize_result.created_count} normalized, "
+        f"{classify_result.review_count} still need review"
     )
 
 
