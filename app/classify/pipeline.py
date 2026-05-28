@@ -12,6 +12,7 @@ class ClassificationMethod(StrEnum):
     MANUAL_OVERRIDE = "manual_override"
     RULE = "rule"
     MERCHANT_ALIAS = "merchant_alias"
+    HISTORICAL_SIMILARITY = "historical_similarity"
     LLM = "llm"
     UNCATEGORIZED = "uncategorized"
 
@@ -88,6 +89,16 @@ class MerchantAlias:
 
 
 @dataclass(frozen=True)
+class HistoricalExample:
+    transaction_id: int
+    amount: Decimal
+    description: str
+    counterparty_name: str | None
+    category: str | None
+    merchant: str | None
+
+
+@dataclass(frozen=True)
 class ClassificationResult:
     method: ClassificationMethod
     category: str | None
@@ -107,6 +118,8 @@ def classify_transaction(
     manual_overrides: list[ManualOverride],
     rules: list[CategorizationRule],
     merchant_aliases: list[MerchantAlias],
+    historical_examples: list[HistoricalExample] | None = None,
+    similarity_threshold: Decimal = Decimal("0.65"),
 ) -> ClassificationResult:
     override = _find_manual_override(transaction, manual_overrides)
     if override is not None:
@@ -144,6 +157,22 @@ def classify_transaction(
                 reason=f"Matched merchant alias for {alias.merchant}.",
             )
 
+    historical_match = best_historical_match(
+        transaction,
+        historical_examples or [],
+        threshold=similarity_threshold,
+    )
+    if historical_match is not None:
+        example, score = historical_match
+        return ClassificationResult(
+            method=ClassificationMethod.HISTORICAL_SIMILARITY,
+            category=example.category,
+            merchant=example.merchant,
+            confidence=score,
+            needs_review=True,
+            reason=f"Similar to manual correction #{example.transaction_id}.",
+        )
+
     return ClassificationResult(
         method=ClassificationMethod.UNCATEGORIZED,
         category=None,
@@ -172,6 +201,62 @@ def alias_matches(transaction: TransactionForClassification, alias: MerchantAlia
     return _matches(searchable_text, alias.match_type, alias.match_text)
 
 
+def best_historical_match(
+    transaction: TransactionForClassification,
+    examples: list[HistoricalExample],
+    *,
+    threshold: Decimal,
+) -> tuple[HistoricalExample, Decimal] | None:
+    scored = [
+        (example, historical_similarity_score(transaction, example))
+        for example in examples
+        if example.transaction_id != transaction.id
+    ]
+    if not scored:
+        return None
+    example, score = max(scored, key=lambda item: item[1])
+    if score < threshold:
+        return None
+    return example, score
+
+
+def historical_similarity_score(transaction: TransactionForClassification, example: HistoricalExample) -> Decimal:
+    transaction_tokens = _tokens(
+        " ".join(
+            part
+            for part in (
+                transaction.description,
+                transaction.counterparty_name or "",
+                transaction.merchant_name or "",
+            )
+            if part
+        )
+    )
+    example_tokens = _tokens(
+        " ".join(
+            part
+            for part in (
+                example.description,
+                example.counterparty_name or "",
+                example.merchant or "",
+            )
+            if part
+        )
+    )
+    text_score = _jaccard(transaction_tokens, example_tokens)
+    amount_score = Decimal("1") if _amount_band(transaction.amount) == _amount_band(example.amount) else Decimal("0")
+    counterparty_score = (
+        Decimal("1")
+        if transaction.counterparty_name
+        and example.counterparty_name
+        and transaction.counterparty_name.casefold() == example.counterparty_name.casefold()
+        else Decimal("0")
+    )
+    return (
+        text_score * Decimal("0.75") + amount_score * Decimal("0.15") + counterparty_score * Decimal("0.10")
+    ).quantize(Decimal("0.01"))
+
+
 def _find_manual_override(
     transaction: TransactionForClassification, manual_overrides: list[ManualOverride]
 ) -> ManualOverride | None:
@@ -179,6 +264,31 @@ def _find_manual_override(
         if override.transaction_id == transaction.id:
             return override
     return None
+
+
+def _tokens(value: str) -> set[str]:
+    return {token for token in re.findall(r"[a-z0-9]+", value.casefold()) if len(token) >= 3}
+
+
+def _jaccard(left: set[str], right: set[str]) -> Decimal:
+    if not left or not right:
+        return Decimal("0")
+    return Decimal(len(left & right)) / Decimal(len(left | right))
+
+
+def _amount_band(amount: Decimal) -> int:
+    absolute = abs(amount)
+    if absolute < Decimal("10"):
+        return 0
+    if absolute < Decimal("25"):
+        return 1
+    if absolute < Decimal("50"):
+        return 2
+    if absolute < Decimal("100"):
+        return 3
+    if absolute < Decimal("250"):
+        return 4
+    return 5
 
 
 def _field_value(transaction: TransactionForClassification, field: MatchField) -> str:

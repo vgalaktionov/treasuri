@@ -107,6 +107,120 @@ def test_classify_transactions_applies_rules_before_aliases(normalized_postgres_
     ]
 
 
+def test_classify_transactions_uses_historical_manual_correction(normalized_postgres_url: str) -> None:
+    with psycopg.connect(normalized_postgres_url) as connection:
+        with connection.transaction():
+            account_id = connection.execute("SELECT id FROM accounts WHERE provider = 'fake' LIMIT 1").fetchone()
+            if account_id is None:
+                raise AssertionError("sample account was not inserted")
+            corrected_transaction_id = connection.execute(
+                """
+                SELECT enriched_transactions.id
+                FROM enriched_transactions
+                JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+                WHERE raw_transactions.description = 'Needs review sample'
+                """
+            ).fetchone()
+            if corrected_transaction_id is None:
+                raise AssertionError("needs-review transaction was not inserted")
+            merchant_id = connection.execute(
+                """
+                INSERT INTO merchants (name, normalized_name, default_category_id)
+                VALUES (
+                    'Sample Review Merchant',
+                    'sample review merchant',
+                    (SELECT id FROM categories WHERE name = 'Groceries')
+                )
+                ON CONFLICT (normalized_name)
+                DO UPDATE SET default_category_id = EXCLUDED.default_category_id
+                RETURNING id
+                """
+            ).fetchone()
+            if merchant_id is None:
+                raise AssertionError("review merchant was not inserted")
+            connection.execute(
+                """
+                INSERT INTO manual_overrides (enriched_transaction_id, category_id, merchant_id, notes)
+                VALUES (
+                    %s,
+                    (SELECT id FROM categories WHERE name = 'Groceries'),
+                    %s,
+                    'Historical correction fixture'
+                )
+                """,
+                (corrected_transaction_id[0], merchant_id[0]),
+            )
+            raw_id = connection.execute(
+                """
+                INSERT INTO raw_transactions (
+                    account_id,
+                    provider,
+                    provider_transaction_id,
+                    source_hash,
+                    booking_date,
+                    value_date,
+                    amount,
+                    currency,
+                    counterparty_name,
+                    description,
+                    raw_payload_json
+                )
+                VALUES (
+                    %s,
+                    'fake',
+                    'history-similar-1',
+                    'history-similar-1',
+                    '2026-05-28',
+                    '2026-05-28',
+                    -41.25,
+                    'EUR',
+                    'Unknown Sample Merchant',
+                    'Needs review sample repeat',
+                    '{}'::jsonb
+                )
+                RETURNING id
+                """,
+                (account_id[0],),
+            ).fetchone()
+            if raw_id is None:
+                raise AssertionError("similar raw transaction was not inserted")
+            connection.execute(
+                """
+                INSERT INTO enriched_transactions (
+                    raw_transaction_id,
+                    needs_review,
+                    classification_method,
+                    classification_confidence,
+                    classification_reason
+                )
+                VALUES (%s, true, 'uncategorized', 0, 'Historical similarity fixture.')
+                """,
+                (raw_id[0],),
+            )
+
+    result = classify_transactions(normalized_postgres_url)
+
+    with psycopg.connect(normalized_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                categories.name,
+                merchants.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                enriched_transactions.classification_confidence
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+            LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+            WHERE raw_transactions.provider_transaction_id = 'history-similar-1'
+            """
+        ).fetchone()
+
+    assert result.classified_count == 4
+    assert row == ("Groceries", "Sample Review Merchant", True, "historical_similarity", Decimal("0.8800"))
+
+
 @pytest.fixture
 def llm_postgres_url() -> Iterator[str]:
     with PostgresContainer(

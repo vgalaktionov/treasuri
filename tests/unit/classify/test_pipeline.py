@@ -8,6 +8,7 @@ from app.classify.pipeline import (
     CategorizationRule,
     ClassificationFlags,
     ClassificationMethod,
+    HistoricalExample,
     ManualOverride,
     MatchField,
     MatchOperator,
@@ -148,6 +149,65 @@ def test_unmatched_transaction_is_marked_for_review() -> None:
         manual_overrides=[],
         rules=[],
         merchant_aliases=[],
+    )
+
+    assert result.method == ClassificationMethod.UNCATEGORIZED
+    assert result.category is None
+    assert result.needs_review is True
+
+
+def test_historical_similarity_suggests_from_manual_correction() -> None:
+    result = classify_transaction(
+        TransactionForClassification(
+            id=43,
+            account_id=7,
+            amount=Decimal("-19.20"),
+            description="ALBERT HEIJN AMSTERDAM CARD",
+            counterparty_name="AH TO GO",
+        ),
+        manual_overrides=[],
+        rules=[],
+        merchant_aliases=[],
+        historical_examples=[
+            HistoricalExample(
+                transaction_id=42,
+                amount=Decimal("-18.95"),
+                description="ALBERT HEIJN 1297 AMSTERDAM",
+                counterparty_name="AH TO GO",
+                category="Groceries",
+                merchant="Albert Heijn",
+            )
+        ],
+    )
+
+    assert result.method == ClassificationMethod.HISTORICAL_SIMILARITY
+    assert result.category == "Groceries"
+    assert result.merchant == "Albert Heijn"
+    assert result.needs_review is True
+
+
+def test_historical_similarity_avoids_low_score_false_positive() -> None:
+    result = classify_transaction(
+        TransactionForClassification(
+            id=43,
+            account_id=7,
+            amount=Decimal("-240.00"),
+            description="SAMPLE INSURANCE PREMIUM",
+            counterparty_name="Sample Insurance",
+        ),
+        manual_overrides=[],
+        rules=[],
+        merchant_aliases=[],
+        historical_examples=[
+            HistoricalExample(
+                transaction_id=42,
+                amount=Decimal("-18.95"),
+                description="ALBERT HEIJN 1297 AMSTERDAM",
+                counterparty_name="AH TO GO",
+                category="Groceries",
+                merchant="Albert Heijn",
+            )
+        ],
     )
 
     assert result.method == ClassificationMethod.UNCATEGORIZED

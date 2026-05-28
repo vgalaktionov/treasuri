@@ -14,6 +14,7 @@ from app.classify.pipeline import (
     ClassificationFlags,
     ClassificationMethod,
     ClassificationResult,
+    HistoricalExample,
     ManualOverride,
     MatchField,
     MatchOperator,
@@ -43,6 +44,7 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
             rules = _load_rules(connection)
             aliases = _load_aliases(connection)
             overrides = _load_manual_overrides(connection)
+            historical_examples = _load_historical_examples(connection)
             category_names = _load_category_names(connection)
             runtime_settings = _load_runtime_settings(database_url, config)
             llm_classifier = _create_llm_classifier(config, enabled=runtime_settings.llm_enabled)
@@ -54,6 +56,7 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
                     manual_overrides=overrides,
                     rules=rules,
                     merchant_aliases=aliases,
+                    historical_examples=historical_examples,
                 )
                 if result.method == ClassificationMethod.UNCATEGORIZED and llm_classifier is not None:
                     result = _try_llm_classification(
@@ -252,6 +255,37 @@ def _load_manual_overrides(connection: Connection[tuple[object, ...]]) -> list[M
             category=_optional_str(row[1]),
             merchant=_optional_str(row[2]),
             notes=_optional_str(row[3]),
+        )
+        for row in rows
+    ]
+
+
+def _load_historical_examples(connection: Connection[tuple[object, ...]]) -> list[HistoricalExample]:
+    rows = connection.execute(
+        """
+        SELECT
+            manual_overrides.enriched_transaction_id,
+            raw_transactions.amount,
+            raw_transactions.description,
+            raw_transactions.counterparty_name,
+            categories.name,
+            merchants.name
+        FROM manual_overrides
+        JOIN enriched_transactions ON enriched_transactions.id = manual_overrides.enriched_transaction_id
+        JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+        LEFT JOIN categories ON categories.id = manual_overrides.category_id
+        LEFT JOIN merchants ON merchants.id = manual_overrides.merchant_id
+        ORDER BY manual_overrides.id
+        """
+    ).fetchall()
+    return [
+        HistoricalExample(
+            transaction_id=_read_int(row[0]),
+            amount=_read_decimal(row[1]),
+            description=str(row[2]),
+            counterparty_name=_optional_str(row[3]),
+            category=_optional_str(row[4]),
+            merchant=_optional_str(row[5]),
         )
         for row in rows
     ]
