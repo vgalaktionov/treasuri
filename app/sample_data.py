@@ -9,7 +9,10 @@ from decimal import Decimal
 import psycopg
 from psycopg import Connection
 
+from app.forecast.service import update_monthly_forecast_in_connection
+
 SAMPLE_YEAR_MONTH = "2026-05"
+SAMPLE_FORECAST_DATE = date(2026, 5, 26)
 
 
 @dataclass(frozen=True)
@@ -119,7 +122,8 @@ def load_sample_data(database_url: str) -> None:
             _upsert_merchants(connection)
             for transaction in SAMPLE_TRANSACTIONS:
                 _upsert_sample_transaction(connection, account_id, transaction)
-            _upsert_sample_forecast(connection)
+            _upsert_sample_settings(connection)
+            update_monthly_forecast_in_connection(connection, as_of=SAMPLE_FORECAST_DATE)
             _upsert_sample_sync_run(connection)
 
 
@@ -267,65 +271,25 @@ def _upsert_sample_transaction(
     )
 
 
-def _upsert_sample_forecast(connection: Connection[tuple[object, ...]]) -> None:
-    connection.execute(
-        """
-        INSERT INTO monthly_forecasts (
-            year_month,
-            income_received,
-            expected_income_remaining,
-            fixed_costs_paid,
-            fixed_costs_upcoming,
-            variable_spent,
-            predicted_variable_remaining,
-            target_savings,
-            safety_buffer,
-            safe_to_spend,
-            safe_per_day,
-            projected_savings,
-            confidence,
-            explanation_json
+def _upsert_sample_settings(connection: Connection[tuple[object, ...]]) -> None:
+    sample_settings = {
+        "current_liquid_balance": "3215.77",
+        "target_monthly_savings": "1000.00",
+        "safety_buffer": "1000.00",
+        "fixed_costs_upcoming": "620.00",
+        "variable_baseline_3m": "0.00",
+        "variable_baseline_6m": "0.00",
+    }
+    for key, value in sample_settings.items():
+        connection.execute(
+            """
+            INSERT INTO app_settings (key, value_json)
+            VALUES (%s, %s::jsonb)
+            ON CONFLICT (key)
+            DO UPDATE SET value_json = EXCLUDED.value_json, updated_at = now()
+            """,
+            (key, value),
         )
-        VALUES (
-            '2026-05',
-            5258.00,
-            0.00,
-            2140.00,
-            620.00,
-            1180.00,
-            760.00,
-            1000.00,
-            1000.00,
-            558.00,
-            93.00,
-            1087.00,
-            'medium',
-            %s::jsonb
-        )
-        ON CONFLICT (year_month)
-        DO UPDATE SET
-            income_received = EXCLUDED.income_received,
-            expected_income_remaining = EXCLUDED.expected_income_remaining,
-            fixed_costs_paid = EXCLUDED.fixed_costs_paid,
-            fixed_costs_upcoming = EXCLUDED.fixed_costs_upcoming,
-            variable_spent = EXCLUDED.variable_spent,
-            predicted_variable_remaining = EXCLUDED.predicted_variable_remaining,
-            target_savings = EXCLUDED.target_savings,
-            safety_buffer = EXCLUDED.safety_buffer,
-            safe_to_spend = EXCLUDED.safe_to_spend,
-            safe_per_day = EXCLUDED.safe_per_day,
-            projected_savings = EXCLUDED.projected_savings,
-            confidence = EXCLUDED.confidence,
-            explanation_json = EXCLUDED.explanation_json,
-            updated_at = now()
-        """,
-        (
-            (
-                '{"source":"sample","formula":"balance + expected income - upcoming fixed costs '
-                '- predicted variable spend - target savings - safety buffer"}'
-            ),
-        ),
-    )
 
 
 def _upsert_sample_sync_run(connection: Connection[tuple[object, ...]]) -> None:

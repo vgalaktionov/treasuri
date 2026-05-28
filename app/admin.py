@@ -12,6 +12,7 @@ from app.bank.sync import sync_bank_transactions
 from app.categories import DEFAULT_CATEGORIES
 from app.classify.service import classify_transactions
 from app.config import AppConfig, load_config
+from app.forecast.service import update_monthly_forecast
 from app.normalize import normalize_raw_transactions
 from app.sample_data import load_sample_data
 
@@ -36,18 +37,20 @@ def sync_now(config: AppConfig) -> None:
     result = sync_bank_transactions(config.database_url, FakeBankAdapter(), account_iban=account_iban)
     normalize_result = normalize_raw_transactions(config.database_url)
     classify_result = classify_transactions(config.database_url)
+    forecast_result = update_monthly_forecast(config.database_url)
     print(
         "Synced "
         f"{result.provider}: {result.new_transaction_count} new, "
         f"{result.updated_transaction_count} updated, "
         f"{normalize_result.created_count} normalized, "
-        f"{classify_result.review_count} still need review"
+        f"{classify_result.review_count} still need review, "
+        f"{forecast_result.year_month} forecast updated"
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.admin")
-    parser.add_argument("command", choices=["seed-categories", "load-sample-data", "sync-now"])
+    parser.add_argument("command", choices=["seed-categories", "load-sample-data", "sync-now", "update-forecast"])
     parser.add_argument("--database-url", default=None)
     args = parser.parse_args()
 
@@ -84,6 +87,11 @@ def main() -> None:
     if args.command == "load-sample-data":
         load_sample_data(database_url)
         print("Loaded deterministic sample data")
+        return
+
+    if args.command == "update-forecast":
+        result = update_monthly_forecast(database_url)
+        print(f"Updated {result.year_month} forecast: safe to spend {result.safe_to_spend}")
         return
 
     sync_now(config)
