@@ -33,6 +33,14 @@
         6M variable baseline
         <input name="variable_baseline_6m" inputmode="decimal" value="{{ settings.variable_baseline_6m }}" required>
       </label>
+      <label>
+        <input type="checkbox" name="llm_enabled" value="true" role="switch" {% if settings.llm_enabled %}checked{% endif %}>
+        LLM fallback
+      </label>
+      <label>
+        LLM confidence threshold
+        <input name="llm_confidence_threshold" inputmode="decimal" value="{{ settings.llm_confidence_threshold }}" required>
+      </label>
       <button type="submit">Save and recalculate</button>
     </form>
   </section>

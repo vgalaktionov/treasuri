@@ -155,6 +155,38 @@ test("categories show budget averages on mobile without horizontal overflow", as
   assert.equal(overflow <= 1, true, `categories page overflows horizontally by ${overflow}px`);
 });
 
+test("settings expose forecast and llm controls on mobile", async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
+  await page.goto(`${baseUrl}/settings`, { waitUntil: "networkidle0" });
+
+  const bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Settings/);
+  assert.match(bodyText, /Current liquid balance/);
+  assert.match(bodyText, /LLM fallback/);
+  assert.match(bodyText, /LLM confidence threshold/);
+
+  const controls = await page.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    hasSwitch: document.querySelector("input[name='llm_enabled'][role='switch']") !== null,
+    thresholdValue: document.querySelector("input[name='llm_confidence_threshold']")?.value,
+  }));
+  assert.equal(controls.overflow <= 1, true, `settings page overflows horizontally by ${controls.overflow}px`);
+  assert.equal(controls.hasSwitch, true);
+  assert.equal(controls.thresholdValue, "0.60");
+
+  const bottomMetrics = await page.evaluate(() => {
+    document.querySelector(".settings-form button[type='submit']").scrollIntoView({ block: "center" });
+    const button = document.querySelector(".settings-form button[type='submit']").getBoundingClientRect();
+    const tabbar = document.querySelector(".mobile-tabbar").getBoundingClientRect();
+    return {
+      buttonBottom: Math.round(button.bottom),
+      tabbarTop: Math.round(tabbar.top),
+    };
+  });
+  assert.equal(bottomMetrics.buttonBottom < bottomMetrics.tabbarTop, true);
+});
+
 test("recurring commitments can be confirmed and disabled on mobile", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });

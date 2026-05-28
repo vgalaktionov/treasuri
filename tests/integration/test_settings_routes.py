@@ -60,6 +60,8 @@ def test_settings_update_persists_assumptions_and_recalculates_dashboard(sample_
             "fixed_costs_upcoming": "620.00",
             "variable_baseline_3m": "0.00",
             "variable_baseline_6m": "0.00",
+            "llm_enabled": "true",
+            "llm_confidence_threshold": "0.75",
         },
         follow_redirects=True,
     )
@@ -71,11 +73,28 @@ def test_settings_update_persists_assumptions_and_recalculates_dashboard(sample_
         forecast_row = connection.execute(
             "SELECT target_savings, safe_to_spend FROM monthly_forecasts WHERE year_month = '2026-05'"
         ).fetchone()
+        llm_settings = connection.execute(
+            """
+            SELECT key, value_json
+            FROM app_settings
+            WHERE key IN ('llm_enabled', 'llm_confidence_threshold')
+            ORDER BY key
+            """
+        ).fetchall()
 
     assert response.status_code == 200
     assert target_setting == ("900.00",)
     assert forecast_row == (Decimal("900.00"), Decimal("658.00"))
+    assert llm_settings == [("llm_confidence_threshold", "0.75"), ("llm_enabled", True)]
     assert b"EUR 658" in response.data
+
+
+def test_settings_route_renders_llm_controls(sample_app: Flask) -> None:
+    response = sample_app.test_client().get("/settings")
+
+    assert response.status_code == 200
+    assert b"LLM fallback" in response.data
+    assert b'name="llm_confidence_threshold"' in response.data
 
 
 def test_settings_update_requires_csrf(sample_app: Flask) -> None:

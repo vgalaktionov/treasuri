@@ -15,6 +15,24 @@ def test_load_config_parses_oidc_testing_profile(monkeypatch: pytest.MonkeyPatch
     assert config.oidc_enabled is False
     assert config.oidc_testing_profile["email"] == "dev-user@example.test"
     assert config.allowed_emails == ("dev-user@example.test", "other@example.test")
+    assert str(config.llm_confidence_threshold) == "0.60"
+
+
+def test_load_config_parses_llm_confidence_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "0.72")
+
+    config = load_config()
+
+    assert str(config.llm_confidence_threshold) == "0.72"
+
+
+def test_load_config_rejects_invalid_llm_confidence_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "high")
+
+    with pytest.raises(ConfigError, match="LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD"):
+        load_config()
 
 
 def test_load_config_rejects_invalid_testing_profile_json(monkeypatch: pytest.MonkeyPatch) -> None:

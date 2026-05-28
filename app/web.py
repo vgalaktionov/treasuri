@@ -20,8 +20,12 @@ from app.review import ReviewCorrection, apply_review_correction, list_category_
 from app.rules import backfill_rule, create_rule, draft_rule_from_transaction, list_rules, preview_rule, set_rule_active
 from app.settings import (
     DEFAULT_FORECAST_SETTINGS,
+    default_classification_settings,
+    load_classification_settings,
     load_forecast_settings,
+    parse_classification_settings,
     parse_forecast_settings,
+    save_classification_settings,
     save_forecast_settings,
 )
 from app.transactions import TransactionFilters, list_transactions
@@ -219,7 +223,12 @@ def register_routes(app: Flask) -> None:
             if app_config.database_url
             else DEFAULT_FORECAST_SETTINGS.as_form_values()
         )
-        return render_template("settings.html", settings=forecast_settings)
+        classification_settings = (
+            load_classification_settings(app_config.database_url, app_config).as_form_values()
+            if app_config.database_url
+            else default_classification_settings(app_config).as_form_values()
+        )
+        return render_template("settings.html", settings={**forecast_settings, **classification_settings})
 
     @app.post("/settings")
     @require_post_csrf
@@ -237,7 +246,15 @@ def register_routes(app: Flask) -> None:
                 "variable_baseline_6m": request.form.get("variable_baseline_6m", ""),
             }
         )
+        classification_settings = parse_classification_settings(
+            {
+                "llm_enabled": request.form.get("llm_enabled", ""),
+                "llm_confidence_threshold": request.form.get("llm_confidence_threshold", ""),
+            },
+            app_config,
+        )
         save_forecast_settings(app_config.database_url, forecast_settings)
+        save_classification_settings(app_config.database_url, classification_settings)
         forecast_as_of = app.config.get("FORECAST_AS_OF")
         update_monthly_forecast(
             app_config.database_url,

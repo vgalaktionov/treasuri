@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 
@@ -32,6 +33,14 @@ def _read_int(name: str, default: int) -> int:
         return int(raw_value)
     except ValueError as exc:
         raise ConfigError(f"{name} must be an integer") from exc
+
+
+def _read_decimal(name: str, default: str) -> Decimal:
+    raw_value = os.environ.get(name, default)
+    try:
+        return Decimal(raw_value)
+    except (InvalidOperation, ValueError) as exc:
+        raise ConfigError(f"{name} must be a decimal value") from exc
 
 
 def _read_json_object(name: str, default: dict[str, Any]) -> dict[str, Any]:
@@ -80,6 +89,9 @@ class AppConfig:
     )
     llm_timeout_seconds: int = field(default_factory=lambda: _read_int("LLM_TIMEOUT_SECONDS", 10))
     llm_temperature: float = field(default_factory=lambda: float(os.environ.get("LLM_CLASSIFICATION_TEMPERATURE", "0")))
+    llm_confidence_threshold: Decimal = field(
+        default_factory=lambda: _read_decimal("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "0.60")
+    )
     bank_provider: str = field(default_factory=lambda: os.environ.get("BANK_PROVIDER", "fake"))
     abn_account_iban: str = field(default_factory=lambda: os.environ.get("ABN_ACCOUNT_IBAN", ""))
     abn_card_number: str = field(default_factory=lambda: os.environ.get("ABN_CARD_NUMBER", ""))

@@ -184,6 +184,95 @@ def test_classify_transactions_uses_llm_fallback_without_clearing_review(
     assert row == ("Groceries", "Sample Merchant", True, "llm", Decimal("0.6100"), "test-llm", "classification-v1")
 
 
+def test_classify_transactions_obeys_database_llm_disabled_setting(
+    llm_postgres_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class UnexpectedLlmClassifier:
+        def __init__(self, **_kwargs: object) -> None:
+            raise AssertionError("LLM classifier should not be constructed when disabled in settings")
+
+    with psycopg.connect(llm_postgres_url) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                INSERT INTO app_settings (key, value_json)
+                VALUES ('llm_enabled', 'false'::jsonb)
+                ON CONFLICT (key)
+                DO UPDATE SET value_json = EXCLUDED.value_json
+                """
+            )
+
+    monkeypatch.setattr("app.classify.service.OpenAiCompatibleClassifier", UnexpectedLlmClassifier)
+
+    classify_transactions(llm_postgres_url, llm_config(llm_postgres_url))
+
+    with psycopg.connect(llm_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT classification_method, needs_review
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            WHERE raw_transactions.description = 'Needs review sample'
+            """
+        ).fetchone()
+
+    assert row == ("uncategorized", True)
+
+
+def test_classify_transactions_respects_llm_confidence_threshold(
+    llm_postgres_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class LowConfidenceLlmClassifier:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def classify(self, transaction, *, categories):
+            if transaction.description != "Needs review sample":
+                return None
+            assert "Groceries" in categories
+            return LlmClassificationSuggestion(
+                category="Groceries",
+                merchant="Sample Merchant",
+                confidence=Decimal("0.61"),
+                reason="Below the configured threshold.",
+                model_ref="test-llm",
+            )
+
+    with psycopg.connect(llm_postgres_url) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                INSERT INTO app_settings (key, value_json)
+                VALUES ('llm_confidence_threshold', '"0.90"'::jsonb)
+                ON CONFLICT (key)
+                DO UPDATE SET value_json = EXCLUDED.value_json
+                """
+            )
+
+    monkeypatch.setattr("app.classify.service.OpenAiCompatibleClassifier", LowConfidenceLlmClassifier)
+
+    classify_transactions(llm_postgres_url, llm_config(llm_postgres_url))
+
+    with psycopg.connect(llm_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                categories.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                enriched_transactions.classification_model
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+            WHERE raw_transactions.description = 'Needs review sample'
+            """
+        ).fetchone()
+
+    assert row == ("Unknown", True, "uncategorized", None)
+
+
 def test_classify_transactions_keeps_uncategorized_when_llm_fails(
     llm_postgres_url: str,
     monkeypatch: pytest.MonkeyPatch,

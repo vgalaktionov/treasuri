@@ -22,12 +22,19 @@ from app.classify.pipeline import (
     classify_transaction,
 )
 from app.config import AppConfig
+from app.settings import load_classification_settings
 
 
 @dataclass(frozen=True)
 class ClassifyResult:
     classified_count: int
     review_count: int
+
+
+@dataclass(frozen=True)
+class _ClassificationRuntimeSettings:
+    llm_enabled: bool
+    llm_confidence_threshold: Decimal
 
 
 def classify_transactions(database_url: str, config: AppConfig | None = None) -> ClassifyResult:
@@ -37,7 +44,8 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
             aliases = _load_aliases(connection)
             overrides = _load_manual_overrides(connection)
             category_names = _load_category_names(connection)
-            llm_classifier = _create_llm_classifier(config)
+            runtime_settings = _load_runtime_settings(database_url, config)
+            llm_classifier = _create_llm_classifier(config, enabled=runtime_settings.llm_enabled)
             classified_count = 0
             review_count = 0
             for transaction_id, transaction in _load_transactions(connection):
@@ -48,7 +56,13 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
                     merchant_aliases=aliases,
                 )
                 if result.method == ClassificationMethod.UNCATEGORIZED and llm_classifier is not None:
-                    result = _try_llm_classification(llm_classifier, transaction, category_names, result)
+                    result = _try_llm_classification(
+                        llm_classifier,
+                        transaction,
+                        category_names,
+                        result,
+                        confidence_threshold=runtime_settings.llm_confidence_threshold,
+                    )
                 _update_enriched_transaction(connection, transaction_id, result)
                 classified_count += 1
                 if result.needs_review:
@@ -57,8 +71,18 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
     return ClassifyResult(classified_count=classified_count, review_count=review_count)
 
 
-def _create_llm_classifier(config: AppConfig | None) -> OpenAiCompatibleClassifier | None:
-    if config is None or not config.llm_enabled:
+def _load_runtime_settings(database_url: str, config: AppConfig | None) -> _ClassificationRuntimeSettings:
+    if config is None:
+        return _ClassificationRuntimeSettings(llm_enabled=False, llm_confidence_threshold=Decimal("0.60"))
+    settings = load_classification_settings(database_url, config)
+    return _ClassificationRuntimeSettings(
+        llm_enabled=settings.llm_enabled,
+        llm_confidence_threshold=settings.llm_confidence_threshold,
+    )
+
+
+def _create_llm_classifier(config: AppConfig | None, *, enabled: bool) -> OpenAiCompatibleClassifier | None:
+    if config is None or not enabled:
         return None
     return OpenAiCompatibleClassifier(
         base_url=config.llm_base_url,
@@ -73,12 +97,16 @@ def _try_llm_classification(
     transaction: TransactionForClassification,
     category_names: list[str],
     fallback: ClassificationResult,
+    *,
+    confidence_threshold: Decimal,
 ) -> ClassificationResult:
     try:
         suggestion = llm_classifier.classify(transaction, categories=category_names)
     except LlmClassificationError:
         return fallback
     if suggestion is None:
+        return fallback
+    if suggestion.confidence < confidence_threshold:
         return fallback
     return ClassificationResult(
         method=ClassificationMethod.LLM,
