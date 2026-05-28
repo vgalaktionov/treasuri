@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, cast
 
 from flask import Flask, Response, abort, redirect, render_template, request, url_for
@@ -184,7 +185,11 @@ def register_routes(app: Flask) -> None:
             }
         )
         save_forecast_settings(app_config.database_url, forecast_settings)
-        update_monthly_forecast(app_config.database_url)
+        forecast_as_of = app.config.get("FORECAST_AS_OF")
+        update_monthly_forecast(
+            app_config.database_url,
+            as_of=forecast_as_of if isinstance(forecast_as_of, date) else None,
+        )
         return redirect(url_for("dashboard"))
 
     @app.get("/recurring")

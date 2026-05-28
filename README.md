@@ -55,6 +55,8 @@ uv run ruff check .
 uv run ruff format --check .
 uv run ty check
 uv run pre-commit run --all-files
+npm ci --prefix e2e
+npm test --prefix e2e
 ```
 
 Install the local git hook once per checkout:
@@ -70,6 +72,8 @@ Migrations are plain, up-only SQL files in `migrations/`. The migration runner c
 The first schema slice creates the PRD core tables for accounts, raw and enriched transactions, merchants, aliases, rules, manual overrides, recurring series, monthly forecasts, sync runs, export runs/files, app settings, and seeded categories.
 
 Postgres integration tests use Testcontainers and start a disposable `postgres:16-alpine` container.
+
+Puppeteer E2E tests also use deterministic sample data. The test harness starts a disposable Postgres container, applies migrations, loads sample data, and launches the Flask app before opening Chrome.
 
 `uv run python -m app.admin load-sample-data` loads deterministic fake financial data into Postgres. It is safe to rerun and is intended for local UI development and automated tests only.
 

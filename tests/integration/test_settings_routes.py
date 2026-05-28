@@ -11,7 +11,7 @@ from testcontainers.postgres import PostgresContainer
 
 from app.config import AppConfig
 from app.migrate import run_migrations
-from app.sample_data import load_sample_data
+from app.sample_data import SAMPLE_FORECAST_DATE, load_sample_data
 from app.web import create_app
 
 
@@ -41,7 +41,7 @@ def sample_app() -> Iterator[Flask]:
                 oidc_cookie_secure=False,
                 llm_enabled=False,
             ),
-            {"TESTING": True},
+            {"TESTING": True, "FORECAST_AS_OF": SAMPLE_FORECAST_DATE},
         )
 
 
@@ -74,8 +74,8 @@ def test_settings_update_persists_assumptions_and_recalculates_dashboard(sample_
 
     assert response.status_code == 200
     assert target_setting == ("900.00",)
-    assert forecast_row == (Decimal("900.00"), Decimal("674.73"))
-    assert b"EUR 675" in response.data
+    assert forecast_row == (Decimal("900.00"), Decimal("658.00"))
+    assert b"EUR 658" in response.data
 
 
 def test_settings_update_requires_csrf(sample_app: Flask) -> None:

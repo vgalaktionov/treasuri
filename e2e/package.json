@@ -1,0 +1,13 @@
+{
+  "name": "treasuri-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Puppeteer acceptance tests for Treasuri",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.spec.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.31.0"
+  }
+}
