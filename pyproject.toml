@@ -19,6 +19,7 @@ dependencies = [
 dev = [
     "pytest>=9.0.3",
     "ruff>=0.15.15",
+    "testcontainers[postgres]>=4.14.2",
     "ty>=0.0.40",
 ]
 

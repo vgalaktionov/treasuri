@@ -32,6 +32,7 @@ DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run pytho
 DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.admin seed-categories
 uv run python -m app.admin sync-now
 uv run pytest
+uv run pytest tests/integration
 uv run ruff check .
 uv run ruff format --check .
 uv run ty check
@@ -42,6 +43,8 @@ uv run ty check
 Migrations are plain, up-only SQL files in `migrations/`. The migration runner creates `schema_migrations`, applies pending files in filename order, and records each version once.
 
 The first schema slice creates the PRD core tables for accounts, raw and enriched transactions, merchants, aliases, rules, manual overrides, recurring series, monthly forecasts, sync runs, export runs/files, app settings, and seeded categories.
+
+Postgres integration tests use Testcontainers and start a disposable `postgres:16-alpine` container.
 
 ## Development Notes
 
