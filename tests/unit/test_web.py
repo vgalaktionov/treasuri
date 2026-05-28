@@ -19,7 +19,7 @@ def test_dashboard_renders_for_allowed_test_profile(client) -> None:
     assert response.status_code == 200
     html_text = html.unescape(response.get_data(as_text=True))
     assert '<a class="brand" href="/" aria-label="💸 Treasuri">' in html_text
-    assert 'src="/static/icons/icon.svg"' in html_text
+    assert '<span class="brand-mark" aria-hidden="true">💸</span>' in html_text
     assert b"Safe to spend" in response.data
     assert b"EUR 558" in response.data
 
@@ -29,6 +29,7 @@ def test_pwa_icon_uses_flying_stack_of_bills(client) -> None:
 
     assert response.status_code == 200
     assert 'aria-label="💸"'.encode() in response.data
+    assert ">💸</text>".encode() in response.data
 
 
 def test_app_route_rejects_disallowed_test_profile(test_config: AppConfig) -> None:

@@ -25,9 +25,10 @@ body {
 }
 
 .brand-mark {
-  block-size: 1.15rem;
-  border-radius: 0.25rem;
-  inline-size: 1.15rem;
+  display: inline-block;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 header nav ul {
