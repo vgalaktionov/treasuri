@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ summary.month }} - Treasuri{% endblock %}
+
+{% block content %}
+  <section class="dashboard-hero" aria-labelledby="month-title">
+    <p class="muted">{{ summary.month }}</p>
+    <h1 id="month-title">Month</h1>
+    <div class="money-answer">
+      <span>Safe to spend</span>
+      <strong>{{ summary.safe_to_spend }}</strong>
+    </div>
+    <div class="quick-grid" aria-label="Month forecast">
+      <article>
+        <span>Safe per day</span>
+        <strong>{{ summary.safe_per_day }}</strong>
+      </article>
+      <article>
+        <span>Projected savings</span>
+        <strong>{{ summary.projected_savings }}</strong>
+      </article>
+      <article>
+        <span>Confidence</span>
+        <strong>{{ summary.confidence }}</strong>
+      </article>
+    </div>
+  </section>
+
+  <section class="month-facts" aria-label="Month drivers">
+    <article>
+      <span>{{ summary.fixed_costs.label }}</span>
+      <strong>{{ summary.fixed_costs.value }}</strong>
+      <p>{{ summary.fixed_costs.detail }}</p>
+    </article>
+    <article>
+      <span>{{ summary.income.label }}</span>
+      <strong>{{ summary.income.value }}</strong>
+      <p>{{ summary.income.detail }}</p>
+    </article>
+    <article>
+      <span>{{ summary.uncategorized.label }}</span>
+      <strong>{{ summary.uncategorized.value }}</strong>
+      <p>{{ summary.uncategorized.detail }}</p>
+    </article>
+  </section>
+
+  <section aria-labelledby="category-pace-title">
+    <p class="muted">Current month</p>
+    <h2 id="category-pace-title">Category pace</h2>
+    {% if summary.category_pace %}
+      <div class="month-pace-list">
+        {% for row in summary.category_pace %}
+          <article class="month-pace-card {{ row.status }}">
+            <div>
+              <h3>{{ row.category }}</h3>
+              <p>{{ row.pace_label }}</p>
+            </div>
+            <dl>
+              <div>
+                <dt>Spent</dt>
+                <dd>{{ row.current_month }}</dd>
+              </div>
+              <div>
+                <dt>Budget</dt>
+                <dd>{{ row.suggested_budget }}</dd>
+              </div>
+            </dl>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <article>
+        <strong>No category pace yet.</strong>
+        <p class="muted">Load sample data or run a sync to compare this month with budget averages.</p>
+      </article>
+    {% endif %}
+  </section>
+{% endblock %}

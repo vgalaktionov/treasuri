@@ -46,6 +46,25 @@ test("dashboard answers the main money question on mobile without horizontal ove
   assert.equal(overflow <= 1, true, `mobile page overflows horizontally by ${overflow}px`);
 });
 
+test("month page explains forecast drivers on mobile without horizontal overflow", async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
+  await page.goto(`${baseUrl}/month`, { waitUntil: "networkidle0" });
+
+  const bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Month/);
+  assert.match(bodyText, /Safe to spend\s+EUR 558/);
+  assert.match(bodyText, /Fixed costs\s+EUR 2,070/);
+  assert.match(bodyText, /EUR 1,450 paid, EUR 620 upcoming/);
+  assert.match(bodyText, /Income status\s+Income received/);
+  assert.match(bodyText, /Uncategorized impact\s+EUR 42/);
+  assert.match(bodyText, /Category pace/);
+  assert.match(bodyText, /Groceries/);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.equal(overflow <= 1, true, `month page overflows horizontally by ${overflow}px`);
+});
+
 test("review page keeps action controls usable on narrow screens", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });

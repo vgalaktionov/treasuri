@@ -14,6 +14,7 @@ from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
 from app.exports.xlsx import generate_budget_export, list_export_runs, load_export_file
 from app.forecast.service import update_monthly_forecast
+from app.month import FALLBACK_MONTH_SUMMARY, load_month_summary
 from app.recurring import list_recurring_series
 from app.review import ReviewCorrection, apply_review_correction, list_category_names
 from app.rules import backfill_rule, create_rule, draft_rule_from_transaction, list_rules, preview_rule, set_rule_active
@@ -54,6 +55,12 @@ def register_routes(app: Flask) -> None:
             load_dashboard_summary(app_config.database_url) if app_config.database_url else FALLBACK_DASHBOARD_SUMMARY
         )
         return render_template("dashboard.html", summary=summary.as_template_context())
+
+    @app.get("/month")
+    def month() -> str:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        summary = load_month_summary(app_config.database_url) if app_config.database_url else FALLBACK_MONTH_SUMMARY
+        return render_template("month.html", summary=summary.as_template_context())
 
     @app.get("/status")
     def status() -> str:
