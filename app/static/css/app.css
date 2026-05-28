@@ -171,6 +171,10 @@ body {
   margin-block-start: 1rem;
 }
 
+.export-action {
+  margin-block: 0 1rem;
+}
+
 .status-list {
   display: grid;
   gap: 0.75rem;

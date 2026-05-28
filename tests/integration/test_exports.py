@@ -1,0 +1,108 @@
+from __future__ import annotations
+
+import re
+from collections.abc import Iterator
+from io import BytesIO
+
+import psycopg
+import pytest
+from flask import Flask
+from openpyxl import load_workbook
+from testcontainers.postgres import PostgresContainer
+
+from app.config import AppConfig
+from app.exports.xlsx import REQUIRED_SHEETS, XLSX_CONTENT_TYPE, generate_budget_export, load_export_file
+from app.migrate import run_migrations
+from app.sample_data import load_sample_data
+from app.web import create_app
+
+
+@pytest.fixture
+def sample_app() -> Iterator[Flask]:
+    with PostgresContainer(
+        image="postgres:16-alpine",
+        username="treasuri",
+        password="treasuri",
+        dbname="treasuri",
+        driver=None,
+    ) as postgres:
+        database_url = postgres.get_connection_url(driver=None)
+        run_migrations(database_url)
+        load_sample_data(database_url)
+        yield create_app(
+            AppConfig(
+                app_env="test",
+                secret_key="test-secret",
+                database_url=database_url,
+                allowed_emails=("dev-user@example.test",),
+                oidc_enabled=False,
+                oidc_testing_profile={
+                    "sub": "dev-user",
+                    "email": "dev-user@example.test",
+                },
+                oidc_cookie_secure=False,
+                llm_enabled=False,
+            ),
+            {"TESTING": True},
+        )
+
+
+def test_generate_budget_export_stores_required_xlsx_sheets(sample_app: Flask) -> None:
+    run_id = generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        row = connection.execute(
+            """
+            SELECT export_runs.status, export_files.id, export_files.filename, export_files.size_bytes
+            FROM export_runs
+            JOIN export_files ON export_files.export_run_id = export_runs.id
+            WHERE export_runs.id = %s
+            """,
+            (run_id,),
+        ).fetchone()
+
+    assert row is not None
+    assert row[0] == "completed"
+    assert row[2] == "budget-averages-2026-05.xlsx"
+    assert row[3] > 0
+
+    export_file = load_export_file(sample_app.config["DATABASE_URL"], row[1])
+    assert export_file is not None
+    workbook = load_workbook(BytesIO(export_file.content), read_only=True)
+
+    assert workbook.sheetnames == list(REQUIRED_SHEETS)
+    assert workbook["Summary"]["A1"].value == "generated_at"
+    assert workbook["Raw transactions"]["A1"].value == "Date"
+
+
+def test_export_routes_generate_and_download_postgres_blob(sample_app: Flask) -> None:
+    client = sample_app.test_client()
+    export_page = client.get("/export")
+    csrf_token = _extract_csrf(export_page.get_data(as_text=True))
+
+    generate_response = client.post(
+        "/export/generate",
+        data={"csrf_token": csrf_token},
+        follow_redirects=True,
+    )
+
+    assert generate_response.status_code == 200
+    assert b"budget-averages-2026-05.xlsx" in generate_response.data
+
+    match = re.search(rb'href="/export/files/(\d+)"', generate_response.data)
+    assert match is not None
+
+    download_response = client.get(f"/export/files/{match.group(1).decode()}")
+
+    assert download_response.status_code == 200
+    assert download_response.headers["Content-Type"] == XLSX_CONTENT_TYPE
+    assert "budget-averages-2026-05.xlsx" in download_response.headers["Content-Disposition"]
+    workbook = load_workbook(BytesIO(download_response.data), read_only=True)
+    assert workbook.sheetnames == list(REQUIRED_SHEETS)
+
+
+def _extract_csrf(html: str) -> str:
+    match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+    if match is None:
+        raise AssertionError("CSRF token was not rendered")
+    return match.group(1)

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Export - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="export-title">
+    <p class="muted">Budget averages workbook</p>
+    <h1 id="export-title">Export</h1>
+
+    <form method="post" action="/export/generate" class="export-action">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Generate XLSX</button>
+    </form>
+
+    {% if runs %}
+      <div class="transaction-list">
+        {% for run in runs %}
+          <article class="transaction-card">
+            <div class="transaction-main">
+              <div>
+                <time datetime="{{ run.started_at.isoformat() if run.started_at else '' }}">
+                  {{ run.started_at.strftime("%d %b %Y %H:%M") if run.started_at else "Not started" }}
+                </time>
+                <h2>{{ run.filename or run.export_type }}</h2>
+                <p>{{ run.status }}{% if run.error_message %}: {{ run.error_message }}{% endif %}</p>
+              </div>
+              {% if run.file_id %}
+                <a role="button" href="/export/files/{{ run.file_id }}">Download</a>
+              {% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <article>
+        <strong>No exports yet.</strong>
+        <p class="muted">Generate a workbook to store it as a Postgres blob.</p>
+      </article>
+    {% endif %}
+  </section>
+{% endblock %}

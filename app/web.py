@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, Response, abort, redirect, render_template, request, url_for
 from whitenoise import WhiteNoise
 
 from app.auth import init_auth, require_post_csrf
 from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
+from app.exports.xlsx import generate_budget_export, list_export_runs, load_export_file
 from app.review import ReviewCorrection, apply_review_correction, list_category_names
 from app.rules import create_rule, draft_rule_from_transaction, preview_rule
 from app.transactions import list_transactions
@@ -116,6 +117,37 @@ def register_routes(app: Flask) -> None:
         draft = draft_rule_from_transaction(app_config.database_url, transaction_id)
         create_rule(app_config.database_url, draft)
         return redirect(url_for("review"))
+
+    @app.get("/export")
+    def export() -> str:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        runs = list_export_runs(app_config.database_url) if app_config.database_url else []
+        return render_template("export.html", runs=runs)
+
+    @app.post("/export/generate")
+    @require_post_csrf
+    def generate_export():
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        generate_budget_export(app_config.database_url)
+        return redirect(url_for("export"))
+
+    @app.get("/export/files/<int:file_id>")
+    def download_export(file_id: int) -> Response:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        export_file = load_export_file(app_config.database_url, file_id)
+        if export_file is None:
+            abort(404)
+        return Response(
+            export_file.content,
+            headers={
+                "Content-Type": export_file.content_type,
+                "Content-Disposition": f'attachment; filename="{export_file.filename}"',
+            },
+        )
 
 
 def main() -> None:
