@@ -9,6 +9,7 @@ from whitenoise import WhiteNoise
 
 from app.auth import init_auth
 from app.config import AppConfig, load_config
+from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
 
 
 def create_app(config: AppConfig | None = None, overrides: dict[str, Any] | None = None) -> Flask:
@@ -34,18 +35,11 @@ def register_routes(app: Flask) -> None:
 
     @app.get("/")
     def dashboard() -> str:
-        summary = {
-            "month": "Sample month",
-            "safe_to_spend": "EUR 558",
-            "safe_per_day": "EUR 93/day",
-            "projected_savings": "EUR 1,087",
-            "target_savings": "EUR 1,000",
-            "confidence": "Medium",
-            "pace": "EUR 142 ahead of normal pace",
-            "review_count": 7,
-            "last_sync": "Sample data only",
-        }
-        return render_template("dashboard.html", summary=summary)
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        summary = (
+            load_dashboard_summary(app_config.database_url) if app_config.database_url else FALLBACK_DASHBOARD_SUMMARY
+        )
+        return render_template("dashboard.html", summary=summary.as_template_context())
 
     @app.get("/status")
     def status() -> str:

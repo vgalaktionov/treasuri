@@ -9,6 +9,7 @@ import psycopg
 
 from app.categories import DEFAULT_CATEGORIES
 from app.config import load_config
+from app.sample_data import load_sample_data
 
 
 def seed_categories(database_url: str, categories: Sequence[str] = DEFAULT_CATEGORIES) -> int:
@@ -29,7 +30,7 @@ def sync_now() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.admin")
-    parser.add_argument("command", choices=["seed-categories", "sync-now"])
+    parser.add_argument("command", choices=["seed-categories", "load-sample-data", "sync-now"])
     parser.add_argument("--database-url", default=None)
     args = parser.parse_args()
 
@@ -40,6 +41,11 @@ def main() -> None:
     if args.command == "seed-categories":
         count = seed_categories(database_url)
         print(f"Seeded category taxonomy ({count} categories checked)")
+        return
+
+    if args.command == "load-sample-data":
+        load_sample_data(database_url)
+        print("Loaded deterministic sample data")
         return
 
     sync_now()
