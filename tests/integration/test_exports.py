@@ -103,6 +103,43 @@ def test_export_routes_generate_and_download_postgres_blob(sample_app: Flask) ->
     assert workbook.sheetnames == list(REQUIRED_SHEETS)
 
 
+def test_export_route_shows_previous_exports_and_failed_runs(sample_app: Flask) -> None:
+    generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
+    generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                INSERT INTO export_runs (
+                    export_type,
+                    period_start,
+                    period_end,
+                    status,
+                    started_at,
+                    finished_at,
+                    error_message
+                )
+                VALUES (
+                    'budget_averages',
+                    '2026-05-01',
+                    '2026-05-31',
+                    'failed',
+                    now(),
+                    now(),
+                    'sample export failure'
+                )
+                """
+            )
+
+    response = sample_app.test_client().get("/export")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert body.count("budget-averages-2026-05.xlsx") == 2
+    assert "failed: sample export failure" in body
+    assert body.count("Download") == 2
+
+
 def _extract_csrf(html: str) -> str:
     match = re.search(r'name="csrf_token" value="([^"]+)"', html)
     if match is None:

@@ -15,7 +15,7 @@
     {% if runs %}
       <div class="transaction-list">
         {% for run in runs %}
-          <article class="transaction-card">
+          <article class="transaction-card export-card">
             <div class="transaction-main">
               <div>
                 <time datetime="{{ run.started_at.isoformat() if run.started_at else '' }}">

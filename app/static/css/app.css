@@ -481,6 +481,10 @@ header nav a {
   margin-block: 0 1rem;
 }
 
+.export-action button {
+  inline-size: 100%;
+}
+
 .settings-form {
   display: grid;
   gap: 0.75rem;
@@ -614,6 +618,19 @@ header nav a {
     grid-row: 1;
     justify-self: end;
     margin-block-start: 0;
+  }
+
+  .export-action button {
+    inline-size: auto;
+  }
+
+  .export-card {
+    grid-template-columns: minmax(18rem, 1fr) auto;
+  }
+
+  .export-card .transaction-main a[role="button"] {
+    grid-column: 2;
+    justify-self: end;
   }
 
   .category-card {

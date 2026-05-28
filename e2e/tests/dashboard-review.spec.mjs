@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 import readline from "node:readline";
 import puppeteer from "puppeteer-core";
@@ -187,6 +190,39 @@ test("settings expose forecast and llm controls on mobile", async () => {
   assert.equal(bottomMetrics.buttonBottom < bottomMetrics.tabbarTop, true);
 });
 
+test("export flow generates and downloads an xlsx on mobile", async () => {
+  const page = await browser.newPage();
+  const downloadPath = mkdtempSync(join(tmpdir(), "treasuri-export-"));
+  const client = await page.target().createCDPSession();
+  await client.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath });
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
+  await page.goto(`${baseUrl}/export`, { waitUntil: "networkidle0" });
+
+  let bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Export/);
+  assert.match(bodyText, /No exports yet/);
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "networkidle0" }),
+    page.locator(".export-action button[type='submit']").click(),
+  ]);
+  bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /budget-averages-2026-05\.xlsx/);
+  assert.match(bodyText, /completed/);
+
+  const metrics = await page.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    downloadCount: document.querySelectorAll("a[href^='/export/files/']").length,
+  }));
+  assert.equal(metrics.overflow <= 1, true, `export page overflows horizontally by ${metrics.overflow}px`);
+  assert.equal(metrics.downloadCount, 1);
+
+  await page.locator("a[href^='/export/files/']").click();
+  const downloaded = await waitForDownloadedFile(downloadPath, "budget-averages-2026-05.xlsx");
+  const signature = readFileSync(downloaded).subarray(0, 2).toString("utf8");
+  assert.equal(signature, "PK");
+});
+
 test("recurring commitments can be confirmed and disabled on mobile", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
@@ -275,6 +311,17 @@ function findChromeExecutable() {
     }
   }
   throw new Error("Set PUPPETEER_EXECUTABLE_PATH or install google-chrome/chromium");
+}
+
+async function waitForDownloadedFile(downloadPath, filename) {
+  const target = join(downloadPath, filename);
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (existsSync(target) && !readdirSync(downloadPath).some((entry) => entry.endsWith(".crdownload"))) {
+      return target;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Download did not finish: ${filename}`);
 }
 
 function waitForExit(child, timeoutMs) {

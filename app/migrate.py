@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,13 +70,29 @@ def run_migrations(database_url: str, migrations_path: Path = DEFAULT_MIGRATIONS
     migrations = discover_migrations(migrations_path)
     applied_now: list[str] = []
 
-    with psycopg.connect(database_url) as connection:
+    with _connect_for_migrations(database_url) as connection:
         applied_versions = read_applied_versions(connection)
         for migration in select_pending_migrations(migrations, applied_versions):
             apply_migration(connection, migration)
             applied_now.append(migration.version)
 
     return applied_now
+
+
+def _connect_for_migrations(
+    database_url: str,
+    *,
+    attempts: int = 20,
+    delay_seconds: float = 0.2,
+) -> Connection[tuple[Any, ...]]:
+    for attempt in range(1, attempts + 1):
+        try:
+            return psycopg.connect(database_url)
+        except psycopg.OperationalError:
+            if attempt == attempts:
+                raise
+            time.sleep(delay_seconds)
+    raise MigrationError("database connection attempts were exhausted")
 
 
 def main() -> None:
