@@ -12,6 +12,7 @@ from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
 from app.exports.xlsx import generate_budget_export, list_export_runs, load_export_file
 from app.forecast.service import update_monthly_forecast
+from app.recurring import list_recurring_series
 from app.review import ReviewCorrection, apply_review_correction, list_category_names
 from app.rules import create_rule, draft_rule_from_transaction, preview_rule
 from app.settings import (
@@ -185,6 +186,12 @@ def register_routes(app: Flask) -> None:
         save_forecast_settings(app_config.database_url, forecast_settings)
         update_monthly_forecast(app_config.database_url)
         return redirect(url_for("dashboard"))
+
+    @app.get("/recurring")
+    def recurring() -> str:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        series = list_recurring_series(app_config.database_url) if app_config.database_url else []
+        return render_template("recurring.html", series=series)
 
 
 def main() -> None:

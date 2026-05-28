@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Recurring - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="recurring-title">
+    <p class="muted">Subscriptions and fixed commitments</p>
+    <h1 id="recurring-title">Recurring</h1>
+
+    {% if series %}
+      <div class="transaction-list">
+        {% for item in series %}
+          <article class="transaction-card">
+            <div class="transaction-main">
+              <div>
+                <p class="muted">{{ item.category }} · {{ item.cadence }}</p>
+                <h2>{{ item.name }}</h2>
+                <p>Next expected {{ item.next_expected_date.strftime("%d %b %Y") if item.next_expected_date else "unknown" }}</p>
+              </div>
+              <strong>{{ item.expected_amount }}</strong>
+            </div>
+            <div class="transaction-meta">
+              <span>confidence {{ item.confidence }}</span>
+              <span>{{ "confirmed" if item.is_confirmed else "detected" }}</span>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <article>
+        <strong>No recurring payments detected.</strong>
+        <p class="muted">Recurring detection runs after sync and can be inspected here.</p>
+      </article>
+    {% endif %}
+  </section>
+{% endblock %}

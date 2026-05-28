@@ -14,6 +14,7 @@ from app.classify.service import classify_transactions
 from app.config import AppConfig, load_config
 from app.forecast.service import update_monthly_forecast
 from app.normalize import normalize_raw_transactions
+from app.recurring import detect_recurring
 from app.sample_data import load_sample_data
 
 
@@ -37,6 +38,7 @@ def sync_now(config: AppConfig) -> None:
     result = sync_bank_transactions(config.database_url, FakeBankAdapter(), account_iban=account_iban)
     normalize_result = normalize_raw_transactions(config.database_url)
     classify_result = classify_transactions(config.database_url)
+    recurring_result = detect_recurring(config.database_url)
     forecast_result = update_monthly_forecast(config.database_url)
     print(
         "Synced "
@@ -44,13 +46,17 @@ def sync_now(config: AppConfig) -> None:
         f"{result.updated_transaction_count} updated, "
         f"{normalize_result.created_count} normalized, "
         f"{classify_result.review_count} still need review, "
+        f"{recurring_result.detected_count} recurring detected, "
         f"{forecast_result.year_month} forecast updated"
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.admin")
-    parser.add_argument("command", choices=["seed-categories", "load-sample-data", "sync-now", "update-forecast"])
+    parser.add_argument(
+        "command",
+        choices=["seed-categories", "load-sample-data", "sync-now", "update-forecast", "detect-recurring"],
+    )
     parser.add_argument("--database-url", default=None)
     args = parser.parse_args()
 
@@ -92,6 +98,11 @@ def main() -> None:
     if args.command == "update-forecast":
         result = update_monthly_forecast(database_url)
         print(f"Updated {result.year_month} forecast: safe to spend {result.safe_to_spend}")
+        return
+
+    if args.command == "detect-recurring":
+        result = detect_recurring(database_url)
+        print(f"Detected {result.detected_count} recurring series")
         return
 
     sync_now(config)
