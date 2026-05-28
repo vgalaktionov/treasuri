@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Rules - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="rules-title">
+    <p class="muted">Deterministic categorization</p>
+    <h1 id="rules-title">Rules</h1>
+
+    {% if items %}
+      <div class="rule-list">
+        {% for item in items %}
+          <article class="rule-card{% if not item.rule.is_active %} inactive{% endif %}">
+            <div class="rule-card-header">
+              <div>
+                <h2>{{ item.rule.name }}</h2>
+                <p>{{ item.rule.field }} {{ item.rule.operator }} "{{ item.rule.pattern }}"</p>
+              </div>
+              <span>{{ "active" if item.rule.is_active else "inactive" }}</span>
+            </div>
+
+            <dl class="rule-facts">
+              <div>
+                <dt>Category</dt>
+                <dd>{{ item.rule.category_name or "None" }}</dd>
+              </div>
+              <div>
+                <dt>Merchant</dt>
+                <dd>{{ item.rule.merchant_name or "None" }}</dd>
+              </div>
+              <div>
+                <dt>Matches</dt>
+                <dd>{{ item.preview.match_count }}</dd>
+              </div>
+              <div>
+                <dt>Would change</dt>
+                <dd>{{ item.preview.would_change_count }}</dd>
+              </div>
+              <div>
+                <dt>Manual skipped</dt>
+                <dd>{{ item.preview.manual_overrides_skipped_count }}</dd>
+              </div>
+            </dl>
+
+            <div class="rule-actions">
+              <form method="post" action="/rules/{{ item.rule.id }}/backfill">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" {% if not item.rule.is_active or item.preview.would_change_count == 0 %}disabled{% endif %}>Apply to history</button>
+              </form>
+              <form method="post" action="/rules/{{ item.rule.id }}/active">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="is_active" value="{{ 'false' if item.rule.is_active else 'true' }}">
+                <button type="submit" class="secondary">{{ "Disable" if item.rule.is_active else "Enable" }}</button>
+              </form>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <article>
+        <strong>No rules yet.</strong>
+        <p class="muted">Save a review correction and preview a rule to create the first reusable classifier.</p>
+      </article>
+    {% endif %}
+  </section>
+{% endblock %}

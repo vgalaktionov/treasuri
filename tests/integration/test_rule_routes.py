@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
+from datetime import date
+from decimal import Decimal
 
 import psycopg
 import pytest
@@ -95,6 +97,7 @@ def test_review_correction_can_preview_and_create_reusable_rule(sample_app: Flas
         ).fetchall()
 
     assert create_response.status_code == 200
+    assert b"Rules" in create_response.data
     assert rows == [
         (
             "counterparty_name",
@@ -104,6 +107,60 @@ def test_review_correction_can_preview_and_create_reusable_rule(sample_app: Flas
             "Sample Pet Care",
             transaction_id,
         )
+    ]
+
+
+def test_rule_backfill_applies_to_history_without_overwriting_manual_override(sample_app: Flask) -> None:
+    client = sample_app.test_client()
+    review_html = client.get("/review").get_data(as_text=True)
+    csrf_token = _extract_csrf(review_html)
+    transaction_id = _review_transaction_id(sample_app)
+    historical_transaction_id = _insert_matching_historical_unknown(sample_app)
+
+    client.post(
+        f"/review/{transaction_id}/category",
+        data={
+            "csrf_token": csrf_token,
+            "category": "Dog",
+            "merchant": "Sample Pet Care",
+            "next": "rule-preview",
+        },
+    )
+    client.post(f"/rules/from-transaction/{transaction_id}", data={"csrf_token": csrf_token})
+
+    rules_response = client.get("/rules")
+    rules_html = rules_response.get_data(as_text=True)
+    assert "Would change" in rules_html
+    assert "<dd>1</dd>" in rules_html
+
+    rule_id = _created_rule_id(sample_app)
+    backfill_response = client.post(
+        f"/rules/{rule_id}/backfill",
+        data={"csrf_token": _extract_csrf(rules_html)},
+        follow_redirects=True,
+    )
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                enriched_transactions.id,
+                categories.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                enriched_transactions.rule_id
+            FROM enriched_transactions
+            JOIN categories ON categories.id = enriched_transactions.category_id
+            WHERE enriched_transactions.id IN (%s, %s)
+            ORDER BY enriched_transactions.id
+            """,
+            (transaction_id, historical_transaction_id),
+        ).fetchall()
+
+    assert backfill_response.status_code == 200
+    assert rows == [
+        (transaction_id, "Dog", False, "manual_override", None),
+        (historical_transaction_id, "Dog", False, "rule", rule_id),
     ]
 
 
@@ -120,6 +177,70 @@ def _review_transaction_id(app: Flask) -> int:
     if row is None:
         raise AssertionError("review transaction was not found")
     return int(row[0])
+
+
+def _created_rule_id(app: Flask) -> int:
+    with psycopg.connect(app.config["DATABASE_URL"]) as connection:
+        row = connection.execute("SELECT id FROM categorization_rules ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None:
+        raise AssertionError("rule was not created")
+    return int(row[0])
+
+
+def _insert_matching_historical_unknown(app: Flask) -> int:
+    with psycopg.connect(app.config["DATABASE_URL"]) as connection:
+        with connection.transaction():
+            account_row = connection.execute("SELECT id FROM accounts WHERE provider = 'fake' LIMIT 1").fetchone()
+            if account_row is None:
+                raise AssertionError("sample account was not found")
+            raw_row = connection.execute(
+                """
+                INSERT INTO raw_transactions (
+                    account_id,
+                    provider,
+                    provider_transaction_id,
+                    source_hash,
+                    booking_date,
+                    value_date,
+                    amount,
+                    currency,
+                    counterparty_name,
+                    description,
+                    raw_payload_json
+                )
+                VALUES (%s, 'fake', 'historical-review-match', 'historical-review-match', %s, %s, %s, 'EUR',
+                    'Unknown Sample Merchant', 'Historical unknown sample', '{}'::jsonb)
+                RETURNING id
+                """,
+                (int(account_row[0]), date(2026, 5, 10), date(2026, 5, 10), Decimal("-12.50")),
+            ).fetchone()
+            if raw_row is None:
+                raise AssertionError("raw transaction insert did not return an id")
+            enriched_row = connection.execute(
+                """
+                INSERT INTO enriched_transactions (
+                    raw_transaction_id,
+                    category_id,
+                    needs_review,
+                    classification_method,
+                    classification_confidence,
+                    classification_reason
+                )
+                VALUES (
+                    %s,
+                    (SELECT id FROM categories WHERE name = 'Unknown'),
+                    true,
+                    'uncategorized',
+                    0,
+                    'Test historical rule match.'
+                )
+                RETURNING id
+                """,
+                (int(raw_row[0]),),
+            ).fetchone()
+    if enriched_row is None:
+        raise AssertionError("enriched transaction insert did not return an id")
+    return int(enriched_row[0])
 
 
 def _extract_csrf(html: str) -> str:

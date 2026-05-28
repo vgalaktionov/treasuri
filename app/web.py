@@ -15,7 +15,7 @@ from app.exports.xlsx import generate_budget_export, list_export_runs, load_expo
 from app.forecast.service import update_monthly_forecast
 from app.recurring import list_recurring_series
 from app.review import ReviewCorrection, apply_review_correction, list_category_names
-from app.rules import create_rule, draft_rule_from_transaction, preview_rule
+from app.rules import backfill_rule, create_rule, draft_rule_from_transaction, list_rules, preview_rule, set_rule_active
 from app.settings import (
     DEFAULT_FORECAST_SETTINGS,
     load_forecast_settings,
@@ -86,6 +86,12 @@ def register_routes(app: Flask) -> None:
             show_review_actions=True,
         )
 
+    @app.get("/rules")
+    def rules() -> str:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        items = list_rules(app_config.database_url) if app_config.database_url else []
+        return render_template("rules.html", items=items)
+
     @app.post("/review/<int:transaction_id>/category")
     @require_post_csrf
     def update_review_category(transaction_id: int):
@@ -125,7 +131,25 @@ def register_routes(app: Flask) -> None:
             abort(400)
         draft = draft_rule_from_transaction(app_config.database_url, transaction_id)
         create_rule(app_config.database_url, draft)
-        return redirect(url_for("review"))
+        return redirect(url_for("rules"))
+
+    @app.post("/rules/<int:rule_id>/backfill")
+    @require_post_csrf
+    def backfill_rule_route(rule_id: int):
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        backfill_rule(app_config.database_url, rule_id)
+        return redirect(url_for("rules"))
+
+    @app.post("/rules/<int:rule_id>/active")
+    @require_post_csrf
+    def update_rule_active(rule_id: int):
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        set_rule_active(app_config.database_url, rule_id, is_active=request.form.get("is_active") == "true")
+        return redirect(url_for("rules"))
 
     @app.get("/export")
     def export() -> str:

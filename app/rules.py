@@ -3,9 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 import psycopg
 from psycopg import Connection
+
+from app.classify.pipeline import (
+    CategorizationRule,
+    ClassificationFlags,
+    MatchField,
+    MatchOperator,
+    TransactionForClassification,
+    rule_matches,
+)
 
 
 @dataclass(frozen=True)
@@ -26,6 +36,39 @@ class RulePreview:
     would_change_count: int
     already_correct_count: int
     manual_overrides_skipped_count: int
+
+
+@dataclass(frozen=True)
+class StoredRule:
+    id: int
+    name: str
+    priority: int
+    is_active: bool
+    field: str
+    operator: str
+    pattern: str
+    category_name: str | None
+    merchant_name: str | None
+
+
+@dataclass(frozen=True)
+class RuleHistoryPreview:
+    match_count: int
+    would_change_count: int
+    already_correct_count: int
+    manual_overrides_skipped_count: int
+
+
+@dataclass(frozen=True)
+class RuleListItem:
+    rule: StoredRule
+    preview: RuleHistoryPreview
+
+
+@dataclass(frozen=True)
+class RuleBackfillResult:
+    updated_count: int
+    skipped_manual_count: int
 
 
 def draft_rule_from_transaction(database_url: str, transaction_id: int) -> RuleDraft:
@@ -142,6 +185,246 @@ def create_rule(database_url: str, draft: RuleDraft) -> int:
     return _read_int(row[0])
 
 
+def list_rules(database_url: str) -> list[RuleListItem]:
+    with psycopg.connect(database_url) as connection:
+        rules = _load_stored_rules(connection)
+        return [RuleListItem(rule=rule, preview=_preview_stored_rule(connection, rule.id)) for rule in rules]
+
+
+def set_rule_active(database_url: str, rule_id: int, *, is_active: bool) -> None:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            connection.execute(
+                "UPDATE categorization_rules SET is_active = %s, updated_at = now() WHERE id = %s",
+                (is_active, rule_id),
+            )
+
+
+def backfill_rule(database_url: str, rule_id: int) -> RuleBackfillResult:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            rule = _load_rule_for_matching(connection, rule_id)
+            if rule is None:
+                raise ValueError(f"rule not found: {rule_id}")
+            if not rule.is_active:
+                return RuleBackfillResult(updated_count=0, skipped_manual_count=0)
+
+            matches = _matching_transactions(connection, rule)
+            updated_count = 0
+            skipped_manual_count = 0
+            for match in matches:
+                if match.has_manual_override:
+                    skipped_manual_count += 1
+                    continue
+                _apply_rule_to_transaction(connection, rule, match.transaction_id)
+                updated_count += 1
+
+    return RuleBackfillResult(updated_count=updated_count, skipped_manual_count=skipped_manual_count)
+
+
+def _load_stored_rules(connection: Connection[tuple[object, ...]]) -> list[StoredRule]:
+    rows = connection.execute(
+        """
+        SELECT
+            categorization_rules.id,
+            categorization_rules.name,
+            categorization_rules.priority,
+            categorization_rules.is_active,
+            categorization_rules.field,
+            categorization_rules.operator,
+            categorization_rules.pattern,
+            categories.name,
+            merchants.name
+        FROM categorization_rules
+        LEFT JOIN categories ON categories.id = categorization_rules.category_id
+        LEFT JOIN merchants ON merchants.id = categorization_rules.merchant_id
+        ORDER BY categorization_rules.priority, categorization_rules.id
+        """
+    ).fetchall()
+    return [
+        StoredRule(
+            id=_read_int(row[0]),
+            name=str(row[1]),
+            priority=_read_int(row[2]),
+            is_active=bool(row[3]),
+            field=str(row[4]),
+            operator=str(row[5]),
+            pattern=str(row[6]),
+            category_name=_optional_str(row[7]),
+            merchant_name=_optional_str(row[8]),
+        )
+        for row in rows
+    ]
+
+
+@dataclass(frozen=True)
+class _RuleTransactionMatch:
+    transaction_id: int
+    category_name: str | None
+    merchant_name: str | None
+    has_manual_override: bool
+
+
+def _preview_stored_rule(connection: Connection[tuple[object, ...]], rule_id: int) -> RuleHistoryPreview:
+    rule = _load_rule_for_matching(connection, rule_id)
+    if rule is None:
+        return RuleHistoryPreview(0, 0, 0, 0)
+    matches = _matching_transactions(connection, rule)
+    skipped = sum(1 for match in matches if match.has_manual_override)
+    eligible = [match for match in matches if not match.has_manual_override]
+    already_correct = sum(
+        1
+        for match in eligible
+        if match.category_name == rule.category and (rule.merchant is None or match.merchant_name == rule.merchant)
+    )
+    return RuleHistoryPreview(
+        match_count=len(matches),
+        would_change_count=len(eligible) - already_correct,
+        already_correct_count=already_correct,
+        manual_overrides_skipped_count=skipped,
+    )
+
+
+def _load_rule_for_matching(connection: Connection[tuple[object, ...]], rule_id: int) -> CategorizationRule | None:
+    row = connection.execute(
+        """
+        SELECT
+            categorization_rules.id,
+            categorization_rules.name,
+            categorization_rules.priority,
+            categorization_rules.field,
+            categorization_rules.operator,
+            categorization_rules.pattern,
+            categories.name,
+            merchants.name,
+            categorization_rules.set_is_income,
+            categorization_rules.set_is_transfer,
+            categorization_rules.set_is_savings,
+            categorization_rules.set_is_fixed_cost,
+            categorization_rules.set_is_excluded_from_budget,
+            categorization_rules.is_active
+        FROM categorization_rules
+        LEFT JOIN categories ON categories.id = categorization_rules.category_id
+        LEFT JOIN merchants ON merchants.id = categorization_rules.merchant_id
+        WHERE categorization_rules.id = %s
+        """,
+        (rule_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return CategorizationRule(
+        id=_read_int(row[0]),
+        name=str(row[1]),
+        priority=_read_int(row[2]),
+        field=MatchField(str(row[3])),
+        operator=MatchOperator(str(row[4])),
+        pattern=str(row[5]),
+        category=_optional_str(row[6]),
+        merchant=_optional_str(row[7]),
+        flags=ClassificationFlags(
+            is_income=_optional_bool(row[8]),
+            is_transfer=_optional_bool(row[9]),
+            is_savings=_optional_bool(row[10]),
+            is_fixed_cost=_optional_bool(row[11]),
+            is_excluded_from_budget=_optional_bool(row[12]),
+        ),
+        is_active=bool(row[13]),
+    )
+
+
+def _matching_transactions(
+    connection: Connection[tuple[object, ...]],
+    rule: CategorizationRule,
+) -> list[_RuleTransactionMatch]:
+    rows = connection.execute(
+        """
+        SELECT
+            enriched_transactions.id,
+            raw_transactions.account_id,
+            raw_transactions.amount,
+            raw_transactions.description,
+            raw_transactions.counterparty_name,
+            raw_transactions.counterparty_iban,
+            merchants.name,
+            categories.name,
+            manual_overrides.id IS NOT NULL
+        FROM enriched_transactions
+        JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+        LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+        LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+        LEFT JOIN manual_overrides ON manual_overrides.enriched_transaction_id = enriched_transactions.id
+        ORDER BY enriched_transactions.id
+        """
+    ).fetchall()
+    matches: list[_RuleTransactionMatch] = []
+    for row in rows:
+        transaction = TransactionForClassification(
+            id=_read_int(row[0]),
+            account_id=_read_int(row[1]),
+            amount=_read_decimal(row[2]),
+            description=str(row[3]),
+            counterparty_name=_optional_str(row[4]),
+            counterparty_iban=_optional_str(row[5]),
+            merchant_name=_optional_str(row[6]),
+        )
+        if rule_matches(transaction, rule):
+            matches.append(
+                _RuleTransactionMatch(
+                    transaction_id=transaction.id,
+                    category_name=_optional_str(row[7]),
+                    merchant_name=transaction.merchant_name,
+                    has_manual_override=bool(row[8]),
+                )
+            )
+    return matches
+
+
+def _apply_rule_to_transaction(
+    connection: Connection[tuple[object, ...]],
+    rule: CategorizationRule,
+    transaction_id: int,
+) -> None:
+    connection.execute(
+        """
+        UPDATE enriched_transactions
+        SET
+            category_id = COALESCE((SELECT id FROM categories WHERE name = %s), category_id),
+            merchant_id = COALESCE((SELECT id FROM merchants WHERE name = %s), merchant_id),
+            is_income = COALESCE(%s, is_income),
+            is_transfer = COALESCE(%s, is_transfer),
+            is_savings = COALESCE(%s, is_savings),
+            is_fixed_cost = COALESCE(%s, is_fixed_cost),
+            is_excluded_from_budget = COALESCE(%s, is_excluded_from_budget),
+            needs_review = false,
+            classification_method = 'rule',
+            classification_confidence = 1,
+            classification_reason = %s,
+            classification_model = NULL,
+            classification_prompt_version = NULL,
+            rule_id = %s,
+            updated_at = now()
+        WHERE id = %s
+            AND NOT EXISTS (
+                SELECT 1
+                FROM manual_overrides
+                WHERE manual_overrides.enriched_transaction_id = enriched_transactions.id
+            )
+        """,
+        (
+            rule.category,
+            rule.merchant,
+            rule.flags.is_income,
+            rule.flags.is_transfer,
+            rule.flags.is_savings,
+            rule.flags.is_fixed_cost,
+            rule.flags.is_excluded_from_budget,
+            f"Backfilled from rule: {rule.name}",
+            rule.id,
+            transaction_id,
+        ),
+    )
+
+
 def _merchant_id(connection: Connection[tuple[object, ...]], merchant_name: str | None) -> int | None:
     if merchant_name is None:
         return None
@@ -155,6 +438,20 @@ def _optional_str(value: object) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _optional_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise RuntimeError(f"expected boolean, got {type(value).__name__}")
+    return value
+
+
+def _read_decimal(value: object) -> Decimal:
+    if not isinstance(value, Decimal):
+        raise RuntimeError(f"expected decimal, got {type(value).__name__}")
+    return value
 
 
 def _read_int(value: object) -> int:

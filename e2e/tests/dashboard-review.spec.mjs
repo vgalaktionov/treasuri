@@ -64,7 +64,7 @@ test("review page keeps action controls usable on narrow screens", async () => {
   }
 });
 
-test("review correction previews a reusable rule before creating it", async () => {
+test("review correction previews a reusable rule before showing it in the rules list", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${baseUrl}/review`, { waitUntil: "networkidle0" });
@@ -82,6 +82,15 @@ test("review correction previews a reusable rule before creating it", async () =
   assert.match(previewText, /Category\s+Groceries/);
   assert.match(previewText, /Merchant\s+Sample Review Merchant/);
   assert.match(previewText, /Manual overrides skipped\s+1/);
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "networkidle0" }),
+    page.locator(".rule-preview button[type='submit']").click(),
+  ]);
+  const rulesText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(rulesText, /Rules/);
+  assert.match(rulesText, /Classify Unknown Sample Merchant/);
+  assert.match(rulesText, /Would change\s+0/);
 });
 
 async function startSampleServer() {
