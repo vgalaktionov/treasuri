@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Rule preview - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="rule-preview-title">
+    <p class="muted">Rule preview</p>
+    <h1 id="rule-preview-title">{{ preview.draft.name }}</h1>
+
+    <article class="rule-preview">
+      <dl class="status-list">
+        <div>
+          <dt>Match</dt>
+          <dd>{{ preview.draft.field }} {{ preview.draft.operator }} "{{ preview.draft.pattern }}"</dd>
+        </div>
+        <div>
+          <dt>Category</dt>
+          <dd>{{ preview.draft.category_name }}</dd>
+        </div>
+        <div>
+          <dt>Merchant</dt>
+          <dd>{{ preview.draft.merchant_name or "None" }}</dd>
+        </div>
+        <div>
+          <dt>Matches</dt>
+          <dd>{{ preview.match_count }}</dd>
+        </div>
+        <div>
+          <dt>Would change</dt>
+          <dd>{{ preview.would_change_count }}</dd>
+        </div>
+        <div>
+          <dt>Already correct</dt>
+          <dd>{{ preview.already_correct_count }}</dd>
+        </div>
+        <div>
+          <dt>Manual overrides skipped</dt>
+          <dd>{{ preview.manual_overrides_skipped_count }}</dd>
+        </div>
+      </dl>
+
+      <form method="post" action="/rules/from-transaction/{{ preview.draft.source_transaction_id }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Create rule</button>
+      </form>
+    </article>
+  </section>
+{% endblock %}

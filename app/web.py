@@ -11,6 +11,7 @@ from app.auth import init_auth, require_post_csrf
 from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
 from app.review import ReviewCorrection, apply_review_correction, list_category_names
+from app.rules import create_rule, draft_rule_from_transaction, preview_rule
 from app.transactions import list_transactions
 
 
@@ -93,6 +94,27 @@ def register_routes(app: Flask) -> None:
                 merchant_name=merchant_name,
             ),
         )
+        if request.form.get("next") == "rule-preview":
+            return redirect(url_for("preview_rule_from_transaction", transaction_id=transaction_id))
+        return redirect(url_for("review"))
+
+    @app.get("/rules/preview/from-transaction/<int:transaction_id>")
+    def preview_rule_from_transaction(transaction_id: int) -> str:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        draft = draft_rule_from_transaction(app_config.database_url, transaction_id)
+        preview = preview_rule(app_config.database_url, draft)
+        return render_template("rule_preview.html", preview=preview)
+
+    @app.post("/rules/from-transaction/<int:transaction_id>")
+    @require_post_csrf
+    def create_rule_from_transaction(transaction_id: int):
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        draft = draft_rule_from_transaction(app_config.database_url, transaction_id)
+        create_rule(app_config.database_url, draft)
         return redirect(url_for("review"))
 
 

@@ -152,7 +152,7 @@ body {
   border-block-start: 1px solid var(--treasuri-line);
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   margin-block-start: 1rem;
   padding-block-start: 1rem;
 }
@@ -161,10 +161,14 @@ body {
   margin: 0;
 }
 
-.review-form button {
-  align-self: end;
-  margin: 0;
-  white-space: nowrap;
+.review-actions {
+  display: flex;
+  gap: 0.5rem;
+  grid-column: 1 / -1;
+}
+
+.rule-preview form {
+  margin-block-start: 1rem;
 }
 
 .status-list {
@@ -216,7 +220,11 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .review-form button {
+  .review-actions {
+    flex-direction: column;
+  }
+
+  .review-actions button {
     inline-size: 100%;
   }
 }
