@@ -37,3 +37,11 @@ def test_compose_starts_local_runtime_shape_without_caddy_or_frontend_build() ->
     assert 'command: ["python", "-m", "app.migrate"]' in compose
     assert "caddy" not in compose.lower()
     assert "npm" not in compose.lower()
+
+
+def test_gpu_compose_override_enables_llama_gpu_without_requiring_it_by_default() -> None:
+    compose = read_project_file("compose.yml")
+    gpu_compose = read_project_file("compose.gpu.yml")
+
+    assert "gpus:" not in compose
+    assert re.search(r"^  llama:\n    gpus: all\n", gpu_compose, flags=re.MULTILINE)

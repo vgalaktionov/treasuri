@@ -20,6 +20,12 @@ docker compose up --build
 
 The Compose stack starts the web process, worker process, Postgres, one-shot migrations, and a local llama.cpp OpenAI-compatible server for the configured Gemma GGUF model. Then open `http://127.0.0.1:5000`.
 
+If the machine has a Docker-visible GPU, run the llama service with GPU access:
+
+```sh
+docker compose -f compose.yml -f compose.gpu.yml up --build
+```
+
 Run the web process with the development OIDC test profile:
 
 ```sh
@@ -37,10 +43,12 @@ Then open `http://127.0.0.1:5000`.
 uv run python -m app.web
 DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.worker
 docker compose up --build
+docker compose -f compose.yml -f compose.gpu.yml up --build
 DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.migrate
 DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.admin seed-categories
 DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.admin load-sample-data
 uv run python -m app.admin sync-now
+uv run python -m app.admin enqueue-sync
 uv run pytest
 uv run pytest tests/integration
 uv run ruff check .

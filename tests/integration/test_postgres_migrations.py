@@ -39,7 +39,7 @@ def test_migrations_apply_from_clean_postgres_and_are_idempotent(postgres_url: s
             row[0] for row in connection.execute("SELECT version FROM schema_migrations ORDER BY version")
         ]
 
-    assert first_run == ["0001_initial", "0002_seed_categories"]
+    assert first_run == ["0001_initial", "0002_seed_categories", "0003_pgqueuer"]
     assert second_run == []
     assert {
         "accounts",
@@ -53,13 +53,17 @@ def test_migrations_apply_from_clean_postgres_and_are_idempotent(postgres_url: s
         "merchant_aliases",
         "merchants",
         "monthly_forecasts",
+        "pgqueuer",
+        "pgqueuer_log",
+        "pgqueuer_schedules",
+        "pgqueuer_statistics",
         "raw_transactions",
         "recurring_series",
         "schema_migrations",
         "sync_runs",
     } <= tables
     assert category_count == (len(DEFAULT_CATEGORIES),)
-    assert migration_versions == ["0001_initial", "0002_seed_categories"]
+    assert migration_versions == ["0001_initial", "0002_seed_categories", "0003_pgqueuer"]
 
 
 def test_seed_categories_admin_command_is_idempotent(postgres_url: str) -> None:

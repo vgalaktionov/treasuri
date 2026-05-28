@@ -7,13 +7,11 @@ from collections.abc import Sequence
 
 import psycopg
 
-from app.bank.fake import FakeBankAdapter
-from app.bank.sync import sync_bank_transactions
 from app.categories import DEFAULT_CATEGORIES
-from app.classify.service import classify_transactions
 from app.config import AppConfig, load_config
 from app.forecast.service import update_monthly_forecast
-from app.normalize import normalize_raw_transactions
+from app.jobs.enqueue import enqueue_sync_now
+from app.jobs.sync import run_sync_now
 from app.recurring import detect_recurring
 from app.sample_data import load_sample_data
 
@@ -31,31 +29,21 @@ def seed_categories(database_url: str, categories: Sequence[str] = DEFAULT_CATEG
 
 
 def sync_now(config: AppConfig) -> None:
-    if config.bank_provider != "fake":
-        raise NotImplementedError("Only the fake bank adapter is wired so far")
-
-    account_iban = config.abn_account_iban or "NL00FAKE0123456789"
-    result = sync_bank_transactions(config.database_url, FakeBankAdapter(), account_iban=account_iban)
-    normalize_result = normalize_raw_transactions(config.database_url)
-    classify_result = classify_transactions(config.database_url)
-    recurring_result = detect_recurring(config.database_url)
-    forecast_result = update_monthly_forecast(config.database_url)
-    print(
-        "Synced "
-        f"{result.provider}: {result.new_transaction_count} new, "
-        f"{result.updated_transaction_count} updated, "
-        f"{normalize_result.created_count} normalized, "
-        f"{classify_result.review_count} still need review, "
-        f"{recurring_result.detected_count} recurring detected, "
-        f"{forecast_result.year_month} forecast updated"
-    )
+    print(run_sync_now(config).as_summary())
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.admin")
     parser.add_argument(
         "command",
-        choices=["seed-categories", "load-sample-data", "sync-now", "update-forecast", "detect-recurring"],
+        choices=[
+            "seed-categories",
+            "load-sample-data",
+            "sync-now",
+            "enqueue-sync",
+            "update-forecast",
+            "detect-recurring",
+        ],
     )
     parser.add_argument("--database-url", default=None)
     args = parser.parse_args()
@@ -103,6 +91,11 @@ def main() -> None:
     if args.command == "detect-recurring":
         result = detect_recurring(database_url)
         print(f"Detected {result.detected_count} recurring series")
+        return
+
+    if args.command == "enqueue-sync":
+        job_id = enqueue_sync_now(database_url)
+        print(f"Enqueued sync-now job {job_id}")
         return
 
     sync_now(config)
