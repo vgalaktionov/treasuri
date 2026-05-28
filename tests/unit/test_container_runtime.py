@@ -45,3 +45,5 @@ def test_gpu_compose_override_enables_llama_gpu_without_requiring_it_by_default(
 
     assert "gpus:" not in compose
     assert re.search(r"^  llama:\n    gpus: all\n", gpu_compose, flags=re.MULTILINE)
+    assert "--n-gpu-layers" in gpu_compose
+    assert '"999"' in gpu_compose

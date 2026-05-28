@@ -26,6 +26,8 @@ If the machine has a Docker-visible GPU, run the llama service with GPU access:
 docker compose -f compose.yml -f compose.gpu.yml up --build
 ```
 
+The GPU override grants the llama container GPU access and passes `--n-gpu-layers 999`, which asks llama.cpp to offload as many layers as fit in VRAM. The llama logs should mention layers being offloaded to confirm the GPU path is active.
+
 Run the web process with the development OIDC test profile:
 
 ```sh
