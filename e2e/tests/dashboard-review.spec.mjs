@@ -232,6 +232,7 @@ test("recurring commitments can be confirmed and disabled on mobile", async () =
   assert.match(bodyText, /Recurring/);
   assert.match(bodyText, /Sample Streaming/);
   assert.match(bodyText, /detected/);
+  assert.match(bodyText, /New recurring payment detected/);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.equal(overflow <= 1, true, `recurring page overflows horizontally by ${overflow}px`);

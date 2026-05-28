@@ -84,6 +84,43 @@ def test_recurring_route_renders_detected_series(sample_app: Flask) -> None:
     assert b"05 Jun 2026" in response.data
     assert b"Confirm" in response.data
     assert b"Disable" in response.data
+    assert b"New recurring payment detected" in response.data
+
+
+def test_recurring_route_warns_about_amount_changes(sample_app: Flask) -> None:
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                UPDATE raw_transactions
+                SET amount = -20.99
+                WHERE source_hash = 'streaming-2026-05-05'
+                """
+            )
+    detect_recurring(sample_app.config["DATABASE_URL"])
+
+    response = sample_app.test_client().get("/recurring")
+
+    assert response.status_code == 200
+    assert b"Amount changed" in response.data
+
+
+def test_recurring_route_warns_about_missing_expected_payment(sample_app: Flask) -> None:
+    detect_recurring(sample_app.config["DATABASE_URL"])
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                UPDATE recurring_series
+                SET next_expected_date = '2026-05-20'
+                WHERE name = 'Sample Streaming'
+                """
+            )
+
+    response = sample_app.test_client().get("/recurring")
+
+    assert response.status_code == 200
+    assert b"Expected payment missing" in response.data
 
 
 def test_confirm_recurring_route_adds_upcoming_commitment_to_forecast(sample_app: Flask) -> None:

@@ -265,7 +265,15 @@ def register_routes(app: Flask) -> None:
     @app.get("/recurring")
     def recurring() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]
-        series = list_recurring_series(app_config.database_url) if app_config.database_url else []
+        forecast_as_of = app.config.get("FORECAST_AS_OF")
+        series = (
+            list_recurring_series(
+                app_config.database_url,
+                as_of=forecast_as_of if isinstance(forecast_as_of, date) else None,
+            )
+            if app_config.database_url
+            else []
+        )
         return render_template("recurring.html", series=series)
 
     @app.post("/recurring/<int:series_id>/confirm")

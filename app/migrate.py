@@ -82,8 +82,8 @@ def run_migrations(database_url: str, migrations_path: Path = DEFAULT_MIGRATIONS
 def _connect_for_migrations(
     database_url: str,
     *,
-    attempts: int = 20,
-    delay_seconds: float = 0.2,
+    attempts: int = 60,
+    delay_seconds: float = 0.5,
 ) -> Connection[tuple[Any, ...]]:
     for attempt in range(1, attempts + 1):
         try:

@@ -22,6 +22,9 @@
             <div class="transaction-meta">
               <span>confidence {{ item.confidence }}</span>
               <span>{{ "confirmed" if item.is_confirmed else "detected" }}</span>
+              {% for warning in item.warnings %}
+                <span class="warning">{{ warning }}</span>
+              {% endfor %}
             </div>
             <div class="rule-actions recurring-actions">
               {% if not item.is_confirmed %}

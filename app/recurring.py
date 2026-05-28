@@ -26,6 +26,7 @@ class RecurringSeriesItem:
     next_expected_date: date | None
     confidence: str
     is_confirmed: bool
+    warnings: tuple[str, ...]
 
 
 def confirm_recurring_series(database_url: str, series_id: int) -> bool:
@@ -89,7 +90,8 @@ def detect_recurring(database_url: str) -> RecurringDetectionResult:
     return RecurringDetectionResult(detected_count=detected_count, linked_transaction_count=linked_count)
 
 
-def list_recurring_series(database_url: str) -> list[RecurringSeriesItem]:
+def list_recurring_series(database_url: str, *, as_of: date | None = None) -> list[RecurringSeriesItem]:
+    warning_date = as_of or date.today()
     with psycopg.connect(database_url) as connection:
         rows = connection.execute(
             """
@@ -101,9 +103,23 @@ def list_recurring_series(database_url: str) -> list[RecurringSeriesItem]:
                 recurring_series.expected_amount,
                 recurring_series.next_expected_date,
                 recurring_series.confidence,
-                recurring_series.is_confirmed
+                recurring_series.is_confirmed,
+                recurring_series.amount_tolerance,
+                recurring_series.expected_day_of_month,
+                activity.min_amount,
+                activity.max_amount,
+                activity.last_booking_date
             FROM recurring_series
             LEFT JOIN categories ON categories.id = recurring_series.category_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    min(abs(raw_transactions.amount)) AS min_amount,
+                    max(abs(raw_transactions.amount)) AS max_amount,
+                    max(raw_transactions.booking_date) AS last_booking_date
+                FROM enriched_transactions
+                JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+                WHERE enriched_transactions.recurring_series_id = recurring_series.id
+            ) AS activity ON true
             WHERE recurring_series.is_active = true
             ORDER BY recurring_series.next_expected_date NULLS LAST, recurring_series.name
             """
@@ -118,6 +134,16 @@ def list_recurring_series(database_url: str) -> list[RecurringSeriesItem]:
             next_expected_date=_optional_date(row[5]),
             confidence=f"{Decimal(str(row[6])):.2f}",
             is_confirmed=bool(row[7]),
+            warnings=_recurring_warnings(
+                is_confirmed=bool(row[7]),
+                amount_tolerance=_optional_decimal(row[8]),
+                expected_day_of_month=_optional_int(row[9]),
+                min_amount=_optional_decimal(row[10]),
+                max_amount=_optional_decimal(row[11]),
+                last_booking_date=_optional_date(row[12]),
+                next_expected_date=_optional_date(row[5]),
+                as_of=warning_date,
+            ),
         )
         for row in rows
     ]
@@ -275,6 +301,44 @@ def _next_month_date(last_seen_date: date, day_of_month: int) -> date:
 def _format_money(value: object) -> str:
     amount = Decimal(str(value)).quantize(Decimal("0.01"))
     return f"EUR {amount:,.2f}"
+
+
+def _recurring_warnings(
+    *,
+    is_confirmed: bool,
+    amount_tolerance: Decimal | None,
+    expected_day_of_month: int | None,
+    min_amount: Decimal | None,
+    max_amount: Decimal | None,
+    last_booking_date: date | None,
+    next_expected_date: date | None,
+    as_of: date,
+) -> tuple[str, ...]:
+    warnings: list[str] = []
+    if not is_confirmed:
+        warnings.append("New recurring payment detected")
+    if (
+        min_amount is not None
+        and max_amount is not None
+        and amount_tolerance is not None
+        and max_amount - min_amount > amount_tolerance
+    ):
+        warnings.append("Amount changed")
+    if next_expected_date is not None and next_expected_date < as_of:
+        warnings.append("Expected payment missing")
+    if expected_day_of_month is not None and last_booking_date is not None:
+        day_delta = last_booking_date.day - expected_day_of_month
+        if day_delta <= -3:
+            warnings.append("Payment arrived earlier than usual")
+        elif day_delta >= 3:
+            warnings.append("Payment arrived later than usual")
+    return tuple(warnings)
+
+
+def _optional_decimal(value: object) -> Decimal | None:
+    if value is None:
+        return None
+    return Decimal(str(value))
 
 
 def _optional_int(value: object) -> int | None:
