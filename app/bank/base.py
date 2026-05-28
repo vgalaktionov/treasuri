@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class BankMutation:
     counterparty_name: str | None
     counterparty_iban: str | None
     description: str
-    raw_payload: dict[str, str]
+    raw_payload: dict[str, Any]
 
 
 class BankAdapter(Protocol):

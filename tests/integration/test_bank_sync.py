@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from decimal import Decimal
 
 import psycopg
 import pytest
 from testcontainers.postgres import PostgresContainer
 
+from app.bank.abn import AbnAmroAdapter, AbnCredentials
 from app.bank.fake import FakeBankAdapter
 from app.bank.sync import sync_bank_transactions
 from app.migrate import run_migrations
@@ -54,3 +56,74 @@ def test_fake_bank_sync_imports_raw_transactions_idempotently(migrated_postgres_
     assert second_result.updated_transaction_count == 3
     assert raw_count == (3,)
     assert sync_counts == [(3, 0), (0, 3)]
+
+
+def test_abn_adapter_imports_raw_transactions_idempotently(migrated_postgres_url: str) -> None:
+    adapter = AbnAmroAdapter(
+        AbnCredentials(
+            account_iban="NL01ABNA0123456789",
+            card_number="123",
+            soft_token="12345",
+        ),
+        session_factory=StaticAbnSession,
+    )
+
+    first_result = sync_bank_transactions(migrated_postgres_url, adapter, account_iban="NL01ABNA0123456789")
+    second_result = sync_bank_transactions(migrated_postgres_url, adapter, account_iban="NL01ABNA0123456789")
+
+    with psycopg.connect(migrated_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                accounts.provider,
+                raw_transactions.provider_transaction_id,
+                raw_transactions.amount,
+                raw_transactions.counterparty_name,
+                raw_transactions.counterparty_iban,
+                raw_transactions.description,
+                raw_transactions.raw_payload_json->>'mutationKey'
+            FROM raw_transactions
+            JOIN accounts ON accounts.id = raw_transactions.account_id
+            WHERE raw_transactions.provider = 'abn_amro'
+            """
+        ).fetchone()
+
+    assert first_result.provider == "abn_amro"
+    assert first_result.new_transaction_count == 1
+    assert first_result.updated_transaction_count == 0
+    assert second_result.new_transaction_count == 0
+    assert second_result.updated_transaction_count == 1
+    assert row == (
+        "abn_amro",
+        "abn-test-1",
+        Decimal("-25.50"),
+        "Sample Cafe",
+        "NL00ABNA0000000000",
+        "Card payment Sample Cafe",
+        "abn-test-1",
+    )
+
+
+class StaticAbnSession:
+    def __init__(self, _iban: str) -> None:
+        pass
+
+    def login(self, card: str, token: str) -> None:
+        _ = card, token
+        pass
+
+    def mutations(self, iban: str, last_key: str | None = None):
+        _ = iban, last_key
+        return {
+            "mutations": [
+                {
+                    "mutationKey": "abn-test-1",
+                    "bookingDate": "2026-05-28",
+                    "valueDate": "2026-05-28",
+                    "amount": {"value": "-25.50", "currency": "EUR"},
+                    "counterpartyName": "Sample Cafe",
+                    "counterpartyIban": "NL00ABNA0000000000",
+                    "descriptionLines": ["Card payment", "Sample Cafe"],
+                }
+            ]
+        }

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.bank.fake import FakeBankAdapter
+from app.bank.factory import build_bank_adapter
 from app.bank.sync import sync_bank_transactions
 from app.classify.service import classify_transactions
 from app.config import AppConfig
@@ -35,11 +35,8 @@ class SyncNowResult:
 
 
 def run_sync_now(config: AppConfig) -> SyncNowResult:
-    if config.bank_provider != "fake":
-        raise NotImplementedError("Only the fake bank adapter is wired so far")
-
-    account_iban = config.abn_account_iban or "NL00FAKE0123456789"
-    sync_result = sync_bank_transactions(config.database_url, FakeBankAdapter(), account_iban=account_iban)
+    adapter, account_iban = build_bank_adapter(config)
+    sync_result = sync_bank_transactions(config.database_url, adapter, account_iban=account_iban)
     normalize_result = normalize_raw_transactions(config.database_url)
     classify_result = classify_transactions(config.database_url, config)
     recurring_result = detect_recurring(config.database_url)

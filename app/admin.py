@@ -71,6 +71,9 @@ def main() -> None:
         llm_temperature=config.llm_temperature,
         bank_provider=config.bank_provider,
         abn_account_iban=config.abn_account_iban,
+        abn_card_number=config.abn_card_number,
+        abn_soft_token=config.abn_soft_token,
+        abn_sync_pages=config.abn_sync_pages,
     )
 
     if args.command == "seed-categories":

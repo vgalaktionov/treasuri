@@ -79,6 +79,8 @@ Puppeteer E2E tests also use deterministic sample data. The test harness starts 
 
 The Docker image is intentionally one artifact. Override the Compose command to run the same image as `python -m app.web`, `python -m app.worker`, `python -m app.migrate`, or `python -m app.admin <command>`.
 
+Bank sync defaults to the deterministic fake provider. To use ABN AMRO, set `BANK_PROVIDER=abn`, `ABN_ACCOUNT_IBAN`, `ABN_CARD_NUMBER`, and `ABN_SOFT_TOKEN`; the app keeps `abna` usage inside the bank adapter boundary.
+
 Classification runs deterministic methods first. If `LLM_ENABLED=true`, uncategorized transactions can receive a local llama suggestion from the OpenAI-compatible endpoint, but they still stay in review until confirmed.
 
 ## Development Notes

@@ -82,6 +82,9 @@ class AppConfig:
     llm_temperature: float = field(default_factory=lambda: float(os.environ.get("LLM_CLASSIFICATION_TEMPERATURE", "0")))
     bank_provider: str = field(default_factory=lambda: os.environ.get("BANK_PROVIDER", "fake"))
     abn_account_iban: str = field(default_factory=lambda: os.environ.get("ABN_ACCOUNT_IBAN", ""))
+    abn_card_number: str = field(default_factory=lambda: os.environ.get("ABN_CARD_NUMBER", ""))
+    abn_soft_token: str = field(default_factory=lambda: os.environ.get("ABN_SOFT_TOKEN", ""))
+    abn_sync_pages: int = field(default_factory=lambda: _read_int("ABN_SYNC_PAGES", 1))
 
     @property
     def is_development(self) -> bool:
