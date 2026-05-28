@@ -26,6 +26,24 @@
                 <span>{{ flag }}</span>
               {% endfor %}
             </div>
+            {% if show_review_actions and transaction.needs_review %}
+              <form class="review-form" method="post" action="/review/{{ transaction.transaction_id }}/category">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label>
+                  Category
+                  <select name="category" required>
+                    {% for category in categories %}
+                      <option value="{{ category }}" {% if category == transaction.category %}selected{% endif %}>{{ category }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>
+                  Merchant
+                  <input name="merchant" value="{{ transaction.merchant }}" autocomplete="off">
+                </label>
+                <button type="submit">Save correction</button>
+              </form>
+            {% endif %}
           </article>
         {% endfor %}
       </div>

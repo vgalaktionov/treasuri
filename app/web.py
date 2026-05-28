@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from flask import Flask, render_template
+from flask import Flask, abort, redirect, render_template, request, url_for
 from whitenoise import WhiteNoise
 
-from app.auth import init_auth
+from app.auth import init_auth, require_post_csrf
 from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
+from app.review import ReviewCorrection, apply_review_correction, list_category_names
 from app.transactions import list_transactions
 
 
@@ -56,18 +57,43 @@ def register_routes(app: Flask) -> None:
             title="Transactions",
             subtitle="Latest known activity",
             transactions=transactions,
+            categories=[],
+            show_review_actions=False,
         )
 
     @app.get("/review")
     def review() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]
         transactions = list_transactions(app_config.database_url, needs_review=True) if app_config.database_url else []
+        categories = list_category_names(app_config.database_url) if app_config.database_url else []
         return render_template(
             "transactions.html",
             title="Review inbox",
             subtitle="Transactions that can change the forecast",
             transactions=transactions,
+            categories=categories,
+            show_review_actions=True,
         )
+
+    @app.post("/review/<int:transaction_id>/category")
+    @require_post_csrf
+    def update_review_category(transaction_id: int):
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        category_name = request.form.get("category", "").strip()
+        if not category_name:
+            abort(400)
+        merchant_name = request.form.get("merchant", "").strip() or None
+        apply_review_correction(
+            app_config.database_url,
+            ReviewCorrection(
+                transaction_id=transaction_id,
+                category_name=category_name,
+                merchant_name=merchant_name,
+            ),
+        )
+        return redirect(url_for("review"))
 
 
 def main() -> None:

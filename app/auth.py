@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
+from secrets import token_urlsafe
 from typing import Any
 
 from flask import Response, abort, current_app, g, request, session
@@ -21,6 +22,8 @@ def init_auth(app: Any) -> None:
 
     oidc.init_app(app)
     app.before_request(_require_allowed_user)
+    app.before_request(_ensure_csrf_token)
+    app.context_processor(_csrf_context)
 
 
 def current_user_profile() -> dict[str, Any]:
@@ -56,6 +59,21 @@ def _require_allowed_user() -> ResponseReturnValue | None:
 
     g.user_email = email
     return None
+
+
+def _ensure_csrf_token() -> None:
+    if _is_public_request():
+        return
+    token = session.get("csrf_token")
+    if not isinstance(token, str):
+        token = token_urlsafe(32)
+        session["csrf_token"] = token
+    g.csrf_token = token
+
+
+def _csrf_context() -> dict[str, str]:
+    token = session.get("csrf_token", "")
+    return {"csrf_token": token if isinstance(token, str) else ""}
 
 
 def require_post_csrf(view: Callable[..., ResponseReturnValue]) -> Callable[..., ResponseReturnValue]:
