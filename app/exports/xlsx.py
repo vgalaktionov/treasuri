@@ -12,6 +12,8 @@ import psycopg
 from openpyxl import Workbook
 from psycopg import Connection
 
+from app.budget import load_category_budgets_in_connection
+
 XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 REQUIRED_SHEETS = (
     "Summary",
@@ -181,25 +183,19 @@ def _write_category_averages_sheet(connection: Connection[tuple[object, ...]], s
             "Notes",
         ]
     )
-    rows = connection.execute(
-        """
-        SELECT
-            categories.name,
-            COALESCE(sum(abs(raw_transactions.amount)) FILTER (
-                WHERE enriched_transactions.is_income = false
-                    AND enriched_transactions.is_transfer = false
-                    AND enriched_transactions.is_excluded_from_budget = false
-            ), 0)
-        FROM categories
-        LEFT JOIN enriched_transactions ON enriched_transactions.category_id = categories.id
-        LEFT JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
-        GROUP BY categories.name
-        ORDER BY categories.name
-        """
-    ).fetchall()
-    for category, current_month in rows:
-        suggested_budget = _round_up_budget(Decimal(str(current_month)))
-        sheet.append([category, None, None, None, current_month, suggested_budget, True, "Sample/current data only"])
+    for row in load_category_budgets_in_connection(connection):
+        sheet.append(
+            [
+                row.category,
+                row.average_3m,
+                row.average_6m,
+                row.average_12m,
+                row.current_month,
+                row.suggested_budget,
+                row.included_in_forecast,
+                f"Excluded this month: {row.excluded_from_forecast}",
+            ]
+        )
 
 
 def _write_monthly_history_sheet(connection: Connection[tuple[object, ...]], sheet) -> None:
@@ -384,13 +380,6 @@ def _finish_export_run(
         """,
         (status, error_message, run_id),
     )
-
-
-def _round_up_budget(value: Decimal) -> Decimal:
-    if value <= 0:
-        return Decimal("0")
-    rounded_units = int((value + Decimal("9.99")) // Decimal("10"))
-    return Decimal(rounded_units * 10)
 
 
 def _read_int(value: object) -> int:

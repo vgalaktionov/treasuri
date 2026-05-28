@@ -86,6 +86,21 @@ test("transactions can be filtered on mobile without horizontal overflow", async
   assert.equal(overflow <= 1, true, `transactions page overflows horizontally by ${overflow}px`);
 });
 
+test("categories show budget averages on mobile without horizontal overflow", async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
+  await page.goto(`${baseUrl}/categories`, { waitUntil: "networkidle0" });
+
+  const bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Categories/);
+  assert.match(bodyText, /Groceries/);
+  assert.match(bodyText, /EUR 64\.35/);
+  assert.match(bodyText, /Suggested/);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.equal(overflow <= 1, true, `categories page overflows horizontally by ${overflow}px`);
+});
+
 test("review correction previews a reusable rule before showing it in the rules list", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });

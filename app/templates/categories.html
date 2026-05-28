@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Categories - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="categories-title">
+    <p class="muted">Budget averages</p>
+    <h1 id="categories-title">Categories</h1>
+
+    {% if rows %}
+      <div class="category-list">
+        {% for row in rows %}
+          <article class="category-card{% if not row.included_in_forecast %} excluded{% endif %}">
+            <div class="category-card-header">
+              <div>
+                <h2>{{ row.category }}</h2>
+                <p>{{ row.pace_label }}</p>
+              </div>
+              <strong>{{ row.current_month }}</strong>
+            </div>
+            <dl class="category-metrics">
+              <div>
+                <dt>3M avg</dt>
+                <dd>{{ row.average_3m }}</dd>
+              </div>
+              <div>
+                <dt>6M avg</dt>
+                <dd>{{ row.average_6m }}</dd>
+              </div>
+              <div>
+                <dt>12M avg</dt>
+                <dd>{{ row.average_12m }}</dd>
+              </div>
+              <div>
+                <dt>Suggested</dt>
+                <dd>{{ row.suggested_budget }}</dd>
+              </div>
+            </dl>
+            <div class="transaction-meta">
+              <span>{{ "included in forecast" if row.included_in_forecast else "excluded from forecast" }}</span>
+              {% if row.excluded_from_forecast != "EUR 0.00" %}<span>{{ row.excluded_from_forecast }} excluded</span>{% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <article>
+        <strong>No category data yet.</strong>
+        <p class="muted">Load sample data or run a sync to calculate budget averages.</p>
+      </article>
+    {% endif %}
+  </section>
+{% endblock %}

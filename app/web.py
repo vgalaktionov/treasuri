@@ -9,6 +9,7 @@ from flask import Flask, Response, abort, redirect, render_template, request, ur
 from whitenoise import WhiteNoise
 
 from app.auth import init_auth, require_post_csrf
+from app.budget import load_category_budgets
 from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
 from app.exports.xlsx import generate_budget_export, list_export_runs, load_export_file
@@ -102,6 +103,12 @@ def register_routes(app: Flask) -> None:
         app_config: AppConfig = app.config["APP_CONFIG"]
         items = list_rules(app_config.database_url) if app_config.database_url else []
         return render_template("rules.html", items=items)
+
+    @app.get("/categories")
+    def categories() -> str:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        rows = load_category_budgets(app_config.database_url) if app_config.database_url else []
+        return render_template("categories.html", rows=[row.as_template_context() for row in rows])
 
     @app.post("/review/<int:transaction_id>/category")
     @require_post_csrf
