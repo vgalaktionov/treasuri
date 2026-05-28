@@ -48,7 +48,11 @@ def update_monthly_forecast_in_connection(
     )
     target_savings = _setting_decimal(settings, "target_monthly_savings", Decimal("1000.00"))
     safety_buffer = _setting_decimal(settings, "safety_buffer", Decimal("1000.00"))
-    fixed_costs_upcoming = _setting_decimal(settings, "fixed_costs_upcoming", Decimal("0.00"))
+    fixed_costs_upcoming = _setting_decimal(
+        settings,
+        "fixed_costs_upcoming",
+        Decimal("0.00"),
+    ) + _confirmed_recurring_upcoming(connection, as_of)
     baseline_3m = _setting_decimal(settings, "variable_baseline_3m", Decimal("0.00"))
     baseline_6m = _setting_decimal(settings, "variable_baseline_6m", Decimal("0.00"))
 
@@ -235,6 +239,22 @@ def _review_count(connection: Connection[tuple[object, ...]]) -> int:
     if row is None:
         return 0
     return _read_int(row[0])
+
+
+def _confirmed_recurring_upcoming(connection: Connection[tuple[object, ...]], as_of: date) -> Decimal:
+    month_end = date(as_of.year, as_of.month, monthrange(as_of.year, as_of.month)[1])
+    return _sum_decimal(
+        connection,
+        """
+        SELECT COALESCE(sum(expected_amount), 0)
+        FROM recurring_series
+        WHERE is_active = true
+            AND is_confirmed = true
+            AND expected_amount IS NOT NULL
+            AND next_expected_date BETWEEN %s AND %s
+        """,
+        (as_of, month_end),
+    )
 
 
 def _sum_decimal(

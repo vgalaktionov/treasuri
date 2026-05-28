@@ -28,6 +28,54 @@ class RecurringSeriesItem:
     is_confirmed: bool
 
 
+def confirm_recurring_series(database_url: str, series_id: int) -> bool:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            row = connection.execute(
+                """
+                UPDATE recurring_series
+                SET
+                    is_confirmed = true,
+                    confidence = greatest(confidence, 0.90),
+                    updated_at = now()
+                WHERE id = %s AND is_active = true
+                RETURNING id
+                """,
+                (series_id,),
+            ).fetchone()
+    return row is not None
+
+
+def disable_recurring_series(database_url: str, series_id: int) -> bool:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            row = connection.execute(
+                """
+                UPDATE recurring_series
+                SET
+                    is_active = false,
+                    is_confirmed = false,
+                    updated_at = now()
+                WHERE id = %s AND is_active = true
+                RETURNING id
+                """,
+                (series_id,),
+            ).fetchone()
+            if row is not None:
+                connection.execute(
+                    """
+                    UPDATE enriched_transactions
+                    SET
+                        is_recurring = false,
+                        recurring_series_id = NULL,
+                        updated_at = now()
+                    WHERE recurring_series_id = %s
+                    """,
+                    (series_id,),
+                )
+    return row is not None
+
+
 def detect_recurring(database_url: str) -> RecurringDetectionResult:
     with psycopg.connect(database_url) as connection:
         with connection.transaction():

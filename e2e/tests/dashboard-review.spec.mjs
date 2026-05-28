@@ -155,6 +155,34 @@ test("categories show budget averages on mobile without horizontal overflow", as
   assert.equal(overflow <= 1, true, `categories page overflows horizontally by ${overflow}px`);
 });
 
+test("recurring commitments can be confirmed and disabled on mobile", async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
+  await page.goto(`${baseUrl}/recurring`, { waitUntil: "networkidle0" });
+
+  let bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Recurring/);
+  assert.match(bodyText, /Sample Streaming/);
+  assert.match(bodyText, /detected/);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.equal(overflow <= 1, true, `recurring page overflows horizontally by ${overflow}px`);
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "networkidle0" }),
+    page.locator(".recurring-actions form[action$='/confirm'] button").click(),
+  ]);
+  bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /confirmed/);
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "networkidle0" }),
+    page.locator(".recurring-actions form[action$='/disable'] button").click(),
+  ]);
+  bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /No recurring payments detected/);
+});
+
 test("review correction previews a reusable rule before showing it in the rules list", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });

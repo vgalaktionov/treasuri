@@ -10,7 +10,7 @@
     {% if series %}
       <div class="transaction-list">
         {% for item in series %}
-          <article class="transaction-card">
+          <article class="transaction-card recurring-card">
             <div class="transaction-main">
               <div>
                 <p class="muted">{{ item.category }} · {{ item.cadence }}</p>
@@ -22,6 +22,18 @@
             <div class="transaction-meta">
               <span>confidence {{ item.confidence }}</span>
               <span>{{ "confirmed" if item.is_confirmed else "detected" }}</span>
+            </div>
+            <div class="rule-actions recurring-actions">
+              {% if not item.is_confirmed %}
+                <form method="post" action="/recurring/{{ item.id }}/confirm">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit">Confirm</button>
+                </form>
+              {% endif %}
+              <form method="post" action="/recurring/{{ item.id }}/disable">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="secondary">Disable</button>
+              </form>
             </div>
           </article>
         {% endfor %}

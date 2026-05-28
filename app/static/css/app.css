@@ -473,6 +473,10 @@ header nav a {
   margin: 0;
 }
 
+.recurring-actions {
+  margin-block-start: 0.85rem;
+}
+
 .export-action {
   margin-block: 0 1rem;
 }
@@ -595,6 +599,21 @@ header nav a {
     grid-column: 2;
     grid-row: 1;
     margin-block-start: 0.1rem;
+  }
+
+  .recurring-card {
+    grid-template-columns: minmax(18rem, 1fr) minmax(12rem, auto) auto auto;
+  }
+
+  .recurring-card .transaction-main strong {
+    grid-column: 3;
+  }
+
+  .recurring-card .recurring-actions {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: end;
+    margin-block-start: 0;
   }
 
   .category-card {

@@ -72,3 +72,29 @@ def test_update_monthly_forecast_recomputes_snapshot_from_transactions(sample_da
             "- predicted_variable_remaining - target_savings_remaining - safety_buffer"
         ),
     )
+
+
+def test_update_monthly_forecast_includes_confirmed_upcoming_recurring(sample_database_url: str) -> None:
+    with psycopg.connect(sample_database_url) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                UPDATE recurring_series
+                SET is_confirmed = true
+                WHERE name = 'Sample Streaming'
+                """
+            )
+
+    result = update_monthly_forecast(sample_database_url, as_of=date(2026, 5, 26))
+
+    with psycopg.connect(sample_database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT fixed_costs_upcoming, safe_to_spend, safe_per_day
+            FROM monthly_forecasts
+            WHERE year_month = '2026-05'
+            """
+        ).fetchone()
+
+    assert result.safe_to_spend == Decimal("545.01")
+    assert row == (Decimal("632.99"), Decimal("545.01"), Decimal("90.84"))

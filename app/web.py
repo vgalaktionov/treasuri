@@ -15,7 +15,7 @@ from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
 from app.exports.xlsx import generate_budget_export, list_export_runs, load_export_file
 from app.forecast.service import update_monthly_forecast
 from app.month import FALLBACK_MONTH_SUMMARY, load_month_summary
-from app.recurring import list_recurring_series
+from app.recurring import confirm_recurring_series, disable_recurring_series, list_recurring_series
 from app.review import ReviewCorrection, apply_review_correction, list_category_names
 from app.rules import backfill_rule, create_rule, draft_rule_from_transaction, list_rules, preview_rule, set_rule_active
 from app.settings import (
@@ -250,6 +250,36 @@ def register_routes(app: Flask) -> None:
         app_config: AppConfig = app.config["APP_CONFIG"]
         series = list_recurring_series(app_config.database_url) if app_config.database_url else []
         return render_template("recurring.html", series=series)
+
+    @app.post("/recurring/<int:series_id>/confirm")
+    @require_post_csrf
+    def confirm_recurring(series_id: int):
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        if not confirm_recurring_series(app_config.database_url, series_id):
+            abort(404)
+        _refresh_forecast(app, app_config)
+        return redirect(url_for("recurring"))
+
+    @app.post("/recurring/<int:series_id>/disable")
+    @require_post_csrf
+    def disable_recurring(series_id: int):
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        if not disable_recurring_series(app_config.database_url, series_id):
+            abort(404)
+        _refresh_forecast(app, app_config)
+        return redirect(url_for("recurring"))
+
+
+def _refresh_forecast(app: Flask, app_config: AppConfig) -> None:
+    forecast_as_of = app.config.get("FORECAST_AS_OF")
+    update_monthly_forecast(
+        app_config.database_url,
+        as_of=forecast_as_of if isinstance(forecast_as_of, date) else None,
+    )
 
 
 def main() -> None:

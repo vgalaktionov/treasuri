@@ -123,6 +123,7 @@ def load_sample_data(database_url: str) -> None:
             _upsert_merchants(connection)
             for transaction in SAMPLE_TRANSACTIONS:
                 _upsert_sample_transaction(connection, account_id, transaction)
+            _upsert_sample_recurring_series(connection)
             _upsert_sample_settings(connection)
             update_monthly_forecast_in_connection(connection, as_of=SAMPLE_FORECAST_DATE)
             _upsert_sample_sync_run(connection)
@@ -283,6 +284,52 @@ def _upsert_sample_settings(connection: Connection[tuple[object, ...]]) -> None:
             variable_baseline_3m=Decimal("0.00"),
             variable_baseline_6m=Decimal("0.00"),
         ),
+    )
+
+
+def _upsert_sample_recurring_series(connection: Connection[tuple[object, ...]]) -> None:
+    connection.execute(
+        """
+        INSERT INTO merchants (name, normalized_name, default_category_id)
+        VALUES (
+            'Sample Streaming',
+            'sample streaming',
+            (SELECT id FROM categories WHERE name = 'Subscriptions')
+        )
+        ON CONFLICT (normalized_name)
+        DO UPDATE SET default_category_id = EXCLUDED.default_category_id, updated_at = now()
+        """
+    )
+    connection.execute("DELETE FROM recurring_series WHERE name = 'Sample Streaming'")
+    connection.execute(
+        """
+        INSERT INTO recurring_series (
+            merchant_id,
+            category_id,
+            name,
+            cadence,
+            amount_mode,
+            expected_amount,
+            amount_tolerance,
+            expected_day_of_month,
+            next_expected_date,
+            confidence,
+            is_confirmed
+        )
+        VALUES (
+            (SELECT id FROM merchants WHERE normalized_name = 'sample streaming'),
+            (SELECT id FROM categories WHERE name = 'Subscriptions'),
+            'Sample Streaming',
+            'monthly',
+            'fixed',
+            12.99,
+            2.00,
+            30,
+            '2026-05-30',
+            0.80,
+            false
+        )
+        """
     )
 
 
