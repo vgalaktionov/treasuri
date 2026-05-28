@@ -36,6 +36,13 @@ uv run pytest tests/integration
 uv run ruff check .
 uv run ruff format --check .
 uv run ty check
+uv run pre-commit run --all-files
+```
+
+Install the local git hook once per checkout:
+
+```sh
+uv run pre-commit install
 ```
 
 ## Database
