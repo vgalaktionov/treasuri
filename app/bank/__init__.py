@@ -1,0 +1,1 @@
+"""Bank provider adapter boundary."""
