@@ -75,5 +75,5 @@ def test_dashboard_renders_database_backed_sample_summary(migrated_postgres_url:
     assert b"May 2026" in response.data
     assert b"EUR 558" in response.data
     assert b"EUR 93/day" in response.data
-    assert b"1 transactions need review" in response.data
+    assert b"1 transaction needs review" in response.data
     assert b"fake completed at 2026-05-28 08:00" in response.data

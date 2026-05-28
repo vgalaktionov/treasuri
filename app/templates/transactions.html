@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Transactions - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="transactions-title">
+    <p class="muted">{{ subtitle }}</p>
+    <h1 id="transactions-title">{{ title }}</h1>
+    {% if transactions %}
+      <div class="transaction-list">
+        {% for transaction in transactions %}
+          <article class="transaction-card{% if transaction.needs_review %} needs-review{% endif %}">
+            <div class="transaction-main">
+              <div>
+                <time datetime="{{ transaction.booking_date.isoformat() }}">{{ transaction.booking_date.strftime("%d %b %Y") }}</time>
+                <h2>{{ transaction.merchant }}</h2>
+                <p>{{ transaction.description }}</p>
+              </div>
+              <strong>{{ transaction.amount }}</strong>
+            </div>
+            <div class="transaction-meta">
+              <span>{{ transaction.category }}</span>
+              <span>{{ transaction.classification_method }}</span>
+              {% if transaction.needs_review %}<span>review</span>{% endif %}
+              {% for flag in transaction.flags %}
+                <span>{{ flag }}</span>
+              {% endfor %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <article>
+        <strong>No transactions to show.</strong>
+        <p class="muted">Load deterministic sample data or run a sync once the bank adapter is configured.</p>
+      </article>
+    {% endif %}
+  </section>
+{% endblock %}

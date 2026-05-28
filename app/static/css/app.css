@@ -88,6 +88,66 @@ body {
   margin-block: 0.35rem 0;
 }
 
+.transaction-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-block-end: 2rem;
+}
+
+.transaction-card {
+  border: 1px solid var(--treasuri-line);
+  border-radius: 0.5rem;
+  margin: 0;
+  padding: 1rem;
+}
+
+.transaction-card.needs-review {
+  border-color: #b45309;
+}
+
+.transaction-main {
+  align-items: flex-start;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr auto;
+}
+
+.transaction-main time,
+.transaction-main p {
+  color: var(--treasuri-muted);
+}
+
+.transaction-main h2 {
+  font-size: 1.1rem;
+  margin-block: 0.2rem;
+}
+
+.transaction-main p {
+  margin: 0;
+}
+
+.transaction-main strong {
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+.transaction-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-block-start: 0.75rem;
+}
+
+.transaction-meta span {
+  background: #f1f5f9;
+  border: 1px solid var(--treasuri-line);
+  border-radius: 999px;
+  color: var(--treasuri-muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.35rem 0.5rem;
+}
+
 .status-list {
   display: grid;
   gap: 0.75rem;
@@ -123,5 +183,13 @@ body {
 
   .status-list div {
     grid-template-columns: 1fr;
+  }
+
+  .transaction-main {
+    grid-template-columns: 1fr;
+  }
+
+  .transaction-main strong {
+    white-space: normal;
   }
 }

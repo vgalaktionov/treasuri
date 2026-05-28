@@ -36,7 +36,7 @@
       <p>The sample forecast keeps expected income, upcoming fixed costs, target savings, and a safety buffer visible so the number can be explained.</p>
     </article>
     <article>
-      <strong>{{ summary.review_count }} transactions need review</strong>
+      <strong>{{ summary.review_count }} transaction{% if summary.review_count != 1 %}s{% endif %} {% if summary.review_count == 1 %}needs{% else %}need{% endif %} review</strong>
       <p>Unknown or low-confidence transactions will appear in the review inbox once the database slice is wired.</p>
     </article>
     <article>
