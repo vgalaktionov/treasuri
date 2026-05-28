@@ -1,0 +1,50 @@
+# Treasuri
+
+Treasuri is a private personal-finance PWA for answering one daily question: am I fine, and what can I still spend this month?
+
+The implementation follows `PRD.md`: Flask, server-rendered HTML, HTMX, Pico CSS, PostgreSQL with plain psycopg, hand-rolled SQL migrations, pgqueuer workers, Flask-OIDC auth, and deterministic sample data before real ABN AMRO sync.
+
+## Local Setup
+
+Install dependencies:
+
+```sh
+uv sync
+```
+
+Run the web process with the development OIDC test profile:
+
+```sh
+OIDC_ENABLED=false \
+OIDC_TESTING_PROFILE_JSON='{"sub":"dev-user","nickname":"dev-user","email":"dev-user@example.test","groups":["finance-app"]}' \
+ALLOWED_EMAILS=dev-user@example.test \
+uv run python -m app.web
+```
+
+Then open `http://127.0.0.1:5000`.
+
+## Current Commands
+
+```sh
+uv run python -m app.web
+uv run python -m app.worker
+DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.migrate
+DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.admin seed-categories
+uv run python -m app.admin sync-now
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run ty check
+```
+
+## Database
+
+Migrations are plain, up-only SQL files in `migrations/`. The migration runner creates `schema_migrations`, applies pending files in filename order, and records each version once.
+
+The first schema slice creates the PRD core tables for accounts, raw and enriched transactions, merchants, aliases, rules, manual overrides, recurring series, monthly forecasts, sync runs, export runs/files, app settings, and seeded categories.
+
+## Development Notes
+
+The dashboard currently renders deterministic sample values only. This proves the runtime shape, mobile layout, local static assets, and OIDC test-profile route protection before the database, import, classification, forecast, export, and worker slices are connected.
+
+Do not use real financial details in local fixtures, browser sessions, tests, or screenshots.

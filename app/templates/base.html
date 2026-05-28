@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <title>{% block title %}Treasuri{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/pico.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <script defer src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
+  </head>
+  <body>
+    <header class="app-shell">
+      <nav aria-label="Primary">
+        <a class="brand" href="/">Treasuri</a>
+        <ul>
+          <li><a href="/">Today</a></li>
+          <li><a href="/status">Status</a></li>
+        </ul>
+      </nav>
+    </header>
+    <main class="app-shell">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}{{ summary.month }} - Treasuri{% endblock %}
+
+{% block content %}
+  <section class="dashboard-hero" aria-labelledby="month-status">
+    <p class="muted">{{ summary.month }}</p>
+    <h1 id="month-status">Am I fine?</h1>
+    <div class="money-answer">
+      <span>Safe to spend</span>
+      <strong>{{ summary.safe_to_spend }}</strong>
+    </div>
+    <div class="quick-grid" aria-label="Forecast summary">
+      <article>
+        <span>Safe per day</span>
+        <strong>{{ summary.safe_per_day }}</strong>
+      </article>
+      <article>
+        <span>Projected savings</span>
+        <strong>{{ summary.projected_savings }}</strong>
+      </article>
+      <article>
+        <span>Target savings</span>
+        <strong>{{ summary.target_savings }}</strong>
+      </article>
+      <article>
+        <span>Confidence</span>
+        <strong>{{ summary.confidence }}</strong>
+      </article>
+    </div>
+  </section>
+
+  <section class="insight-list" aria-label="What changed">
+    <article>
+      <strong>{{ summary.pace }}</strong>
+      <p>The sample forecast keeps expected income, upcoming fixed costs, target savings, and a safety buffer visible so the number can be explained.</p>
+    </article>
+    <article>
+      <strong>{{ summary.review_count }} transactions need review</strong>
+      <p>Unknown or low-confidence transactions will appear in the review inbox once the database slice is wired.</p>
+    </article>
+    <article>
+      <strong>Last sync: {{ summary.last_sync }}</strong>
+      <p>This foundation uses deterministic sample values only. Real ABN sync comes behind the bank adapter boundary.</p>
+    </article>
+  </section>
+{% endblock %}

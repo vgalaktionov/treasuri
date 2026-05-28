@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Status - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="status-title">
+    <h1 id="status-title">Status</h1>
+    <dl class="status-list">
+      <div>
+        <dt>Environment</dt>
+        <dd>{{ config.app_env }}</dd>
+      </div>
+      <div>
+        <dt>OIDC enabled</dt>
+        <dd>{{ config.oidc_enabled }}</dd>
+      </div>
+      <div>
+        <dt>LLM enabled</dt>
+        <dd>{{ config.llm_enabled }}</dd>
+      </div>
+      <div>
+        <dt>LLM endpoint</dt>
+        <dd>{{ config.llm_base_url }}</dd>
+      </div>
+      <div>
+        <dt>LLM model</dt>
+        <dd>{{ config.llm_model }}</dd>
+      </div>
+      <div>
+        <dt>Bank provider</dt>
+        <dd>{{ config.bank_provider }}</dd>
+      </div>
+    </dl>
+  </section>
+{% endblock %}

@@ -1,0 +1,1 @@
+"""Treasuri Flask application package."""
