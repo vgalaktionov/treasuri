@@ -108,6 +108,8 @@ def _update_enriched_transaction(
             classification_method = 'manual_override',
             classification_confidence = 1,
             classification_reason = 'User correction from review inbox.',
+            classification_model = NULL,
+            classification_prompt_version = NULL,
             updated_at = now()
         WHERE id = %s
         """,

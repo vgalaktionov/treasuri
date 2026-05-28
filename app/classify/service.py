@@ -8,9 +8,11 @@ from decimal import Decimal
 import psycopg
 from psycopg import Connection
 
+from app.classify.llm import LlmClassificationError, OpenAiCompatibleClassifier
 from app.classify.pipeline import (
     CategorizationRule,
     ClassificationFlags,
+    ClassificationMethod,
     ClassificationResult,
     ManualOverride,
     MatchField,
@@ -19,6 +21,7 @@ from app.classify.pipeline import (
     TransactionForClassification,
     classify_transaction,
 )
+from app.config import AppConfig
 
 
 @dataclass(frozen=True)
@@ -27,12 +30,14 @@ class ClassifyResult:
     review_count: int
 
 
-def classify_transactions(database_url: str) -> ClassifyResult:
+def classify_transactions(database_url: str, config: AppConfig | None = None) -> ClassifyResult:
     with psycopg.connect(database_url) as connection:
         with connection.transaction():
             rules = _load_rules(connection)
             aliases = _load_aliases(connection)
             overrides = _load_manual_overrides(connection)
+            category_names = _load_category_names(connection)
+            llm_classifier = _create_llm_classifier(config)
             classified_count = 0
             review_count = 0
             for transaction_id, transaction in _load_transactions(connection):
@@ -42,12 +47,49 @@ def classify_transactions(database_url: str) -> ClassifyResult:
                     rules=rules,
                     merchant_aliases=aliases,
                 )
+                if result.method == ClassificationMethod.UNCATEGORIZED and llm_classifier is not None:
+                    result = _try_llm_classification(llm_classifier, transaction, category_names, result)
                 _update_enriched_transaction(connection, transaction_id, result)
                 classified_count += 1
                 if result.needs_review:
                     review_count += 1
 
     return ClassifyResult(classified_count=classified_count, review_count=review_count)
+
+
+def _create_llm_classifier(config: AppConfig | None) -> OpenAiCompatibleClassifier | None:
+    if config is None or not config.llm_enabled:
+        return None
+    return OpenAiCompatibleClassifier(
+        base_url=config.llm_base_url,
+        model=config.llm_model,
+        timeout_seconds=config.llm_timeout_seconds,
+        temperature=config.llm_temperature,
+    )
+
+
+def _try_llm_classification(
+    llm_classifier: OpenAiCompatibleClassifier,
+    transaction: TransactionForClassification,
+    category_names: list[str],
+    fallback: ClassificationResult,
+) -> ClassificationResult:
+    try:
+        suggestion = llm_classifier.classify(transaction, categories=category_names)
+    except LlmClassificationError:
+        return fallback
+    if suggestion is None:
+        return fallback
+    return ClassificationResult(
+        method=ClassificationMethod.LLM,
+        category=suggestion.category,
+        merchant=suggestion.merchant,
+        confidence=suggestion.confidence,
+        needs_review=True,
+        reason=f"LLM suggestion: {suggestion.reason}",
+        model_ref=suggestion.model_ref,
+        prompt_version=suggestion.prompt_version,
+    )
 
 
 def _load_transactions(
@@ -187,17 +229,23 @@ def _load_manual_overrides(connection: Connection[tuple[object, ...]]) -> list[M
     ]
 
 
+def _load_category_names(connection: Connection[tuple[object, ...]]) -> list[str]:
+    rows = connection.execute("SELECT name FROM categories ORDER BY name").fetchall()
+    return [str(row[0]) for row in rows]
+
+
 def _update_enriched_transaction(
     connection: Connection[tuple[object, ...]],
     transaction_id: int,
     result: ClassificationResult,
 ) -> None:
+    merchant_normalized_name = _upsert_suggested_merchant(connection, result)
     connection.execute(
         """
         UPDATE enriched_transactions
         SET
             category_id = COALESCE((SELECT id FROM categories WHERE name = %s), category_id),
-            merchant_id = COALESCE((SELECT id FROM merchants WHERE name = %s), merchant_id),
+            merchant_id = COALESCE((SELECT id FROM merchants WHERE normalized_name = %s), merchant_id),
             is_income = COALESCE(%s, is_income),
             is_transfer = COALESCE(%s, is_transfer),
             is_savings = COALESCE(%s, is_savings),
@@ -207,13 +255,15 @@ def _update_enriched_transaction(
             classification_method = %s,
             classification_confidence = %s,
             classification_reason = %s,
+            classification_model = %s,
+            classification_prompt_version = %s,
             rule_id = %s,
             updated_at = now()
         WHERE id = %s
         """,
         (
             result.category,
-            result.merchant,
+            merchant_normalized_name,
             result.flags.is_income,
             result.flags.is_transfer,
             result.flags.is_savings,
@@ -223,10 +273,38 @@ def _update_enriched_transaction(
             result.method,
             result.confidence,
             result.reason,
+            result.model_ref,
+            result.prompt_version,
             result.rule_id,
             transaction_id,
         ),
     )
+
+
+def _upsert_suggested_merchant(
+    connection: Connection[tuple[object, ...]],
+    result: ClassificationResult,
+) -> str | None:
+    if result.merchant is None or result.merchant.strip() == "":
+        return None
+    normalized_name = result.merchant.strip().casefold()
+    connection.execute(
+        """
+        INSERT INTO merchants (name, normalized_name, default_category_id)
+        VALUES (
+            %s,
+            %s,
+            (SELECT id FROM categories WHERE name = %s)
+        )
+        ON CONFLICT (normalized_name)
+        DO UPDATE SET
+            name = EXCLUDED.name,
+            default_category_id = COALESCE(EXCLUDED.default_category_id, merchants.default_category_id),
+            updated_at = now()
+        """,
+        (result.merchant.strip(), normalized_name, result.category),
+    )
+    return normalized_name
 
 
 def _read_int(value: object) -> int:

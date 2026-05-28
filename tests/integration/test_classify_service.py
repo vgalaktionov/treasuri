@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from decimal import Decimal
 
 import psycopg
 import pytest
@@ -8,7 +9,9 @@ from testcontainers.postgres import PostgresContainer
 
 from app.bank.fake import FakeBankAdapter
 from app.bank.sync import sync_bank_transactions
+from app.classify.llm import LlmClassificationError, LlmClassificationSuggestion
 from app.classify.service import classify_transactions
+from app.config import AppConfig
 from app.migrate import run_migrations
 from app.normalize import normalize_raw_transactions
 
@@ -102,3 +105,114 @@ def test_classify_transactions_applies_rules_before_aliases(normalized_postgres_
         ("Monthly salary sample", "Income", None, False, "rule"),
         ("Needs review sample", "Unknown", None, True, "uncategorized"),
     ]
+
+
+@pytest.fixture
+def llm_postgres_url() -> Iterator[str]:
+    with PostgresContainer(
+        image="postgres:16-alpine",
+        username="treasuri",
+        password="treasuri",
+        dbname="treasuri",
+        driver=None,
+    ) as postgres:
+        database_url = postgres.get_connection_url(driver=None)
+        run_migrations(database_url)
+        sync_bank_transactions(database_url, FakeBankAdapter(), account_iban="NL00FAKE0123456789")
+        normalize_raw_transactions(database_url)
+        yield database_url
+
+
+def llm_config(database_url: str) -> AppConfig:
+    return AppConfig(
+        app_env="test",
+        secret_key="test-secret",
+        database_url=database_url,
+        oidc_enabled=False,
+        llm_enabled=True,
+        llm_base_url="http://llama.test/v1",
+        llm_model="test-llm",
+        llm_timeout_seconds=1,
+        bank_provider="fake",
+    )
+
+
+def test_classify_transactions_uses_llm_fallback_without_clearing_review(
+    llm_postgres_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeLlmClassifier:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def classify(self, transaction, *, categories):
+            if transaction.description != "Needs review sample":
+                return None
+            assert "Groceries" in categories
+            return LlmClassificationSuggestion(
+                category="Groceries",
+                merchant="Sample Merchant",
+                confidence=Decimal("0.61"),
+                reason="The description is too vague but resembles a merchant purchase.",
+                model_ref="test-llm",
+            )
+
+    monkeypatch.setattr("app.classify.service.OpenAiCompatibleClassifier", FakeLlmClassifier)
+
+    result = classify_transactions(llm_postgres_url, llm_config(llm_postgres_url))
+
+    with psycopg.connect(llm_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                categories.name,
+                merchants.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                enriched_transactions.classification_confidence,
+                enriched_transactions.classification_model,
+                enriched_transactions.classification_prompt_version
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+            LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+            WHERE raw_transactions.description = 'Needs review sample'
+            """
+        ).fetchone()
+
+    assert result.classified_count == 3
+    assert row == ("Groceries", "Sample Merchant", True, "llm", Decimal("0.6100"), "test-llm", "classification-v1")
+
+
+def test_classify_transactions_keeps_uncategorized_when_llm_fails(
+    llm_postgres_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingLlmClassifier:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def classify(self, _transaction, *, categories):
+            _ = categories
+            raise LlmClassificationError("boom")
+
+    monkeypatch.setattr("app.classify.service.OpenAiCompatibleClassifier", FailingLlmClassifier)
+
+    classify_transactions(llm_postgres_url, llm_config(llm_postgres_url))
+
+    with psycopg.connect(llm_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                categories.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                enriched_transactions.classification_model
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+            WHERE raw_transactions.description = 'Needs review sample'
+            """
+        ).fetchone()
+
+    assert row == ("Unknown", True, "uncategorized", None)

@@ -41,7 +41,7 @@ def run_sync_now(config: AppConfig) -> SyncNowResult:
     account_iban = config.abn_account_iban or "NL00FAKE0123456789"
     sync_result = sync_bank_transactions(config.database_url, FakeBankAdapter(), account_iban=account_iban)
     normalize_result = normalize_raw_transactions(config.database_url)
-    classify_result = classify_transactions(config.database_url)
+    classify_result = classify_transactions(config.database_url, config)
     recurring_result = detect_recurring(config.database_url)
     forecast_result = update_monthly_forecast(config.database_url)
     return SyncNowResult(

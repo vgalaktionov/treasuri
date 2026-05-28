@@ -12,6 +12,7 @@ class ClassificationMethod(StrEnum):
     MANUAL_OVERRIDE = "manual_override"
     RULE = "rule"
     MERCHANT_ALIAS = "merchant_alias"
+    LLM = "llm"
     UNCATEGORIZED = "uncategorized"
 
 
@@ -95,6 +96,8 @@ class ClassificationResult:
     needs_review: bool
     reason: str
     rule_id: int | None = None
+    model_ref: str | None = None
+    prompt_version: str | None = None
     flags: ClassificationFlags = ClassificationFlags()
 
 

@@ -75,6 +75,8 @@ Postgres integration tests use Testcontainers and start a disposable `postgres:1
 
 The Docker image is intentionally one artifact. Override the Compose command to run the same image as `python -m app.web`, `python -m app.worker`, `python -m app.migrate`, or `python -m app.admin <command>`.
 
+Classification runs deterministic methods first. If `LLM_ENABLED=true`, uncategorized transactions can receive a local llama suggestion from the OpenAI-compatible endpoint, but they still stay in review until confirmed.
+
 ## Development Notes
 
 The dashboard can render deterministic sample values from Postgres after `load-sample-data`, or a no-database fallback for early smoke tests. This proves the runtime shape, mobile layout, local static assets, and OIDC test-profile route protection before real bank sync, review workflows, export, and worker slices are connected.
