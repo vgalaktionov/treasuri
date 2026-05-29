@@ -17,4 +17,5 @@ def test_ci_workflow_runs_checks_before_publishing_image() -> None:
     assert "needs: checks" in workflow
     assert "ghcr.io/${{ github.repository }}" in workflow
     assert "push: ${{ github.event_name == 'push' }}" in workflow
+    assert "GIT_SHA=${{ github.sha }}" in workflow
     assert "type=sha,prefix=sha-" in workflow

@@ -2,7 +2,12 @@ FROM python:3.12-slim AS runtime
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.17 /uv /uvx /bin/
 
+ARG APP_VERSION=0.1.0
+ARG GIT_SHA=
+
 ENV PATH="/app/.venv/bin:${PATH}" \
+    APP_VERSION="${APP_VERSION}" \
+    GIT_SHA="${GIT_SHA}" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \

@@ -15,6 +15,10 @@ def test_dockerfile_builds_single_uv_managed_runtime_image() -> None:
 
     assert "FROM python:3.12-slim AS runtime" in dockerfile
     assert "COPY --from=ghcr.io/astral-sh/uv:" in dockerfile
+    assert "ARG APP_VERSION=0.1.0" in dockerfile
+    assert "ARG GIT_SHA=" in dockerfile
+    assert 'APP_VERSION="${APP_VERSION}"' in dockerfile
+    assert 'GIT_SHA="${GIT_SHA}"' in dockerfile
     assert "uv sync --frozen --no-dev --no-install-project" in dockerfile
     assert 'CMD ["python", "-m", "app.web"]' in dockerfile
     assert "USER treasuri" in dockerfile
