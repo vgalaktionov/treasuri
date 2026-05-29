@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
+from urllib.error import URLError
 
 import pytest
 
-from app.classify.llm import LlmClassificationError, OpenAiCompatibleClassifier
+from app.classify.llm import LlmClassificationError, OpenAiCompatibleClassifier, _post_json
 from app.classify.pipeline import TransactionForClassification
 
 
@@ -88,3 +89,25 @@ def test_openai_classifier_rejects_non_json_content() -> None:
 
     with pytest.raises(LlmClassificationError, match="strict JSON"):
         classifier.classify(transaction(), categories=["Groceries", "Rent"])
+
+
+def test_post_json_wraps_transport_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    def timeout_urlopen(_request, *, timeout: int):
+        assert timeout == 2
+        raise TimeoutError("sample timeout")
+
+    monkeypatch.setattr("app.classify.llm.urlopen", timeout_urlopen)
+
+    with pytest.raises(LlmClassificationError, match="request failed"):
+        _post_json("http://llama:8080/v1/chat/completions", {"model": "local-model"}, 2)
+
+
+def test_post_json_wraps_transport_url_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_urlopen(_request, *, timeout: int):
+        assert timeout == 2
+        raise URLError("connection refused")
+
+    monkeypatch.setattr("app.classify.llm.urlopen", failing_urlopen)
+
+    with pytest.raises(LlmClassificationError, match="request failed"):
+        _post_json("http://llama:8080/v1/chat/completions", {"model": "local-model"}, 2)
