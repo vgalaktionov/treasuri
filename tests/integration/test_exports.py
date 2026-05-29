@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
+from hashlib import sha256
 from io import BytesIO
 
 import psycopg
@@ -53,7 +54,13 @@ def test_generate_budget_export_stores_required_xlsx_sheets(sample_app: Flask) -
     with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
         row = connection.execute(
             """
-            SELECT export_runs.status, export_files.id, export_files.filename, export_files.size_bytes
+            SELECT
+                export_runs.status,
+                export_files.id,
+                export_files.filename,
+                export_files.size_bytes,
+                export_files.sha256,
+                export_files.content
             FROM export_runs
             JOIN export_files ON export_files.export_run_id = export_runs.id
             WHERE export_runs.id = %s
@@ -65,9 +72,11 @@ def test_generate_budget_export_stores_required_xlsx_sheets(sample_app: Flask) -
     assert row[0] == "completed"
     assert row[2] == "budget-averages-2026-05.xlsx"
     assert row[3] > 0
+    assert row[4] == sha256(row[5]).hexdigest()
 
     export_file = load_export_file(sample_app.config["DATABASE_URL"], row[1])
     assert export_file is not None
+    assert sha256(export_file.content).hexdigest() == row[4]
     workbook = load_workbook(BytesIO(export_file.content), read_only=True)
 
     assert workbook.sheetnames == list(REQUIRED_SHEETS)
@@ -100,9 +109,22 @@ def test_export_routes_generate_and_download_postgres_blob(sample_app: Flask) ->
 
     download_response = client.get(f"/export/files/{match.group(1).decode()}")
 
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        row = connection.execute(
+            """
+            SELECT sha256, content
+            FROM export_files
+            WHERE id = %s
+            """,
+            (int(match.group(1).decode()),),
+        ).fetchone()
+
     assert download_response.status_code == 200
     assert download_response.headers["Content-Type"] == XLSX_CONTENT_TYPE
     assert "budget-averages-2026-05.xlsx" in download_response.headers["Content-Disposition"]
+    assert row is not None
+    assert download_response.data == row[1]
+    assert sha256(download_response.data).hexdigest() == row[0]
     workbook = load_workbook(BytesIO(download_response.data), read_only=True)
     assert workbook.sheetnames == list(REQUIRED_SHEETS)
 
