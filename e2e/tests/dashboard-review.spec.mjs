@@ -326,7 +326,7 @@ uiTest("export flow generates and downloads an xlsx on mobile", async () => {
     page.waitForNavigation({ waitUntil: "networkidle0" }),
     page.locator(".export-action button[type='submit']").click(),
   ]);
-  bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  bodyText = await waitForExportCompletion(page);
   assert.match(bodyText, /budget-averages-2026-05\.xlsx/);
   assert.match(bodyText, /completed/);
 
@@ -552,6 +552,18 @@ async function waitForDownloadedFile(downloadPath, filename) {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error(`Download did not finish: ${filename}`);
+}
+
+async function waitForExportCompletion(page) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const bodyText = await page.$eval("body", (body) => body.innerText);
+    if (bodyText.includes("budget-averages-2026-05.xlsx") && bodyText.includes("completed")) {
+      return bodyText;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await page.reload({ waitUntil: "networkidle0" });
+  }
+  throw new Error("Export did not complete through the worker");
 }
 
 function waitForExit(child, timeoutMs) {

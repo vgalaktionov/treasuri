@@ -12,9 +12,9 @@ from app.auth import current_user_email, init_auth, require_post_csrf
 from app.budget import load_category_budgets
 from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
-from app.exports.xlsx import generate_budget_export, list_export_runs, load_export_file
+from app.exports.xlsx import create_pending_budget_export, list_export_runs, load_export_file
 from app.forecast.service import update_monthly_forecast
-from app.jobs.enqueue import enqueue_backfill_rule
+from app.jobs.enqueue import enqueue_backfill_rule, enqueue_generate_xlsx_export
 from app.month import FALLBACK_MONTH_SUMMARY, load_month_summary
 from app.recurring import confirm_recurring_series, disable_recurring_series, list_recurring_series
 from app.review import (
@@ -308,7 +308,9 @@ def register_routes(app: Flask) -> None:
         app_config: AppConfig = app.config["APP_CONFIG"]
         if not app_config.database_url:
             abort(400)
-        generate_budget_export(app_config.database_url, created_by=current_user_email())
+        created_by = current_user_email()
+        run_id = create_pending_budget_export(app_config.database_url, created_by=created_by)
+        enqueue_generate_xlsx_export(app_config.database_url, created_by=created_by, run_id=run_id)
         return redirect(url_for("export"))
 
     @app.get("/export/files/<int:file_id>")

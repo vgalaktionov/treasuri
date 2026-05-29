@@ -89,11 +89,19 @@ def enqueue_update_monthly_forecast(database_url: str) -> int:
     )
 
 
-def enqueue_generate_xlsx_export(database_url: str, *, created_by: str | None = None) -> int:
+def enqueue_generate_xlsx_export(
+    database_url: str,
+    *,
+    created_by: str | None = None,
+    run_id: int | None = None,
+) -> int:
+    payload: dict[str, object] = {"created_by": created_by}
+    if run_id is not None:
+        payload["run_id"] = run_id
     return enqueue_job(
         database_url,
         GENERATE_XLSX_EXPORT_ENTRYPOINT,
-        {"created_by": created_by},
+        payload,
     )
 
 

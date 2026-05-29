@@ -95,10 +95,12 @@ def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
     @pgq.entrypoint(GENERATE_XLSX_EXPORT_ENTRYPOINT)
     async def generate_xlsx_export_job(job: Job) -> None:
         created_by = _optional_str_payload(job, "created_by")
+        run_id = _optional_int_payload(job, "run_id")
         run_id = await asyncio.to_thread(
             generate_budget_export,
             config.database_url,
             created_by=created_by,
+            run_id=run_id,
         )
         print(f"{GENERATE_XLSX_EXPORT_ENTRYPOINT}: run {run_id}", flush=True)
 
@@ -144,6 +146,15 @@ def _required_int_payload(job: Job, key: str) -> int:
     value = _job_payload(job).get(key)
     if not isinstance(value, int):
         raise ValueError(f"job payload requires integer {key}")
+    return value
+
+
+def _optional_int_payload(job: Job, key: str) -> int | None:
+    value = _job_payload(job).get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int):
+        raise ValueError(f"job payload {key} must be an integer")
     return value
 
 

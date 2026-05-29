@@ -47,22 +47,29 @@ class ExportRunSummary:
     error_message: str | None
 
 
-def generate_budget_export(database_url: str, *, created_by: str | None = None) -> int:
+def create_pending_budget_export(database_url: str, *, created_by: str | None = None) -> int:
     with psycopg.connect(database_url) as connection:
         with connection.transaction():
             year_month = _latest_year_month(connection)
             period_start = date.fromisoformat(f"{year_month}-01")
             period_end = _period_end(period_start)
-            run_id = _create_export_run(connection, period_start, period_end, created_by)
-            try:
-                content = _build_workbook(connection, year_month)
-                filename = f"budget-averages-{year_month}.xlsx"
-                _store_export_file(connection, run_id, filename, content)
-                _finish_export_run(connection, run_id, "completed", None)
-            except Exception as exc:
-                _finish_export_run(connection, run_id, "failed", str(exc))
-                raise
-    return run_id
+            return _create_export_run(connection, period_start, period_end, created_by, status="pending")
+
+
+def generate_budget_export(database_url: str, *, created_by: str | None = None, run_id: int | None = None) -> int:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        prepared_run_id, year_month = _prepare_export_run(connection, created_by=created_by, run_id=run_id)
+        try:
+            content = _build_workbook(connection, year_month)
+            filename = f"budget-averages-{year_month}.xlsx"
+            with connection.transaction():
+                _store_export_file(connection, prepared_run_id, filename, content)
+                _finish_export_run(connection, prepared_run_id, "completed", None)
+        except Exception as exc:
+            with connection.transaction():
+                _finish_export_run(connection, prepared_run_id, "failed", str(exc))
+            raise
+    return prepared_run_id
 
 
 def list_export_runs(database_url: str) -> list[ExportRunSummary]:
@@ -344,6 +351,8 @@ def _create_export_run(
     period_start: date,
     period_end: date,
     created_by: str | None,
+    *,
+    status: str,
 ) -> int:
     row = connection.execute(
         """
@@ -356,14 +365,74 @@ def _create_export_run(
             created_by,
             metadata_json
         )
-        VALUES ('budget_averages', %s, %s, 'running', now(), %s, '{}'::jsonb)
+        VALUES (
+            'budget_averages',
+            %s,
+            %s,
+            %s,
+            CASE WHEN %s = 'running' THEN now() ELSE NULL END,
+            %s,
+            '{}'::jsonb
+        )
         RETURNING id
         """,
-        (period_start, period_end, created_by),
+        (period_start, period_end, status, status, created_by),
     ).fetchone()
     if row is None:
         raise RuntimeError("export run insert did not return an id")
     return _read_int(row[0])
+
+
+def _prepare_export_run(
+    connection: Connection[tuple[object, ...]],
+    *,
+    created_by: str | None,
+    run_id: int | None,
+) -> tuple[int, str]:
+    with connection.transaction():
+        if run_id is None:
+            year_month = _latest_year_month(connection)
+            period_start = date.fromisoformat(f"{year_month}-01")
+            period_end = _period_end(period_start)
+            prepared_run_id = _create_export_run(
+                connection,
+                period_start,
+                period_end,
+                created_by,
+                status="running",
+            )
+            return prepared_run_id, year_month
+
+        period_start = _start_export_run(connection, run_id, created_by)
+        return run_id, period_start.strftime("%Y-%m")
+
+
+def _start_export_run(
+    connection: Connection[tuple[object, ...]],
+    run_id: int,
+    created_by: str | None,
+) -> date:
+    connection.execute("DELETE FROM export_files WHERE export_run_id = %s", (run_id,))
+    row = connection.execute(
+        """
+        UPDATE export_runs
+        SET
+            status = 'running',
+            started_at = now(),
+            finished_at = NULL,
+            error_message = NULL,
+            created_by = COALESCE(created_by, %s)
+        WHERE id = %s
+        RETURNING period_start
+        """,
+        (created_by, run_id),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"export run does not exist: {run_id}")
+    period_start = row[0]
+    if not isinstance(period_start, date):
+        raise RuntimeError(f"expected date period_start, got {type(period_start).__name__}")
+    return period_start
 
 
 def _store_export_file(connection: Connection[tuple[object, ...]], run_id: int, filename: str, content: bytes) -> None:

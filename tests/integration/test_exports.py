@@ -13,6 +13,7 @@ from testcontainers.postgres import PostgresContainer
 
 from app.config import AppConfig
 from app.exports.xlsx import REQUIRED_SHEETS, XLSX_CONTENT_TYPE, generate_budget_export, load_export_file
+from app.jobs.worker import run_until_drained
 from app.migrate import run_migrations
 from app.sample_data import load_sample_data
 from app.web import create_app
@@ -102,9 +103,35 @@ def test_export_routes_generate_and_download_postgres_blob(sample_app: Flask) ->
     )
 
     assert generate_response.status_code == 200
-    assert b"budget-averages-2026-05.xlsx" in generate_response.data
+    assert b"pending" in generate_response.data
 
-    match = re.search(rb'href="/export/files/(\d+)"', generate_response.data)
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        pending_row = connection.execute(
+            """
+            SELECT
+                export_runs.id,
+                export_runs.status,
+                export_runs.created_by,
+                pgqueuer.entrypoint,
+                (convert_from(pgqueuer.payload, 'UTF8')::jsonb ->> 'run_id')::bigint
+            FROM export_runs
+            JOIN pgqueuer ON (convert_from(pgqueuer.payload, 'UTF8')::jsonb ->> 'run_id')::bigint = export_runs.id
+            ORDER BY export_runs.id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+
+    assert pending_row is not None
+    assert isinstance(pending_row[0], int)
+    assert pending_row[1:] == ("pending", "dev-user@example.test", "generate_xlsx_export", pending_row[0])
+
+    run_until_drained(sample_app.config["APP_CONFIG"])
+
+    completed_response = client.get("/export")
+    assert completed_response.status_code == 200
+    assert b"budget-averages-2026-05.xlsx" in completed_response.data
+
+    match = re.search(rb'href="/export/files/(\d+)"', completed_response.data)
     assert match is not None
 
     download_response = client.get(f"/export/files/{match.group(1).decode()}")
