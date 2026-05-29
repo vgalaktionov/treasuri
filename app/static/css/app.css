@@ -447,6 +447,27 @@ header nav a {
   margin-block-start: 0.65rem;
 }
 
+.flag-fieldset {
+  border: 1px solid var(--treasuri-line);
+  border-radius: 0.5rem;
+  display: grid;
+  gap: 0.45rem 0.75rem;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0.75rem;
+}
+
+.flag-fieldset legend {
+  color: var(--treasuri-muted);
+  font-size: 0.9rem;
+  padding-inline: 0.25rem;
+}
+
+.flag-fieldset .checkbox-label {
+  min-block-size: auto;
+}
+
 .review-actions {
   display: flex;
   gap: 0.5rem;
@@ -947,6 +968,10 @@ header nav a {
 
   .review-form {
     grid-template-columns: 1fr;
+  }
+
+  .flag-fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .review-actions {

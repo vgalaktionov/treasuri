@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import cast
 
 import psycopg
 from psycopg import Connection
@@ -242,6 +243,7 @@ def _load_manual_overrides(connection: Connection[tuple[object, ...]]) -> list[M
             manual_overrides.enriched_transaction_id,
             categories.name,
             merchants.name,
+            manual_overrides.flags_json,
             manual_overrides.notes
         FROM manual_overrides
         LEFT JOIN categories ON categories.id = manual_overrides.category_id
@@ -254,7 +256,8 @@ def _load_manual_overrides(connection: Connection[tuple[object, ...]]) -> list[M
             transaction_id=_read_int(row[0]),
             category=_optional_str(row[1]),
             merchant=_optional_str(row[2]),
-            notes=_optional_str(row[3]),
+            flags=_classification_flags(row[3]),
+            notes=_optional_str(row[4]),
         )
         for row in rows
     ]
@@ -312,6 +315,7 @@ def _update_enriched_transaction(
             is_transfer = COALESCE(%s, is_transfer),
             is_savings = COALESCE(%s, is_savings),
             is_fixed_cost = COALESCE(%s, is_fixed_cost),
+            is_one_off = COALESCE(%s, is_one_off),
             is_excluded_from_budget = COALESCE(%s, is_excluded_from_budget),
             needs_review = %s,
             classification_method = %s,
@@ -330,6 +334,7 @@ def _update_enriched_transaction(
             result.flags.is_transfer,
             result.flags.is_savings,
             result.flags.is_fixed_cost,
+            result.flags.is_one_off,
             result.flags.is_excluded_from_budget,
             result.needs_review,
             result.method,
@@ -385,6 +390,28 @@ def _optional_str(value: object) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _classification_flags(value: object) -> ClassificationFlags:
+    if not isinstance(value, dict):
+        return ClassificationFlags()
+    flags = cast(dict[str, object], value)
+    return ClassificationFlags(
+        is_income=_optional_flag(flags.get("is_income")),
+        is_transfer=_optional_flag(flags.get("is_transfer")),
+        is_savings=_optional_flag(flags.get("is_savings")),
+        is_fixed_cost=_optional_flag(flags.get("is_fixed_cost")),
+        is_one_off=_optional_flag(flags.get("is_one_off")),
+        is_excluded_from_budget=_optional_flag(flags.get("is_excluded_from_budget")),
+    )
+
+
+def _optional_flag(value: object) -> bool | None:
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise RuntimeError(f"expected boolean flag, got {type(value).__name__}")
+    return value
 
 
 def _optional_bool(value: object) -> bool | None:

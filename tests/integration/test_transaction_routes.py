@@ -100,6 +100,8 @@ def test_transactions_route_can_apply_manual_edit(sample_app) -> None:
             "return_to": "/transactions?q=one-off",
             "category": "Shopping",
             "merchant": "Sample Edited Shop",
+            "is_one_off": "1",
+            "is_excluded_from_budget": "1",
         },
         follow_redirects=True,
     )
@@ -112,6 +114,9 @@ def test_transactions_route_can_apply_manual_edit(sample_app) -> None:
                 merchants.name,
                 enriched_transactions.needs_review,
                 enriched_transactions.classification_method,
+                enriched_transactions.is_one_off,
+                enriched_transactions.is_excluded_from_budget,
+                manual_overrides.flags_json,
                 manual_overrides.id IS NOT NULL
             FROM enriched_transactions
             JOIN categories ON categories.id = enriched_transactions.category_id
@@ -126,7 +131,21 @@ def test_transactions_route_can_apply_manual_edit(sample_app) -> None:
     assert edit_response.status_code == 200
     assert b"Sample Edited Shop" in edit_response.data
     assert b"Shopping" in edit_response.data
-    assert row == ("Shopping", "Sample Edited Shop", False, "manual_override", True)
+    assert row == (
+        "Shopping",
+        "Sample Edited Shop",
+        False,
+        "manual_override",
+        True,
+        True,
+        {
+            "is_one_off": True,
+            "is_savings": False,
+            "is_transfer": False,
+            "is_excluded_from_budget": True,
+        },
+        True,
+    )
 
 
 def _transaction_id(app, description: str) -> int:

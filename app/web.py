@@ -199,6 +199,10 @@ def register_routes(app: Flask) -> None:
                 category_name=category_name,
                 merchant_name=merchant_name,
                 create_alias=request.form.get("create_alias") == "1",
+                is_transfer=request.form.get("is_transfer") == "1",
+                is_savings=request.form.get("is_savings") == "1",
+                is_one_off=request.form.get("is_one_off") == "1",
+                is_excluded_from_budget=request.form.get("is_excluded_from_budget") == "1",
             ),
         )
         if request.form.get("next") == "rule-preview":
@@ -222,6 +226,10 @@ def register_routes(app: Flask) -> None:
                 category_name=category_name,
                 merchant_name=merchant_name,
                 create_alias=request.form.get("create_alias") == "1",
+                is_transfer=request.form.get("is_transfer") == "1",
+                is_savings=request.form.get("is_savings") == "1",
+                is_one_off=request.form.get("is_one_off") == "1",
+                is_excluded_from_budget=request.form.get("is_excluded_from_budget") == "1",
             ),
         )
         _refresh_forecast(app, app_config)

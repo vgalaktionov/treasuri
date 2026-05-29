@@ -66,6 +66,8 @@ def test_review_category_update_creates_manual_override_and_clears_review(sample
             "category": "Dog",
             "merchant": "Sample Pet Care",
             "create_alias": "1",
+            "is_one_off": "1",
+            "is_excluded_from_budget": "1",
         },
         follow_redirects=True,
     )
@@ -78,6 +80,9 @@ def test_review_category_update_creates_manual_override_and_clears_review(sample
                 merchants.name,
                 enriched_transactions.needs_review,
                 enriched_transactions.classification_method,
+                enriched_transactions.is_one_off,
+                enriched_transactions.is_excluded_from_budget,
+                manual_overrides.flags_json,
                 manual_overrides.id IS NOT NULL,
                 merchant_aliases.match_text,
                 merchant_aliases.match_type
@@ -94,7 +99,25 @@ def test_review_category_update_creates_manual_override_and_clears_review(sample
 
     assert response.status_code == 200
     assert b"Unknown Sample Merchant" not in response.data
-    assert rows == [("Dog", "Sample Pet Care", False, "manual_override", True, "Unknown Sample Merchant", "contains")]
+    assert rows == [
+        (
+            "Dog",
+            "Sample Pet Care",
+            False,
+            "manual_override",
+            True,
+            True,
+            {
+                "is_one_off": True,
+                "is_savings": False,
+                "is_transfer": False,
+                "is_excluded_from_budget": True,
+            },
+            True,
+            "Unknown Sample Merchant",
+            "contains",
+        )
+    ]
 
 
 def test_review_category_update_can_skip_merchant_alias(sample_app: Flask) -> None:

@@ -16,6 +16,10 @@ class ReviewCorrection:
     merchant_name: str | None
     notes: str | None = None
     create_alias: bool = False
+    is_transfer: bool = False
+    is_savings: bool = False
+    is_one_off: bool = False
+    is_excluded_from_budget: bool = False
 
 
 def list_category_names(database_url: str) -> list[str]:
@@ -89,7 +93,7 @@ def _upsert_manual_override(
             correction.transaction_id,
             category_id,
             merchant_id,
-            json.dumps({}, sort_keys=True),
+            json.dumps(_flags_json(correction), sort_keys=True),
             correction.notes,
         ),
     )
@@ -146,6 +150,10 @@ def _update_enriched_transaction(
         SET
             category_id = %s,
             merchant_id = %s,
+            is_transfer = %s,
+            is_savings = %s,
+            is_one_off = %s,
+            is_excluded_from_budget = %s,
             needs_review = false,
             classification_method = 'manual_override',
             classification_confidence = 1,
@@ -155,8 +163,25 @@ def _update_enriched_transaction(
             updated_at = now()
         WHERE id = %s
         """,
-        (category_id, merchant_id, correction.transaction_id),
+        (
+            category_id,
+            merchant_id,
+            correction.is_transfer,
+            correction.is_savings,
+            correction.is_one_off,
+            correction.is_excluded_from_budget,
+            correction.transaction_id,
+        ),
     )
+
+
+def _flags_json(correction: ReviewCorrection) -> dict[str, bool]:
+    return {
+        "is_transfer": correction.is_transfer,
+        "is_savings": correction.is_savings,
+        "is_one_off": correction.is_one_off,
+        "is_excluded_from_budget": correction.is_excluded_from_budget,
+    }
 
 
 def _read_int(value: object) -> int:

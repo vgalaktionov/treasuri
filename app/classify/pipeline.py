@@ -52,6 +52,7 @@ class ClassificationFlags:
     is_transfer: bool | None = None
     is_savings: bool | None = None
     is_fixed_cost: bool | None = None
+    is_one_off: bool | None = None
     is_excluded_from_budget: bool | None = None
 
 

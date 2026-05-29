@@ -77,6 +77,25 @@
                     <input type="checkbox" name="create_alias" value="1">
                     Remember merchant
                   </label>
+                  <fieldset class="flag-fieldset">
+                    <legend>Flags</legend>
+                    <label class="checkbox-label">
+                      <input type="checkbox" name="is_transfer" value="1" {% if "transfer" in transaction.flags %}checked{% endif %}>
+                      Transfer
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" name="is_savings" value="1" {% if "savings" in transaction.flags %}checked{% endif %}>
+                      Savings
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" name="is_one_off" value="1" {% if "one-off" in transaction.flags %}checked{% endif %}>
+                      One-off
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" name="is_excluded_from_budget" value="1" {% if "excluded" in transaction.flags %}checked{% endif %}>
+                      Exclude
+                    </label>
+                  </fieldset>
                   <div class="review-actions">
                     <button type="submit">Save changes</button>
                   </div>
@@ -102,6 +121,25 @@
                   <input type="checkbox" name="create_alias" value="1" checked>
                   Remember merchant
                 </label>
+                <fieldset class="flag-fieldset">
+                  <legend>Flags</legend>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="is_transfer" value="1" {% if "transfer" in transaction.flags %}checked{% endif %}>
+                    Transfer
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="is_savings" value="1" {% if "savings" in transaction.flags %}checked{% endif %}>
+                    Savings
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="is_one_off" value="1" {% if "one-off" in transaction.flags %}checked{% endif %}>
+                    One-off
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="is_excluded_from_budget" value="1" {% if "excluded" in transaction.flags %}checked{% endif %}>
+                    Exclude
+                  </label>
+                </fieldset>
                 <div class="review-actions">
                   <button type="submit">Save</button>
                   <button type="submit" name="next" value="rule-preview" class="secondary">Save and preview rule</button>
