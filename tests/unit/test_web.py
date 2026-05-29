@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import html
 
+import pytest
+
 from app.config import AppConfig
 from app.web import create_app
 
@@ -70,6 +72,76 @@ def test_app_route_rejects_missing_allowed_email_list() -> None:
     response = app.test_client().get("/")
 
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/month",
+        "/transactions",
+        "/transactions/1/raw",
+        "/review",
+        "/rules",
+        "/rules/preview/from-transaction/1",
+        "/categories",
+        "/recurring",
+        "/export",
+        "/export/files/1",
+        "/settings",
+        "/status",
+        "/more",
+    ],
+)
+def test_private_get_routes_reject_disallowed_test_profile(path: str) -> None:
+    app = create_app(
+        AppConfig(
+            app_env="test",
+            secret_key="test-secret",
+            allowed_emails=("allowed@example.test",),
+            oidc_enabled=False,
+            oidc_testing_profile={
+                "sub": "dev-user",
+                "email": "dev-user@example.test",
+            },
+            oidc_cookie_secure=False,
+        ),
+        {"TESTING": True},
+    )
+
+    response = app.test_client().get(path)
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/healthz",
+        "/service-worker.js",
+        "/logged-out",
+        "/static/site.webmanifest",
+    ],
+)
+def test_public_get_routes_allow_disallowed_test_profile(path: str) -> None:
+    app = create_app(
+        AppConfig(
+            app_env="test",
+            secret_key="test-secret",
+            allowed_emails=("allowed@example.test",),
+            oidc_enabled=False,
+            oidc_testing_profile={
+                "sub": "dev-user",
+                "email": "dev-user@example.test",
+            },
+            oidc_cookie_secure=False,
+        ),
+        {"TESTING": True},
+    )
+
+    response = app.test_client().get(path)
+
+    assert response.status_code == 200
 
 
 def test_logout_clears_session_and_renders_public_signed_out_page(client) -> None:
