@@ -142,6 +142,49 @@ def test_worker_drains_sync_abn_transaction_chain(
     assert forecast_log["year_month"] == "2026-05"
 
 
+def test_worker_refreshes_forecast_when_sync_has_only_seen_transactions(
+    migrated_postgres_url: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = AppConfig(
+        app_env="test",
+        secret_key="test-secret",
+        database_url=migrated_postgres_url,
+        oidc_enabled=False,
+        llm_enabled=False,
+        bank_provider="fake",
+    )
+    enqueue_sync_abn_transactions(migrated_postgres_url)
+    run_until_drained(config)
+    capsys.readouterr()
+    _set_forecast_updated_at(migrated_postgres_url, "2026-05-01 00:00:00+00")
+
+    enqueue_sync_abn_transactions(migrated_postgres_url)
+    run_until_drained(config)
+    logs = _json_logs(capsys.readouterr().out)
+
+    with psycopg.connect(migrated_postgres_url) as connection:
+        forecast_row = connection.execute(
+            """
+            SELECT updated_at
+            FROM monthly_forecasts
+            WHERE year_month = '2026-05'
+            """
+        ).fetchone()
+
+    sync_log = _find_log(logs, "job_completed", SYNC_ABN_TRANSACTIONS_ENTRYPOINT)
+    assert sync_log is not None
+    assert sync_log["new_transaction_count"] == 0
+    assert sync_log["updated_transaction_count"] == 3
+    normalize_log = _find_log(logs, "job_completed", "normalize_transactions")
+    assert normalize_log is not None
+    assert normalize_log["created_count"] == 0
+    forecast_log = _find_log(logs, "forecast_recalculated", UPDATE_MONTHLY_FORECAST_ENTRYPOINT)
+    assert forecast_log is not None
+    assert forecast_log["year_month"] == "2026-05"
+    assert forecast_row is not None
+    assert str(forecast_row[0]) > "2026-05-01"
+
+
 def test_worker_drains_generate_xlsx_export_job(migrated_postgres_url: str, capsys: pytest.CaptureFixture[str]) -> None:
     load_sample_data(migrated_postgres_url)
     job_id = enqueue_generate_xlsx_export(migrated_postgres_url, created_by="dev-user@example.test")
@@ -201,3 +244,12 @@ def _find_log(logs: list[dict[str, object]], event: str, entrypoint: str) -> dic
         if log.get("event") == event and log.get("entrypoint") == entrypoint:
             return log
     return None
+
+
+def _set_forecast_updated_at(database_url: str, updated_at: str) -> None:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            connection.execute(
+                "UPDATE monthly_forecasts SET updated_at = %s WHERE year_month = '2026-05'",
+                (updated_at,),
+            )

@@ -71,6 +71,12 @@ def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
             raise
         if sync_result.new_transaction_count > 0 or sync_result.updated_transaction_count > 0:
             await enqueue_job_async(config.database_url, NORMALIZE_TRANSACTIONS_ENTRYPOINT)
+        else:
+            await enqueue_job_async(
+                config.database_url,
+                UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+                dedupe_key=UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+            )
         _log_job_completed(
             SYNC_ABN_TRANSACTIONS_ENTRYPOINT,
             job,
@@ -90,6 +96,12 @@ def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
             raise
         if normalize_result.created_count > 0:
             await enqueue_job_async(config.database_url, CLASSIFY_TRANSACTIONS_ENTRYPOINT)
+        else:
+            await enqueue_job_async(
+                config.database_url,
+                UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+                dedupe_key=UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+            )
         _log_job_completed(NORMALIZE_TRANSACTIONS_ENTRYPOINT, job, created_count=normalize_result.created_count)
 
     @pgq.entrypoint(CLASSIFY_TRANSACTIONS_ENTRYPOINT)

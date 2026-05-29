@@ -66,6 +66,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Runtime secrets previously supported direct environment values only. Added mounted-file support for `SECRET_KEY`, `ABN_CARD_NUMBER`, and `ABN_SOFT_TOKEN` with ambiguity and missing-file coverage.
 - Production startup previously accepted development defaults. Added fail-fast config checks for default secret, missing database URL, and missing allowed-email allowlist outside development/test.
 - Review and transaction correction tests previously asserted the corrected rows but not the PRD forecast-refresh contract. Added regression coverage that manual corrections refresh the current-month forecast.
+- Worker sync previously skipped forecast refresh when bank sync found only already-seen transactions. Added a queued-chain regression that refreshes the forecast after raw updates without new normalized rows.
 
 ## Residual Risk
 
