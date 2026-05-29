@@ -12,6 +12,23 @@ from pgqueuer.adapters.drivers.psycopg import PsycopgDriver
 from pgqueuer.adapters.persistence.queries import Queries
 
 SYNC_NOW_ENTRYPOINT = "sync-now"
+SYNC_ABN_TRANSACTIONS_ENTRYPOINT = "sync_abn_transactions"
+NORMALIZE_TRANSACTIONS_ENTRYPOINT = "normalize_transactions"
+CLASSIFY_TRANSACTIONS_ENTRYPOINT = "classify_transactions"
+DETECT_RECURRING_ENTRYPOINT = "detect_recurring"
+UPDATE_MONTHLY_FORECAST_ENTRYPOINT = "update_monthly_forecast"
+GENERATE_XLSX_EXPORT_ENTRYPOINT = "generate_xlsx_export"
+BACKFILL_RULE_ENTRYPOINT = "backfill_rule"
+
+REQUIRED_JOB_ENTRYPOINTS = (
+    SYNC_ABN_TRANSACTIONS_ENTRYPOINT,
+    NORMALIZE_TRANSACTIONS_ENTRYPOINT,
+    CLASSIFY_TRANSACTIONS_ENTRYPOINT,
+    DETECT_RECURRING_ENTRYPOINT,
+    UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+    GENERATE_XLSX_EXPORT_ENTRYPOINT,
+    BACKFILL_RULE_ENTRYPOINT,
+)
 
 
 async def enqueue_job_async(
@@ -40,3 +57,49 @@ def enqueue_job(
 
 def enqueue_sync_now(database_url: str) -> int:
     return enqueue_job(database_url, SYNC_NOW_ENTRYPOINT, {}, dedupe_key=SYNC_NOW_ENTRYPOINT)
+
+
+def enqueue_sync_abn_transactions(database_url: str) -> int:
+    return enqueue_job(
+        database_url,
+        SYNC_ABN_TRANSACTIONS_ENTRYPOINT,
+        {},
+        dedupe_key=SYNC_ABN_TRANSACTIONS_ENTRYPOINT,
+    )
+
+
+def enqueue_normalize_transactions(database_url: str) -> int:
+    return enqueue_job(database_url, NORMALIZE_TRANSACTIONS_ENTRYPOINT, {})
+
+
+def enqueue_classify_transactions(database_url: str) -> int:
+    return enqueue_job(database_url, CLASSIFY_TRANSACTIONS_ENTRYPOINT, {})
+
+
+def enqueue_detect_recurring(database_url: str) -> int:
+    return enqueue_job(database_url, DETECT_RECURRING_ENTRYPOINT, {})
+
+
+def enqueue_update_monthly_forecast(database_url: str) -> int:
+    return enqueue_job(
+        database_url,
+        UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+        {},
+        dedupe_key=UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+    )
+
+
+def enqueue_generate_xlsx_export(database_url: str, *, created_by: str | None = None) -> int:
+    return enqueue_job(
+        database_url,
+        GENERATE_XLSX_EXPORT_ENTRYPOINT,
+        {"created_by": created_by},
+    )
+
+
+def enqueue_backfill_rule(database_url: str, rule_id: int) -> int:
+    return enqueue_job(
+        database_url,
+        BACKFILL_RULE_ENTRYPOINT,
+        {"rule_id": rule_id},
+    )
