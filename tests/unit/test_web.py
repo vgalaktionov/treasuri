@@ -110,6 +110,14 @@ def test_logged_out_page_is_public_for_disallowed_profile() -> None:
     assert b"Signed out" in response.data
 
 
+def test_protected_routes_mark_session_permanent(client) -> None:
+    response = client.get("/")
+
+    assert response.status_code == 200
+    with client.session_transaction() as user_session:
+        assert user_session.permanent is True
+
+
 def test_status_shows_llm_model(client) -> None:
     response = client.get("/status")
 

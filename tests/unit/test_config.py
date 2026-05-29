@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 
 from app.config import ConfigError, load_config
@@ -16,6 +18,7 @@ def test_load_config_parses_oidc_testing_profile(monkeypatch: pytest.MonkeyPatch
     assert config.oidc_testing_profile["email"] == "dev-user@example.test"
     assert config.allowed_emails == ("dev-user@example.test", "other@example.test")
     assert str(config.llm_confidence_threshold) == "0.60"
+    assert config.to_flask_config()["PERMANENT_SESSION_LIFETIME"] == timedelta(minutes=480)
 
 
 def test_load_config_parses_runtime_identity(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,6 +46,14 @@ def test_load_config_rejects_invalid_llm_confidence_threshold(monkeypatch: pytes
     monkeypatch.setenv("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "high")
 
     with pytest.raises(ConfigError, match="LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD"):
+        load_config()
+
+
+def test_load_config_rejects_non_positive_session_lifetime(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("SESSION_LIFETIME_MINUTES", "0")
+
+    with pytest.raises(ConfigError, match="SESSION_LIFETIME_MINUTES"):
         load_config()
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
@@ -101,6 +102,7 @@ class AppConfig:
         default_factory=lambda: _read_json_object("OIDC_TESTING_PROFILE_JSON", {})
     )
     oidc_cookie_secure: bool = field(default_factory=lambda: _read_bool("OIDC_ID_TOKEN_COOKIE_SECURE", True))
+    session_lifetime_minutes: int = field(default_factory=lambda: _read_int("SESSION_LIFETIME_MINUTES", 480))
     llm_enabled: bool = field(default_factory=lambda: _read_bool("LLM_ENABLED", True))
     llm_base_url: str = field(default_factory=lambda: os.environ.get("LLM_BASE_URL", "http://llama:8080/v1"))
     llm_model: str = field(
@@ -126,6 +128,8 @@ class AppConfig:
 
         if not self.secret_key:
             raise ConfigError("SECRET_KEY is required")
+        if self.session_lifetime_minutes < 1:
+            raise ConfigError("SESSION_LIFETIME_MINUTES must be at least 1")
         if self.oidc_enabled and not self.oidc_client_secrets:
             raise ConfigError("OIDC_CLIENT_SECRETS is required when OIDC_ENABLED=true")
 
@@ -139,6 +143,7 @@ class AppConfig:
             "OIDC_SCOPES": self.oidc_scopes,
             "OIDC_TESTING_PROFILE": self.oidc_testing_profile,
             "OIDC_ID_TOKEN_COOKIE_SECURE": self.oidc_cookie_secure,
+            "PERMANENT_SESSION_LIFETIME": timedelta(minutes=self.session_lifetime_minutes),
             "SESSION_COOKIE_HTTPONLY": True,
             "SESSION_COOKIE_SAMESITE": "Lax",
             "SESSION_COOKIE_SECURE": not self.is_development,

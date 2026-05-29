@@ -64,6 +64,7 @@ def _require_allowed_user() -> ResponseReturnValue | None:
 def _ensure_csrf_token() -> None:
     if _is_public_request():
         return
+    session.permanent = True
     token = session.get("csrf_token")
     if not isinstance(token, str):
         token = token_urlsafe(32)
