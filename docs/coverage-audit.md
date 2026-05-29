@@ -16,6 +16,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 | Idempotent bank import and normalization | `tests/integration/test_bank_sync.py`, `tests/integration/test_normalize.py`, `tests/unit/bank/test_abn.py` |
 | Recurring detection and confirmation | `tests/integration/test_recurring.py`, recurring E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Rule preview and historical backfill | `tests/integration/test_rule_routes.py`, rule E2E in `e2e/tests/dashboard-review.spec.mjs` |
+| Rule create, edit, disable UI | `tests/integration/test_rule_routes.py`, rule E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | XLSX generation, blob storage, and download | `tests/integration/test_exports.py`, export E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Auth and allowed-user behavior | `tests/unit/test_web.py`, route tests using `OIDC_TESTING_PROFILE_JSON`, CSRF checks in review/rule/settings/export route tests |
 | PWA installability and offline shell | `tests/unit/test_pwa.py`, PWA E2E in `e2e/tests/dashboard-review.spec.mjs` |
@@ -31,6 +32,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - E2E failures previously had no visual artifacts. Added screenshot and stack capture under `E2E_ARTIFACT_DIR` or `/tmp/treasuri-e2e-artifacts`.
 - Forecast confidence previously ignored stale sync state. Added sync-freshness confidence reasons and dashboard visibility.
 - The transactions screen previously filtered only. Added manual edit coverage from `/transactions` itself.
+- The rules screen previously lacked direct create/edit forms. Added rule editor coverage while keeping preview before historical backfill.
 
 ## Residual Risk
 

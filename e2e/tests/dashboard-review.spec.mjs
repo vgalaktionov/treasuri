@@ -323,6 +323,17 @@ uiTest("review correction previews a reusable rule before showing it in the rule
   assert.match(rulesText, /Rules/);
   assert.match(rulesText, /Classify Unknown Sample Merchant/);
   assert.match(rulesText, /Would change\s+0/);
+
+  await page.locator("details.rule-editor > summary").click();
+  await page.locator("form.rule-form input[name='name']").fill("Classify one-off purchases");
+  await page.locator("form.rule-form input[name='pattern']").fill("Large one-off sample purchase");
+  await page.select("form.rule-form select[name='category']", "Shopping");
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "networkidle0" }),
+    page.locator("form.rule-form button[type='submit']").click(),
+  ]);
+  const createdRuleText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(createdRuleText, /Classify one-off purchases/);
 });
 
 uiTest("pwa is installable and falls back offline without cached financial data", async () => {

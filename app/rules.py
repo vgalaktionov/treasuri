@@ -17,10 +17,13 @@ from app.classify.pipeline import (
     rule_matches,
 )
 
+RULE_FIELDS = ("description", "counterparty_name", "counterparty_iban", "merchant")
+RULE_OPERATORS = ("contains", "exact", "regex", "starts_with", "ends_with")
+
 
 @dataclass(frozen=True)
 class RuleDraft:
-    source_transaction_id: int
+    source_transaction_id: int | None
     name: str
     field: str
     operator: str
@@ -69,6 +72,18 @@ class RuleListItem:
 class RuleBackfillResult:
     updated_count: int
     skipped_manual_count: int
+
+
+@dataclass(frozen=True)
+class RuleEditorInput:
+    name: str
+    priority: int
+    is_active: bool
+    field: str
+    operator: str
+    pattern: str
+    category_name: str
+    merchant_name: str | None
 
 
 def draft_rule_from_transaction(database_url: str, transaction_id: int) -> RuleDraft:
@@ -183,6 +198,105 @@ def create_rule(database_url: str, draft: RuleDraft) -> int:
     if row is None:
         raise RuntimeError("rule insert did not return an id")
     return _read_int(row[0])
+
+
+def create_rule_from_input(database_url: str, rule_input: RuleEditorInput) -> int:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            category_id = _category_id(connection, rule_input.category_name)
+            merchant_id = _upsert_merchant_id(connection, rule_input.merchant_name, category_id)
+            row = connection.execute(
+                """
+                INSERT INTO categorization_rules (
+                    name,
+                    priority,
+                    is_active,
+                    field,
+                    operator,
+                    pattern,
+                    category_id,
+                    merchant_id
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    rule_input.name,
+                    rule_input.priority,
+                    rule_input.is_active,
+                    rule_input.field,
+                    rule_input.operator,
+                    rule_input.pattern,
+                    category_id,
+                    merchant_id,
+                ),
+            ).fetchone()
+    if row is None:
+        raise RuntimeError("rule insert did not return an id")
+    return _read_int(row[0])
+
+
+def update_rule_from_input(database_url: str, rule_id: int, rule_input: RuleEditorInput) -> None:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            category_id = _category_id(connection, rule_input.category_name)
+            merchant_id = _upsert_merchant_id(connection, rule_input.merchant_name, category_id)
+            connection.execute(
+                """
+                UPDATE categorization_rules
+                SET
+                    name = %s,
+                    priority = %s,
+                    is_active = %s,
+                    field = %s,
+                    operator = %s,
+                    pattern = %s,
+                    category_id = %s,
+                    merchant_id = %s,
+                    updated_at = now()
+                WHERE id = %s
+                """,
+                (
+                    rule_input.name,
+                    rule_input.priority,
+                    rule_input.is_active,
+                    rule_input.field,
+                    rule_input.operator,
+                    rule_input.pattern,
+                    category_id,
+                    merchant_id,
+                    rule_id,
+                ),
+            )
+
+
+def parse_rule_editor_input(form: dict[str, str]) -> RuleEditorInput:
+    name = form.get("name", "").strip()
+    field = form.get("field", "").strip()
+    operator = form.get("operator", "").strip()
+    pattern = form.get("pattern", "").strip()
+    category_name = form.get("category", "").strip()
+    merchant_name = form.get("merchant", "").strip() or None
+    if not name:
+        raise ValueError("rule name is required")
+    if field not in RULE_FIELDS:
+        raise ValueError(f"unsupported rule field: {field}")
+    if operator not in RULE_OPERATORS:
+        raise ValueError(f"unsupported rule operator: {operator}")
+    if not pattern:
+        raise ValueError("rule pattern is required")
+    if not category_name:
+        raise ValueError("rule category is required")
+    return RuleEditorInput(
+        name=name,
+        priority=_parse_priority(form.get("priority", "")),
+        is_active=form.get("is_active") == "1",
+        field=field,
+        operator=operator,
+        pattern=pattern,
+        category_name=category_name,
+        merchant_name=merchant_name,
+    )
 
 
 def list_rules(database_url: str) -> list[RuleListItem]:
@@ -432,6 +546,46 @@ def _merchant_id(connection: Connection[tuple[object, ...]], merchant_name: str 
     if row is None:
         return None
     return _read_int(row[0])
+
+
+def _upsert_merchant_id(
+    connection: Connection[tuple[object, ...]],
+    merchant_name: str | None,
+    category_id: int,
+) -> int | None:
+    if merchant_name is None or merchant_name.strip() == "":
+        return None
+    normalized_name = merchant_name.strip().casefold()
+    row = connection.execute(
+        """
+        INSERT INTO merchants (name, normalized_name, default_category_id)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (normalized_name)
+        DO UPDATE SET default_category_id = EXCLUDED.default_category_id, updated_at = now()
+        RETURNING id
+        """,
+        (merchant_name.strip(), normalized_name, category_id),
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("merchant upsert did not return an id")
+    return _read_int(row[0])
+
+
+def _category_id(connection: Connection[tuple[object, ...]], category_name: str) -> int:
+    row = connection.execute("SELECT id FROM categories WHERE name = %s", (category_name,)).fetchone()
+    if row is None:
+        raise ValueError(f"unknown category: {category_name}")
+    return _read_int(row[0])
+
+
+def _parse_priority(value: str) -> int:
+    try:
+        priority = int(value or "100")
+    except ValueError as exc:
+        raise ValueError("rule priority must be an integer") from exc
+    if priority < 0:
+        raise ValueError("rule priority must be non-negative")
+    return priority
 
 
 def _optional_str(value: object) -> str | None:

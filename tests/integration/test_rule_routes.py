@@ -164,6 +164,90 @@ def test_rule_backfill_applies_to_history_without_overwriting_manual_override(sa
     ]
 
 
+def test_rules_route_can_create_edit_and_disable_rule(sample_app: Flask) -> None:
+    client = sample_app.test_client()
+    rules_html = client.get("/rules").get_data(as_text=True)
+    csrf_token = _extract_csrf(rules_html)
+
+    create_response = client.post(
+        "/rules",
+        data={
+            "csrf_token": csrf_token,
+            "name": "Classify grocery text",
+            "priority": "40",
+            "is_active": "1",
+            "field": "description",
+            "operator": "contains",
+            "pattern": "Groceries sample",
+            "category": "Groceries",
+            "merchant": "Sample Rule Merchant",
+        },
+        follow_redirects=True,
+    )
+    rule_id = _created_rule_id(sample_app)
+
+    edit_response = client.post(
+        f"/rules/{rule_id}",
+        data={
+            "csrf_token": _extract_csrf(create_response.get_data(as_text=True)),
+            "name": "Classify edited grocery text",
+            "priority": "20",
+            "is_active": "1",
+            "field": "counterparty_name",
+            "operator": "contains",
+            "pattern": "Sample Supermarket",
+            "category": "Eating out",
+            "merchant": "",
+        },
+        follow_redirects=True,
+    )
+    disable_response = client.post(
+        f"/rules/{rule_id}/active",
+        data={
+            "csrf_token": _extract_csrf(edit_response.get_data(as_text=True)),
+            "is_active": "false",
+        },
+        follow_redirects=True,
+    )
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                categorization_rules.name,
+                categorization_rules.priority,
+                categorization_rules.is_active,
+                categorization_rules.field,
+                categorization_rules.operator,
+                categorization_rules.pattern,
+                categories.name,
+                merchants.name
+            FROM categorization_rules
+            JOIN categories ON categories.id = categorization_rules.category_id
+            LEFT JOIN merchants ON merchants.id = categorization_rules.merchant_id
+            WHERE categorization_rules.id = %s
+            """,
+            (rule_id,),
+        ).fetchone()
+
+    assert create_response.status_code == 200
+    assert b"Classify grocery text" in create_response.data
+    assert edit_response.status_code == 200
+    assert b"Classify edited grocery text" in edit_response.data
+    assert disable_response.status_code == 200
+    assert b"inactive" in disable_response.data
+    assert row == (
+        "Classify edited grocery text",
+        20,
+        False,
+        "counterparty_name",
+        "contains",
+        "Sample Supermarket",
+        "Eating out",
+        None,
+    )
+
+
 def _review_transaction_id(app: Flask) -> int:
     with psycopg.connect(app.config["DATABASE_URL"]) as connection:
         row = connection.execute(

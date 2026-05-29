@@ -7,6 +7,60 @@
     <p class="muted">Deterministic categorization</p>
     <h1 id="rules-title">Rules</h1>
 
+    <details class="rule-editor">
+      <summary>Create rule</summary>
+      <form class="rule-form" method="post" action="/rules">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>
+          Name
+          <input name="name" required autocomplete="off" placeholder="Classify supermarket text">
+        </label>
+        <label>
+          Priority
+          <input name="priority" type="number" min="0" value="100" required>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="is_active" value="1" checked>
+          Active
+        </label>
+        <label>
+          Field
+          <select name="field" required>
+            {% for field in rule_fields %}
+              <option value="{{ field }}">{{ field }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Operator
+          <select name="operator" required>
+            {% for operator in rule_operators %}
+              <option value="{{ operator }}">{{ operator }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Pattern
+          <input name="pattern" required autocomplete="off">
+        </label>
+        <label>
+          Category
+          <select name="category" required>
+            {% for category in categories %}
+              <option value="{{ category }}">{{ category }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Merchant
+          <input name="merchant" autocomplete="off">
+        </label>
+        <div class="review-actions">
+          <button type="submit">Save rule</button>
+        </div>
+      </form>
+    </details>
+
     {% if items %}
       <div class="rule-list">
         {% for item in items %}
@@ -41,6 +95,60 @@
                 <dd>{{ item.preview.manual_overrides_skipped_count }}</dd>
               </div>
             </dl>
+
+            <details class="rule-editor rule-editor-inline">
+              <summary>Edit</summary>
+              <form class="rule-form" method="post" action="/rules/{{ item.rule.id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label>
+                  Name
+                  <input name="name" value="{{ item.rule.name }}" required autocomplete="off">
+                </label>
+                <label>
+                  Priority
+                  <input name="priority" type="number" min="0" value="{{ item.rule.priority }}" required>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="is_active" value="1" {% if item.rule.is_active %}checked{% endif %}>
+                  Active
+                </label>
+                <label>
+                  Field
+                  <select name="field" required>
+                    {% for field in rule_fields %}
+                      <option value="{{ field }}" {% if field == item.rule.field %}selected{% endif %}>{{ field }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>
+                  Operator
+                  <select name="operator" required>
+                    {% for operator in rule_operators %}
+                      <option value="{{ operator }}" {% if operator == item.rule.operator %}selected{% endif %}>{{ operator }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>
+                  Pattern
+                  <input name="pattern" value="{{ item.rule.pattern }}" required autocomplete="off">
+                </label>
+                <label>
+                  Category
+                  <select name="category" required>
+                    {% for category in categories %}
+                      <option value="{{ category }}" {% if category == item.rule.category_name %}selected{% endif %}>{{ category }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>
+                  Merchant
+                  <input name="merchant" value="{{ item.rule.merchant_name or '' }}" autocomplete="off">
+                </label>
+                <div class="review-actions">
+                  <button type="submit">Save rule</button>
+                </div>
+              </form>
+            </details>
 
             <div class="rule-actions">
               <form method="post" action="/rules/{{ item.rule.id }}/backfill">

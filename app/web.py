@@ -17,7 +17,19 @@ from app.forecast.service import update_monthly_forecast
 from app.month import FALLBACK_MONTH_SUMMARY, load_month_summary
 from app.recurring import confirm_recurring_series, disable_recurring_series, list_recurring_series
 from app.review import ReviewCorrection, apply_review_correction, list_category_names
-from app.rules import backfill_rule, create_rule, draft_rule_from_transaction, list_rules, preview_rule, set_rule_active
+from app.rules import (
+    RULE_FIELDS,
+    RULE_OPERATORS,
+    backfill_rule,
+    create_rule,
+    create_rule_from_input,
+    draft_rule_from_transaction,
+    list_rules,
+    parse_rule_editor_input,
+    preview_rule,
+    set_rule_active,
+    update_rule_from_input,
+)
 from app.settings import (
     DEFAULT_FORECAST_SETTINGS,
     default_classification_settings,
@@ -129,7 +141,40 @@ def register_routes(app: Flask) -> None:
     def rules() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]
         items = list_rules(app_config.database_url) if app_config.database_url else []
-        return render_template("rules.html", items=items)
+        categories = list_category_names(app_config.database_url) if app_config.database_url else []
+        return render_template(
+            "rules.html",
+            items=items,
+            categories=categories,
+            rule_fields=RULE_FIELDS,
+            rule_operators=RULE_OPERATORS,
+        )
+
+    @app.post("/rules")
+    @require_post_csrf
+    def create_rule_route():
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        try:
+            rule_input = parse_rule_editor_input(request.form.to_dict())
+        except ValueError:
+            abort(400)
+        create_rule_from_input(app_config.database_url, rule_input)
+        return redirect(url_for("rules"))
+
+    @app.post("/rules/<int:rule_id>")
+    @require_post_csrf
+    def update_rule_route(rule_id: int):
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        try:
+            rule_input = parse_rule_editor_input(request.form.to_dict())
+        except ValueError:
+            abort(400)
+        update_rule_from_input(app_config.database_url, rule_id, rule_input)
+        return redirect(url_for("rules"))
 
     @app.get("/categories")
     def categories() -> str:
