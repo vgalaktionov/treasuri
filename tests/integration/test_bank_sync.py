@@ -8,6 +8,7 @@ import pytest
 from testcontainers.postgres import PostgresContainer
 
 from app.bank.abn import AbnAmroAdapter, AbnCredentials
+from app.bank.base import BankMutation
 from app.bank.fake import FakeBankAdapter
 from app.bank.sync import sync_bank_transactions
 from app.migrate import run_migrations
@@ -104,6 +105,35 @@ def test_abn_adapter_imports_raw_transactions_idempotently(migrated_postgres_url
     )
 
 
+def test_bank_sync_records_failed_sync_run(migrated_postgres_url: str) -> None:
+    with pytest.raises(RuntimeError, match="sample adapter failure"):
+        sync_bank_transactions(
+            migrated_postgres_url,
+            FailingBankAdapter(),
+            account_iban="NL00FAIL0123456789",
+        )
+
+    with psycopg.connect(migrated_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT provider, status, error_message, new_transaction_count, updated_transaction_count
+            FROM sync_runs
+            WHERE provider = 'failing'
+            """
+        ).fetchone()
+        raw_count = connection.execute(
+            """
+            SELECT count(*)
+            FROM raw_transactions
+            JOIN accounts ON accounts.id = raw_transactions.account_id
+            WHERE accounts.provider = 'failing'
+            """
+        ).fetchone()
+
+    assert row == ("failing", "failed", "sample adapter failure", 0, 0)
+    assert raw_count == (0,)
+
+
 class StaticAbnSession:
     def __init__(self, _iban: str) -> None:
         pass
@@ -127,3 +157,10 @@ class StaticAbnSession:
                 }
             ]
         }
+
+
+class FailingBankAdapter:
+    provider = "failing"
+
+    def fetch_recent_mutations(self) -> list[BankMutation]:
+        raise RuntimeError("sample adapter failure")

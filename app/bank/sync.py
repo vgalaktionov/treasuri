@@ -20,18 +20,25 @@ class SyncResult:
 
 
 def sync_bank_transactions(database_url: str, adapter: BankAdapter, *, account_iban: str) -> SyncResult:
-    with psycopg.connect(database_url) as connection:
-        with connection.transaction():
-            account_id = _upsert_account(connection, adapter.provider, account_iban)
-            new_count = 0
-            updated_count = 0
-            for mutation in adapter.fetch_recent_mutations():
-                inserted = _upsert_raw_transaction(connection, account_id, adapter.provider, mutation)
-                if inserted:
-                    new_count += 1
-                else:
-                    updated_count += 1
-            _insert_sync_run(connection, adapter.provider, new_count, updated_count)
+    try:
+        with psycopg.connect(database_url) as connection:
+            with connection.transaction():
+                account_id = _upsert_account(connection, adapter.provider, account_iban)
+                new_count = 0
+                updated_count = 0
+                for mutation in adapter.fetch_recent_mutations():
+                    inserted = _upsert_raw_transaction(connection, account_id, adapter.provider, mutation)
+                    if inserted:
+                        new_count += 1
+                    else:
+                        updated_count += 1
+                _insert_completed_sync_run(connection, adapter.provider, new_count, updated_count)
+    except Exception as exc:
+        try:
+            _insert_failed_sync_run(database_url, adapter.provider, exc)
+        except psycopg.Error:
+            pass
+        raise
 
     return SyncResult(
         provider=adapter.provider,
@@ -125,7 +132,7 @@ def build_source_hash(account_id: int, mutation: BankMutation) -> str:
     return hashlib.sha256(stable_value.encode("utf-8")).hexdigest()
 
 
-def _insert_sync_run(
+def _insert_completed_sync_run(
     connection: Connection[tuple[object, ...]],
     provider: str,
     new_transaction_count: int,
@@ -150,6 +157,32 @@ def _insert_sync_run(
             json.dumps({"source": "bank-sync"}, sort_keys=True),
         ),
     )
+
+
+def _insert_failed_sync_run(database_url: str, provider: str, error: Exception) -> None:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                INSERT INTO sync_runs (
+                    provider,
+                    finished_at,
+                    status,
+                    error_message,
+                    metadata_json
+                )
+                VALUES (%s, now(), 'failed', %s, %s::jsonb)
+                """,
+                (
+                    provider,
+                    _safe_error_message(error),
+                    json.dumps({"source": "bank-sync"}, sort_keys=True),
+                ),
+            )
+
+
+def _safe_error_message(error: Exception) -> str:
+    return str(error).splitlines()[0][:500] or type(error).__name__
 
 
 def _read_int_id(value: object) -> int:
