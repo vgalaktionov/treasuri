@@ -12,6 +12,7 @@ class ClassificationMethod(StrEnum):
     MANUAL_OVERRIDE = "manual_override"
     RULE = "rule"
     MERCHANT_ALIAS = "merchant_alias"
+    RECURRING_MATCH = "recurring_match"
     HISTORICAL_SIMILARITY = "historical_similarity"
     LLM = "llm"
     UNCATEGORIZED = "uncategorized"
@@ -52,6 +53,7 @@ class ClassificationFlags:
     is_transfer: bool | None = None
     is_savings: bool | None = None
     is_fixed_cost: bool | None = None
+    is_recurring: bool | None = None
     is_one_off: bool | None = None
     is_excluded_from_budget: bool | None = None
 
@@ -100,6 +102,16 @@ class HistoricalExample:
 
 
 @dataclass(frozen=True)
+class RecurringMatch:
+    id: int
+    name: str
+    category: str | None
+    merchant: str | None
+    expected_amount: Decimal
+    amount_tolerance: Decimal
+
+
+@dataclass(frozen=True)
 class ClassificationResult:
     method: ClassificationMethod
     category: str | None
@@ -108,6 +120,7 @@ class ClassificationResult:
     needs_review: bool
     reason: str
     rule_id: int | None = None
+    recurring_series_id: int | None = None
     model_ref: str | None = None
     runtime: str | None = None
     prompt_version: str | None = None
@@ -120,6 +133,7 @@ def classify_transaction(
     manual_overrides: list[ManualOverride],
     rules: list[CategorizationRule],
     merchant_aliases: list[MerchantAlias],
+    recurring_matches: list[RecurringMatch] | None = None,
     historical_examples: list[HistoricalExample] | None = None,
     similarity_threshold: Decimal = Decimal("0.65"),
 ) -> ClassificationResult:
@@ -158,6 +172,19 @@ def classify_transaction(
                 needs_review=alias.default_category is None,
                 reason=f"Matched merchant alias for {alias.merchant}.",
             )
+
+    recurring_match = best_recurring_match(transaction, recurring_matches or [])
+    if recurring_match is not None:
+        return ClassificationResult(
+            method=ClassificationMethod.RECURRING_MATCH,
+            category=recurring_match.category,
+            merchant=recurring_match.merchant or recurring_match.name,
+            confidence=Decimal("0.90"),
+            needs_review=recurring_match.category is None,
+            reason=f"Matched recurring payment: {recurring_match.name}.",
+            recurring_series_id=recurring_match.id,
+            flags=ClassificationFlags(is_fixed_cost=True, is_recurring=True),
+        )
 
     historical_match = best_historical_match(
         transaction,
@@ -220,6 +247,34 @@ def best_historical_match(
     if score < threshold:
         return None
     return example, score
+
+
+def best_recurring_match(
+    transaction: TransactionForClassification,
+    recurring_matches: list[RecurringMatch],
+) -> RecurringMatch | None:
+    matches = [match for match in recurring_matches if recurring_match_matches(transaction, match)]
+    if not matches:
+        return None
+    return min(matches, key=lambda match: abs(abs(transaction.amount) - match.expected_amount))
+
+
+def recurring_match_matches(transaction: TransactionForClassification, match: RecurringMatch) -> bool:
+    if transaction.amount >= 0:
+        return False
+    if abs(abs(transaction.amount) - match.expected_amount) > match.amount_tolerance:
+        return False
+    searchable_text = " ".join(
+        part
+        for part in (
+            transaction.description,
+            transaction.counterparty_name or "",
+            transaction.merchant_name or "",
+        )
+        if part
+    ).casefold()
+    match_names = (match.name, match.merchant or "")
+    return any(name.casefold() in searchable_text for name in match_names if name.strip())
 
 
 def historical_similarity_score(transaction: TransactionForClassification, example: HistoricalExample) -> Decimal:

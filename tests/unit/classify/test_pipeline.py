@@ -13,8 +13,10 @@ from app.classify.pipeline import (
     MatchField,
     MatchOperator,
     MerchantAlias,
+    RecurringMatch,
     TransactionForClassification,
     classify_transaction,
+    recurring_match_matches,
     rule_matches,
 )
 
@@ -173,6 +175,101 @@ def test_alias_without_default_category_still_needs_review() -> None:
     assert result.method == ClassificationMethod.MERCHANT_ALIAS
     assert result.category is None
     assert result.needs_review is True
+
+
+def test_recurring_match_runs_before_historical_similarity() -> None:
+    result = classify_transaction(
+        TransactionForClassification(
+            id=43,
+            account_id=7,
+            amount=Decimal("-13.20"),
+            description="SAMPLE STREAMING MONTHLY",
+            counterparty_name="Sample Streaming",
+        ),
+        manual_overrides=[],
+        rules=[],
+        merchant_aliases=[],
+        recurring_matches=[
+            RecurringMatch(
+                id=9,
+                name="Sample Streaming",
+                category="Subscriptions",
+                merchant="Sample Streaming",
+                expected_amount=Decimal("12.99"),
+                amount_tolerance=Decimal("1.00"),
+            )
+        ],
+        historical_examples=[
+            HistoricalExample(
+                transaction_id=42,
+                amount=Decimal("-13.20"),
+                description="SAMPLE STREAMING MONTHLY",
+                counterparty_name="Sample Streaming",
+                category="Shopping",
+                merchant="Sample Streaming",
+            )
+        ],
+    )
+
+    assert result.method == ClassificationMethod.RECURRING_MATCH
+    assert result.category == "Subscriptions"
+    assert result.merchant == "Sample Streaming"
+    assert result.recurring_series_id == 9
+    assert result.needs_review is False
+    assert result.flags.is_fixed_cost is True
+    assert result.flags.is_recurring is True
+
+
+def test_recurring_match_requires_negative_amount_within_tolerance_and_text_match() -> None:
+    match = RecurringMatch(
+        id=9,
+        name="Sample Streaming",
+        category="Subscriptions",
+        merchant="Sample Streaming",
+        expected_amount=Decimal("12.99"),
+        amount_tolerance=Decimal("1.00"),
+    )
+
+    assert recurring_match_matches(
+        TransactionForClassification(
+            id=43,
+            account_id=7,
+            amount=Decimal("-13.20"),
+            description="SAMPLE STREAMING MONTHLY",
+            counterparty_name=None,
+        ),
+        match,
+    )
+    assert not recurring_match_matches(
+        TransactionForClassification(
+            id=43,
+            account_id=7,
+            amount=Decimal("13.20"),
+            description="SAMPLE STREAMING REFUND",
+            counterparty_name=None,
+        ),
+        match,
+    )
+    assert not recurring_match_matches(
+        TransactionForClassification(
+            id=43,
+            account_id=7,
+            amount=Decimal("-19.20"),
+            description="SAMPLE STREAMING MONTHLY",
+            counterparty_name=None,
+        ),
+        match,
+    )
+    assert not recurring_match_matches(
+        TransactionForClassification(
+            id=43,
+            account_id=7,
+            amount=Decimal("-13.20"),
+            description="UNRELATED MONTHLY",
+            counterparty_name=None,
+        ),
+        match,
+    )
 
 
 def test_unmatched_transaction_is_marked_for_review() -> None:

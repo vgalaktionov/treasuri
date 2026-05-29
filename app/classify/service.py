@@ -21,6 +21,7 @@ from app.classify.pipeline import (
     MatchField,
     MatchOperator,
     MerchantAlias,
+    RecurringMatch,
     TransactionForClassification,
     classify_transaction,
 )
@@ -46,6 +47,7 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
         with connection.transaction():
             rules = _load_rules(connection)
             aliases = _load_aliases(connection)
+            recurring_matches = _load_recurring_matches(connection)
             overrides = _load_manual_overrides(connection)
             historical_examples = _load_historical_examples(connection)
             category_names = _load_category_names(connection)
@@ -60,6 +62,7 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
                     manual_overrides=overrides,
                     rules=rules,
                     merchant_aliases=aliases,
+                    recurring_matches=recurring_matches,
                     historical_examples=historical_examples,
                 )
                 if result.method == ClassificationMethod.UNCATEGORIZED and llm_classifier is not None:
@@ -272,6 +275,37 @@ def _load_manual_overrides(connection: Connection[tuple[object, ...]]) -> list[M
     ]
 
 
+def _load_recurring_matches(connection: Connection[tuple[object, ...]]) -> list[RecurringMatch]:
+    rows = connection.execute(
+        """
+        SELECT
+            recurring_series.id,
+            recurring_series.name,
+            categories.name,
+            merchants.name,
+            recurring_series.expected_amount,
+            COALESCE(recurring_series.amount_tolerance, 0)
+        FROM recurring_series
+        LEFT JOIN categories ON categories.id = recurring_series.category_id
+        LEFT JOIN merchants ON merchants.id = recurring_series.merchant_id
+        WHERE recurring_series.is_active = true
+            AND recurring_series.expected_amount IS NOT NULL
+        ORDER BY recurring_series.is_confirmed DESC, recurring_series.confidence DESC, recurring_series.id
+        """
+    ).fetchall()
+    return [
+        RecurringMatch(
+            id=_read_int(row[0]),
+            name=str(row[1]),
+            category=_optional_str(row[2]),
+            merchant=_optional_str(row[3]),
+            expected_amount=_read_decimal(row[4]),
+            amount_tolerance=_read_decimal(row[5]),
+        )
+        for row in rows
+    ]
+
+
 def _load_historical_examples(connection: Connection[tuple[object, ...]]) -> list[HistoricalExample]:
     rows = connection.execute(
         """
@@ -324,6 +358,8 @@ def _update_enriched_transaction(
             is_transfer = COALESCE(%s, is_transfer),
             is_savings = COALESCE(%s, is_savings),
             is_fixed_cost = COALESCE(%s, is_fixed_cost),
+            is_variable_cost = CASE WHEN %s IS TRUE THEN false ELSE is_variable_cost END,
+            is_recurring = COALESCE(%s, is_recurring),
             is_one_off = COALESCE(%s, is_one_off),
             is_excluded_from_budget = COALESCE(%s, is_excluded_from_budget),
             needs_review = %s,
@@ -334,6 +370,7 @@ def _update_enriched_transaction(
             classification_runtime = %s,
             classification_prompt_version = %s,
             rule_id = %s,
+            recurring_series_id = COALESCE(%s, recurring_series_id),
             updated_at = now()
         WHERE id = %s
         """,
@@ -344,6 +381,8 @@ def _update_enriched_transaction(
             result.flags.is_transfer,
             result.flags.is_savings,
             result.flags.is_fixed_cost,
+            result.flags.is_fixed_cost,
+            result.flags.is_recurring,
             result.flags.is_one_off,
             result.flags.is_excluded_from_budget,
             result.needs_review,
@@ -354,6 +393,7 @@ def _update_enriched_transaction(
             result.runtime,
             result.prompt_version,
             result.rule_id,
+            result.recurring_series_id,
             transaction_id,
         ),
     )
@@ -412,6 +452,7 @@ def _classification_flags(value: object) -> ClassificationFlags:
         is_transfer=_optional_flag(flags.get("is_transfer")),
         is_savings=_optional_flag(flags.get("is_savings")),
         is_fixed_cost=_optional_flag(flags.get("is_fixed_cost")),
+        is_recurring=_optional_flag(flags.get("is_recurring")),
         is_one_off=_optional_flag(flags.get("is_one_off")),
         is_excluded_from_budget=_optional_flag(flags.get("is_excluded_from_budget")),
     )

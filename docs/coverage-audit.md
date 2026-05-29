@@ -12,6 +12,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 | Manual overrides and review correction | `tests/integration/test_review_actions.py`, `tests/integration/test_rule_routes.py`, `tests/integration/test_transaction_routes.py`, review and transaction E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Merchant aliases from review | `tests/integration/test_review_actions.py`, alias classifier coverage in `tests/unit/classify/test_pipeline.py` |
 | Historical similarity suggestions | `tests/unit/classify/test_pipeline.py`, `tests/integration/test_classify_service.py` |
+| Recurring classifier ordering before historical and LLM fallback | `tests/unit/classify/test_pipeline.py`, `tests/integration/test_classify_service.py` |
 | Local llama fallback behavior | `tests/unit/classify/test_llm.py`, `tests/integration/test_classify_service.py`, settings route tests |
 | Idempotent bank import and normalization | `tests/integration/test_bank_sync.py`, `tests/integration/test_normalize.py`, `tests/unit/bank/test_abn.py` |
 | Configured sync lookback window | `tests/integration/test_bank_sync.py`, `tests/unit/test_sync_job.py` |
@@ -53,6 +54,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Runtime identity previously was not visible in the artifact. Added app version and git SHA configuration, image build args, CI build-arg coverage, and status-page visibility.
 - Sync lookback days previously appeared in settings without constraining fetched mutations. Added sync filtering, metadata, worker logging, and tests that prove the saved setting reaches foreground and worker sync paths.
 - `SYNC_LOOKBACK_DAYS` and `EXPORT_RETENTION_DAYS` previously existed only in the PRD runtime contract. Added env-backed defaults, retention pruning for old finished exports, status visibility, and Testcontainers coverage.
+- The classification pipeline previously skipped the PRD's recurring matcher stage. Added recurring-series matching before historical similarity and LLM fallback, including persistence of recurring flags and series links.
 
 ## Residual Risk
 

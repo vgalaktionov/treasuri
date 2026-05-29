@@ -223,6 +223,120 @@ def test_classify_transactions_uses_historical_manual_correction(normalized_post
 
 
 @pytest.fixture
+def recurring_postgres_url() -> Iterator[str]:
+    with PostgresContainer(
+        image="postgres:16-alpine",
+        username="treasuri",
+        password="treasuri",
+        dbname="treasuri",
+        driver=None,
+    ) as postgres:
+        database_url = postgres.get_connection_url(driver=None)
+        run_migrations(database_url)
+        sync_bank_transactions(database_url, FakeBankAdapter(), account_iban="NL00FAKE0123456789")
+        normalize_raw_transactions(database_url)
+        yield database_url
+
+
+def test_classify_transactions_uses_recurring_match_before_llm(
+    recurring_postgres_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class GuardedLlmClassifier:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def classify(self, transaction, *, categories):
+            _ = categories
+            if transaction.description == "Needs review sample":
+                raise AssertionError("recurring matches should run before LLM fallback")
+            return None
+
+    monkeypatch.setattr("app.classify.service.OpenAiCompatibleClassifier", GuardedLlmClassifier)
+
+    with psycopg.connect(recurring_postgres_url) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                INSERT INTO merchants (name, normalized_name, default_category_id)
+                VALUES (
+                    'Unknown Sample Merchant',
+                    'unknown sample merchant',
+                    (SELECT id FROM categories WHERE name = 'Subscriptions')
+                )
+                ON CONFLICT (normalized_name)
+                DO UPDATE SET default_category_id = EXCLUDED.default_category_id
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO recurring_series (
+                    merchant_id,
+                    category_id,
+                    name,
+                    cadence,
+                    amount_mode,
+                    expected_amount,
+                    amount_tolerance,
+                    expected_day_of_month,
+                    next_expected_date,
+                    confidence,
+                    is_confirmed
+                )
+                VALUES (
+                    (SELECT id FROM merchants WHERE normalized_name = 'unknown sample merchant'),
+                    (SELECT id FROM categories WHERE name = 'Subscriptions'),
+                    'Unknown Sample Merchant',
+                    'monthly',
+                    'fixed',
+                    42.00,
+                    1.00,
+                    27,
+                    '2026-06-27',
+                    0.90,
+                    true
+                )
+                """
+            )
+
+    result = classify_transactions(recurring_postgres_url, llm_config(recurring_postgres_url))
+
+    with psycopg.connect(recurring_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                categories.name,
+                merchants.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                enriched_transactions.classification_confidence,
+                enriched_transactions.is_recurring,
+                enriched_transactions.is_fixed_cost,
+                enriched_transactions.is_variable_cost,
+                enriched_transactions.recurring_series_id IS NOT NULL
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+            LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+            WHERE raw_transactions.description = 'Needs review sample'
+            """
+        ).fetchone()
+
+    assert result.method_counts["recurring_match"] == 1
+    assert row == (
+        "Subscriptions",
+        "Unknown Sample Merchant",
+        False,
+        "recurring_match",
+        Decimal("0.9000"),
+        True,
+        True,
+        False,
+        True,
+    )
+
+
+@pytest.fixture
 def llm_postgres_url() -> Iterator[str]:
     with PostgresContainer(
         image="postgres:16-alpine",
