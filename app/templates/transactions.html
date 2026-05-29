@@ -7,7 +7,15 @@
     <p class="muted">{{ subtitle }}</p>
     <h1 id="transactions-title">{{ title }}</h1>
     {% if show_filters %}
-      <form class="transaction-filters" method="get" action="/transactions">
+      <form
+        class="transaction-filters"
+        method="get"
+        action="/transactions"
+        hx-get="/transactions"
+        hx-target="#transaction-results"
+        hx-select="#transaction-results"
+        hx-push-url="true"
+      >
         <div class="filter-primary">
           <label>
             Search
@@ -74,38 +82,83 @@
         </details>
       </form>
     {% endif %}
-    {% if transactions %}
-      <div class="transaction-list">
-        {% for transaction in transactions %}
-          <article class="transaction-card{% if transaction.needs_review %} needs-review{% endif %}">
-            <div class="transaction-main">
-              <div>
-                <time datetime="{{ transaction.booking_date.isoformat() }}">{{ transaction.booking_date.strftime("%d %b %Y") }}</time>
-                <h2>{{ transaction.merchant }}</h2>
-                <p>{{ transaction.description }}</p>
+    <div id="transaction-results" aria-live="polite">
+      {% if transactions %}
+        <div class="transaction-list">
+          {% for transaction in transactions %}
+            <article class="transaction-card{% if transaction.needs_review %} needs-review{% endif %}">
+              <div class="transaction-main">
+                <div>
+                  <time datetime="{{ transaction.booking_date.isoformat() }}">{{ transaction.booking_date.strftime("%d %b %Y") }}</time>
+                  <h2>{{ transaction.merchant }}</h2>
+                  <p>{{ transaction.description }}</p>
+                </div>
+                <strong>{{ transaction.amount }}</strong>
               </div>
-              <strong>{{ transaction.amount }}</strong>
-            </div>
-            <div class="transaction-meta">
-              <span>{{ transaction.category }}</span>
-              <span>{{ transaction.classification_method }}</span>
-              {% if transaction.needs_review %}<span>review</span>{% endif %}
-              {% for flag in transaction.flags %}
-                <span>{{ flag }}</span>
-              {% endfor %}
-            </div>
-            {% if show_inline_edit %}
-              <div class="transaction-actions">
-                <a href="/rules/preview/from-transaction/{{ transaction.transaction_id }}">Preview rule</a>
-                <a href="/transactions/{{ transaction.transaction_id }}/raw">Raw data</a>
+              <div class="transaction-meta">
+                <span>{{ transaction.category }}</span>
+                <span>{{ transaction.classification_method }}</span>
+                {% if transaction.needs_review %}<span>review</span>{% endif %}
+                {% for flag in transaction.flags %}
+                  <span>{{ flag }}</span>
+                {% endfor %}
               </div>
-            {% endif %}
-            {% if show_inline_edit %}
-              <details class="transaction-edit">
-                <summary>Edit</summary>
-                <form class="review-form transaction-edit-form" method="post" action="/transactions/{{ transaction.transaction_id }}/category">
+              {% if show_inline_edit %}
+                <div class="transaction-actions">
+                  <a href="/rules/preview/from-transaction/{{ transaction.transaction_id }}">Preview rule</a>
+                  <a href="/transactions/{{ transaction.transaction_id }}/raw">Raw data</a>
+                </div>
+              {% endif %}
+              {% if show_inline_edit %}
+                <details class="transaction-edit">
+                  <summary>Edit</summary>
+                  <form class="review-form transaction-edit-form" method="post" action="/transactions/{{ transaction.transaction_id }}/category">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="return_to" value="{{ return_to }}">
+                    <label>
+                      Category
+                      <select name="category" required>
+                        {% for category in categories %}
+                          <option value="{{ category }}" {% if category == transaction.category %}selected{% endif %}>{{ category }}</option>
+                        {% endfor %}
+                      </select>
+                    </label>
+                    <label>
+                      Merchant
+                      <input name="merchant" value="{{ transaction.merchant }}" autocomplete="off">
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" name="create_alias" value="1">
+                      Remember merchant
+                    </label>
+                    <fieldset class="flag-fieldset">
+                      <legend>Flags</legend>
+                      <label class="checkbox-label">
+                        <input type="checkbox" name="is_transfer" value="1" {% if "transfer" in transaction.flags %}checked{% endif %}>
+                        Transfer
+                      </label>
+                      <label class="checkbox-label">
+                        <input type="checkbox" name="is_savings" value="1" {% if "savings" in transaction.flags %}checked{% endif %}>
+                        Savings
+                      </label>
+                      <label class="checkbox-label">
+                        <input type="checkbox" name="is_one_off" value="1" {% if "one-off" in transaction.flags %}checked{% endif %}>
+                        One-off
+                      </label>
+                      <label class="checkbox-label">
+                        <input type="checkbox" name="is_excluded_from_budget" value="1" {% if "excluded" in transaction.flags %}checked{% endif %}>
+                        Exclude
+                      </label>
+                    </fieldset>
+                    <div class="review-actions">
+                      <button type="submit">Save changes</button>
+                    </div>
+                  </form>
+                </details>
+              {% endif %}
+              {% if show_review_actions and transaction.needs_review %}
+                <form class="review-form" method="post" action="/review/{{ transaction.transaction_id }}/category">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <input type="hidden" name="return_to" value="{{ return_to }}">
                   <label>
                     Category
                     <select name="category" required>
@@ -119,7 +172,7 @@
                     <input name="merchant" value="{{ transaction.merchant }}" autocomplete="off">
                   </label>
                   <label class="checkbox-label">
-                    <input type="checkbox" name="create_alias" value="1">
+                    <input type="checkbox" name="create_alias" value="1" checked>
                     Remember merchant
                   </label>
                   <fieldset class="flag-fieldset">
@@ -142,64 +195,21 @@
                     </label>
                   </fieldset>
                   <div class="review-actions">
-                    <button type="submit">Save changes</button>
+                    <button type="submit">Save</button>
+                    <button type="submit" name="next" value="rule-preview" class="secondary">Save and preview rule</button>
+                    <button type="submit" name="next" value="apply-similar" class="secondary">Save and apply similar</button>
                   </div>
                 </form>
-              </details>
-            {% endif %}
-            {% if show_review_actions and transaction.needs_review %}
-              <form class="review-form" method="post" action="/review/{{ transaction.transaction_id }}/category">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <label>
-                  Category
-                  <select name="category" required>
-                    {% for category in categories %}
-                      <option value="{{ category }}" {% if category == transaction.category %}selected{% endif %}>{{ category }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label>
-                  Merchant
-                  <input name="merchant" value="{{ transaction.merchant }}" autocomplete="off">
-                </label>
-                <label class="checkbox-label">
-                  <input type="checkbox" name="create_alias" value="1" checked>
-                  Remember merchant
-                </label>
-                <fieldset class="flag-fieldset">
-                  <legend>Flags</legend>
-                  <label class="checkbox-label">
-                    <input type="checkbox" name="is_transfer" value="1" {% if "transfer" in transaction.flags %}checked{% endif %}>
-                    Transfer
-                  </label>
-                  <label class="checkbox-label">
-                    <input type="checkbox" name="is_savings" value="1" {% if "savings" in transaction.flags %}checked{% endif %}>
-                    Savings
-                  </label>
-                  <label class="checkbox-label">
-                    <input type="checkbox" name="is_one_off" value="1" {% if "one-off" in transaction.flags %}checked{% endif %}>
-                    One-off
-                  </label>
-                  <label class="checkbox-label">
-                    <input type="checkbox" name="is_excluded_from_budget" value="1" {% if "excluded" in transaction.flags %}checked{% endif %}>
-                    Exclude
-                  </label>
-                </fieldset>
-                <div class="review-actions">
-                  <button type="submit">Save</button>
-                  <button type="submit" name="next" value="rule-preview" class="secondary">Save and preview rule</button>
-                  <button type="submit" name="next" value="apply-similar" class="secondary">Save and apply similar</button>
-                </div>
-              </form>
-            {% endif %}
-          </article>
-        {% endfor %}
-      </div>
-    {% else %}
-      <article>
-        <strong>No transactions to show.</strong>
-        <p class="muted">Load deterministic sample data or run a sync once the bank adapter is configured.</p>
-      </article>
-    {% endif %}
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <article>
+          <strong>No transactions to show.</strong>
+          <p class="muted">Load deterministic sample data or run a sync once the bank adapter is configured.</p>
+        </article>
+      {% endif %}
+    </div>
   </section>
 {% endblock %}

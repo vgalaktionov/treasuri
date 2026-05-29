@@ -53,6 +53,12 @@ def test_transactions_route_renders_sample_history(sample_app) -> None:
     assert b"EUR 5,258.00" in response.data
     assert b"Preview rule" in response.data
     assert b"Raw data" in response.data
+    assert b'hx-get="/transactions"' in response.data
+    assert b'hx-target="#transaction-results"' in response.data
+    assert b'hx-select="#transaction-results"' in response.data
+    assert b'hx-push-url="true"' in response.data
+    assert b'id="transaction-results"' in response.data
+    assert b'aria-live="polite"' in response.data
 
 
 def test_review_route_only_renders_transactions_needing_review(sample_app) -> None:

@@ -41,6 +41,8 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - The transactions screen previously filtered only. Added manual edit coverage from `/transactions` itself.
 - Transaction filters previously covered only search, month, category, and review state. Added explicit merchant,
   uncategorized, amount-range, and transaction-type filters for income, transfers, recurring, excluded, and related flags.
+- Transaction filters previously used full-page form submits despite shipping HTMX. Added HTMX partial result updates with
+  pushed URLs and Puppeteer coverage for XHR-driven mobile filtering.
 - Transaction rows previously had no source-level troubleshooting action. Added raw transaction detail pages and row links with route and E2E coverage.
 - Transaction corrections previously edited only category and merchant. Added transfer, savings, one-off, and budget-exclusion flag editing with route and E2E coverage.
 - Review corrections previously handled only one transaction or rule preview. Added apply-to-similar review corrections that skip existing manual overrides.
