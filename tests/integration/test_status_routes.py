@@ -31,11 +31,17 @@ def test_status_route_shows_runtime_state_without_secrets() -> None:
         body = response.get_data(as_text=True)
 
     assert response.status_code == 200
+    assert "App version" in body
+    assert "0.1.test" in body
+    assert "Git SHA" in body
+    assert "abcdef123456" in body
     assert "Migration version" in body
     assert "0004_classification_runtime" in body
     assert "Last sync" in body
     assert "completed" in body
     assert "fake, 7 new, 0 updated" in body
+    assert "Last forecast update" in body
+    assert "safe to spend 558.00" in body
     assert "Queued jobs" in body
     assert "queued 1" in body
     assert "Latest worker result" in body
@@ -70,6 +76,9 @@ def test_status_route_handles_missing_database() -> None:
     assert response.status_code == 200
     assert "Connection" in body
     assert "not configured" in body
+    assert "App version" in body
+    assert "Git SHA" in body
+    assert "unavailable" in body
 
 
 @contextmanager
@@ -87,6 +96,8 @@ def _sample_app() -> Iterator[Flask]:
         yield create_app(
             AppConfig(
                 app_env="test",
+                app_version="0.1.test",
+                git_sha="abcdef1234567890",
                 secret_key="super-secret",
                 database_url=database_url,
                 allowed_emails=("dev-user@example.test",),

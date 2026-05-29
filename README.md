@@ -123,6 +123,8 @@ Common optional environment:
 ```text
 HTTP_HOST
 HTTP_PORT
+APP_VERSION
+GIT_SHA
 LLM_ENABLED
 LLM_BASE_URL
 LLM_MODEL

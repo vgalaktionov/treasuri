@@ -6,6 +6,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 
@@ -63,10 +64,28 @@ def _read_csv(name: str, default: tuple[str, ...] = ()) -> tuple[str, ...]:
     return tuple(value.strip().lower() for value in raw_value.split(",") if value.strip())
 
 
+def _read_git_sha() -> str:
+    return (
+        os.environ.get("GIT_SHA", "") or os.environ.get("SOURCE_COMMIT", "") or os.environ.get("GITHUB_SHA", "")
+    ).strip()
+
+
+def _read_app_version() -> str:
+    raw_version = os.environ.get("APP_VERSION", "").strip()
+    if raw_version:
+        return raw_version
+    try:
+        return version("treasuri")
+    except PackageNotFoundError:
+        return "0.1.0"
+
+
 @dataclass(frozen=True)
 class AppConfig:
     """Typed config loaded from environment variables."""
 
+    app_version: str = field(default_factory=_read_app_version)
+    git_sha: str = field(default_factory=_read_git_sha)
     app_env: str = field(default_factory=lambda: os.environ.get("APP_ENV", "development"))
     secret_key: str = field(default_factory=lambda: os.environ.get("SECRET_KEY", "dev-secret-change-me"))
     database_url: str = field(default_factory=lambda: os.environ.get("DATABASE_URL", ""))

@@ -28,6 +28,8 @@ def load_status_sections(config: AppConfig) -> list[StatusSection]:
     runtime_section = StatusSection(
         title="Runtime",
         rows=[
+            StatusRow("App version", config.app_version),
+            StatusRow("Git SHA", _short_sha(config.git_sha)),
             StatusRow("Environment", config.app_env),
             StatusRow("OIDC", "enabled" if config.oidc_enabled else "disabled"),
             StatusRow("OIDC client secrets", _configured(config.oidc_client_secrets)),
@@ -100,10 +102,19 @@ def _load_database_sections(database_url: str) -> list[StatusSection]:
             LIMIT 1
             """
         ).fetchone()
+        forecast = connection.execute(
+            """
+            SELECT year_month, updated_at, safe_to_spend, confidence
+            FROM monthly_forecasts
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+            """
+        ).fetchone()
 
     return [
         StatusSection("Database", [StatusRow("Migration version", _optional_text(migration_version, 0, "none"))]),
         StatusSection("Sync", [_sync_row(sync_run)]),
+        StatusSection("Forecast", [_forecast_row(forecast)]),
         StatusSection("Worker", [_job_count_row(job_counts), _job_log_row(job_log)]),
         StatusSection("Exports", [_export_row(export_run)]),
     ]
@@ -133,6 +144,18 @@ def _job_count_row(rows: list[tuple[object, ...]]) -> StatusRow:
     return StatusRow("Queued jobs", str(queued), counts)
 
 
+def _forecast_row(row: tuple[object, ...] | None) -> StatusRow:
+    if row is None:
+        return StatusRow("Last forecast update", "none")
+    updated = _format_datetime(row[1])
+    detail_parts = [
+        f"safe to spend {row[2]}",
+        f"confidence {row[3]}",
+        f"updated {updated}" if updated else None,
+    ]
+    return StatusRow("Last forecast update", str(row[0]), ", ".join(part for part in detail_parts if part))
+
+
 def _job_log_row(row: tuple[object, ...] | None) -> StatusRow:
     if row is None:
         return StatusRow("Latest worker result", "none")
@@ -160,6 +183,10 @@ def _export_row(row: tuple[object, ...] | None) -> StatusRow:
 
 def _configured(value: str) -> str:
     return "configured" if value else "missing"
+
+
+def _short_sha(value: str) -> str:
+    return value[:12] if value else "unavailable"
 
 
 def _redact_url(value: str) -> str:
