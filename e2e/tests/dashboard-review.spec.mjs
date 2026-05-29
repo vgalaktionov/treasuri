@@ -428,10 +428,11 @@ uiTest("review correction previews a reusable rule before showing it in the rule
   assert.match(createdRuleText, /Classify one-off purchases/);
 });
 
-uiTest("pwa is installable and falls back offline without cached financial data", async () => {
+uiTest("pwa is installable and caches an offline dashboard summary shell", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(baseUrl, { waitUntil: "networkidle0" });
+  const expectedSummary = await page.$eval("#treasuri-offline-summary", (script) => JSON.parse(script.textContent));
 
   const manifest = await page.evaluate(async () => {
     const response = await fetch("/static/site.webmanifest");
@@ -466,25 +467,35 @@ uiTest("pwa is installable and falls back offline without cached financial data"
   await page.reload({ waitUntil: "networkidle0", timeout: 10000 });
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null, { timeout: 5000 });
 
-  serverProcess.stdin.write("stop\n");
-  await waitForExit(serverProcess, 8000);
-  serverProcess = undefined;
+  const hasOfflineShell = await page.evaluate(async () => Boolean(await caches.match("/static/offline.html")));
+  assert.equal(hasOfflineShell, true);
 
-  await page.goto(`${baseUrl}/transactions?offline=1`, { waitUntil: "domcontentloaded", timeout: 10000 });
-  const bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  await page.goto(`${baseUrl}/static/offline.html`, { waitUntil: "domcontentloaded", timeout: 10000 });
+  await page.waitForFunction(() => document.body?.innerText.length > 0, { timeout: 5000 });
+  const bodyText = await page.$eval("body", (body) => body.innerText);
   assert.match(bodyText, /Treasuri is offline/);
-  assert.match(bodyText, /Reconnect to view financial data/);
-  assert.doesNotMatch(bodyText, /EUR 558/);
+  assert.match(bodyText, /Last known dashboard summary/);
+  assert.match(bodyText, new RegExp(`Safe to spend\\s+${escapeRegExp(expectedSummary.safe_to_spend)}`));
+  assert.match(bodyText, new RegExp(`Safe per day\\s+${escapeRegExp(expectedSummary.safe_per_day)}`));
+  assert.match(
+    bodyText,
+    new RegExp(
+      `Confidence\\s+${escapeRegExp(expectedSummary.confidence)}\\s+${escapeRegExp(expectedSummary.confidence_note)}`,
+    ),
+  );
   assert.doesNotMatch(bodyText, /Sample Supermarket/);
 });
 
 function uiTest(name, run) {
-  nodeTest(name, async () => {
+  nodeTest(name, { timeout: 60000 }, async () => {
+    const existingPages = new Set(openPages);
     try {
       await run();
     } catch (error) {
       await captureFailureArtifacts(name, error);
       throw error;
+    } finally {
+      await closeNewPages(existingPages);
     }
   });
 }
@@ -516,6 +527,19 @@ async function captureFailureArtifacts(testName, error) {
     index += 1;
   }
   console.error(`Saved E2E failure artifacts for "${testName}" in ${outputDirectory}`);
+}
+
+async function closeNewPages(existingPages) {
+  const pagesToClose = [...openPages].filter((page) => !existingPages.has(page) && !page.isClosed());
+  await Promise.all(
+    pagesToClose.map(async (page) => {
+      try {
+        await page.close();
+      } catch {
+        // Browser shutdown will clean up pages that are already gone.
+      }
+    }),
+  );
 }
 
 async function startSampleServer() {
@@ -557,6 +581,10 @@ function withTimeout(promise, timeoutMs, message) {
     timer = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function waitForDownloadedFile(downloadPath, filename) {

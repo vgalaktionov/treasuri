@@ -14,10 +14,49 @@
         <p class="muted">Offline</p>
         <h1 id="offline-title">Treasuri is offline</h1>
         <article>
-          <strong>Reconnect to view financial data.</strong>
+          <strong data-offline-empty>Reconnect to view financial data.</strong>
           <p class="muted">The offline shell avoids caching transaction details.</p>
+        </article>
+        <article data-offline-summary hidden>
+          <strong>Last known dashboard summary</strong>
+          <dl class="breakdown-grid">
+            <div>
+              <dt>Month</dt>
+              <dd data-offline-field="month"></dd>
+            </div>
+            <div>
+              <dt>Safe to spend</dt>
+              <dd data-offline-field="safe_to_spend"></dd>
+            </div>
+            <div>
+              <dt>Safe per day</dt>
+              <dd data-offline-field="safe_per_day"></dd>
+            </div>
+            <div>
+              <dt>Projected savings</dt>
+              <dd data-offline-field="projected_savings"></dd>
+            </div>
+            <div>
+              <dt>Target savings</dt>
+              <dd data-offline-field="target_savings"></dd>
+            </div>
+            <div>
+              <dt>Confidence</dt>
+              <dd><span data-offline-field="confidence"></span> <small data-offline-field="confidence_note"></small></dd>
+            </div>
+            <div>
+              <dt>Review</dt>
+              <dd><span data-offline-field="review_count"></span> transaction(s) need review</dd>
+            </div>
+            <div>
+              <dt>Last sync</dt>
+              <dd data-offline-field="last_sync"></dd>
+            </div>
+          </dl>
+          <p class="muted">Stored on this device after the dashboard loaded successfully.</p>
         </article>
       </section>
     </main>
+    <script defer src="/static/js/offline-summary.js"></script>
   </body>
 </html>

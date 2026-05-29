@@ -34,6 +34,14 @@ def test_pwa_icon_uses_flying_stack_of_bills(client) -> None:
     assert ">💸</text>".encode() in response.data
 
 
+def test_favicon_uses_flying_stack_of_bills(client) -> None:
+    response = client.get("/favicon.ico")
+
+    assert response.status_code == 200
+    assert response.headers["Content-Type"].startswith("image/svg+xml")
+    assert ">💸</text>".encode() in response.data
+
+
 def test_app_route_rejects_disallowed_test_profile(test_config: AppConfig) -> None:
     disallowed_config = AppConfig(
         app_env="test",

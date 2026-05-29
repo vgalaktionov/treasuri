@@ -58,6 +58,18 @@ header nav a {
   font-size: clamp(2rem, 10vw, 4.5rem);
 }
 
+#offline-title {
+  font-size: clamp(2.35rem, 9vw, 3rem);
+  hyphens: none;
+  line-height: 1.05;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+[data-offline-summary] .breakdown-grid div:last-child {
+  grid-column: 1 / -1;
+}
+
 .money-answer {
   background: var(--treasuri-soft);
   border: 1px solid var(--treasuri-line);

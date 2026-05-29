@@ -79,6 +79,12 @@ def register_routes(app: Flask) -> None:
         response.headers["Cache-Control"] = "no-cache"
         return response
 
+    @app.get("/favicon.ico")
+    def favicon() -> Response:
+        response = app.send_static_file("icons/icon.svg")
+        response.headers["Content-Type"] = "image/svg+xml"
+        return response
+
     @app.get("/")
     def dashboard() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]

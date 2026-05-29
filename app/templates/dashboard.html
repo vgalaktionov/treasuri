@@ -83,3 +83,22 @@
     </article>
   </section>
 {% endblock %}
+
+{% block scripts %}
+  <script id="treasuri-offline-summary" type="application/json">
+    {{
+      {
+        "month": summary.month,
+        "safe_to_spend": summary.safe_to_spend,
+        "safe_per_day": summary.safe_per_day,
+        "projected_savings": summary.projected_savings,
+        "target_savings": summary.target_savings,
+        "confidence": summary.confidence,
+        "confidence_note": summary.confidence_note,
+        "review_count": summary.review_count,
+        "last_sync": summary.last_sync,
+      } | tojson
+    }}
+  </script>
+  <script defer src="{{ url_for('static', filename='js/offline-summary.js') }}"></script>
+{% endblock %}

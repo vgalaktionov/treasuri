@@ -1,9 +1,10 @@
-const CACHE_NAME = "treasuri-shell-v1";
+const CACHE_NAME = "treasuri-shell-v2";
 const SHELL_ASSETS = [
   "/static/offline.html",
   "/static/css/app.css",
   "/static/vendor/pico.min.css",
   "/static/vendor/htmx.min.js",
+  "/static/js/offline-summary.js",
   "/static/icons/icon.svg",
   "/static/site.webmanifest"
 ];
