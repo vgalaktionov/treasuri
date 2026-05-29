@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterator
 from datetime import date
@@ -11,6 +12,8 @@ from flask import Flask
 from testcontainers.postgres import PostgresContainer
 
 from app.config import AppConfig
+from app.jobs.enqueue import BACKFILL_RULE_ENTRYPOINT
+from app.jobs.worker import run_until_drained
 from app.migrate import run_migrations
 from app.sample_data import load_sample_data
 from app.web import create_app
@@ -141,6 +144,14 @@ def test_rule_backfill_applies_to_history_without_overwriting_manual_override(sa
     )
 
     with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        queued_job = connection.execute(
+            """
+            SELECT entrypoint, payload, status
+            FROM pgqueuer
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
         rows = connection.execute(
             """
             SELECT
@@ -158,9 +169,46 @@ def test_rule_backfill_applies_to_history_without_overwriting_manual_override(sa
         ).fetchall()
 
     assert backfill_response.status_code == 200
+    assert queued_job == (BACKFILL_RULE_ENTRYPOINT, json_bytes({"rule_id": rule_id}), "queued")
+    assert rows == [
+        (transaction_id, "Dog", False, "manual_override", None),
+        (historical_transaction_id, "Unknown", True, "uncategorized", None),
+    ]
+
+    run_until_drained(sample_app.config["APP_CONFIG"])
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                enriched_transactions.id,
+                categories.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                enriched_transactions.rule_id
+            FROM enriched_transactions
+            JOIN categories ON categories.id = enriched_transactions.category_id
+            WHERE enriched_transactions.id IN (%s, %s)
+            ORDER BY enriched_transactions.id
+            """,
+            (transaction_id, historical_transaction_id),
+        ).fetchall()
+        job_log = connection.execute(
+            """
+            SELECT status, entrypoint
+            FROM pgqueuer_log
+            WHERE status = 'successful'
+            ORDER BY id
+            """
+        ).fetchall()
+
     assert rows == [
         (transaction_id, "Dog", False, "manual_override", None),
         (historical_transaction_id, "Dog", False, "rule", rule_id),
+    ]
+    assert job_log == [
+        ("successful", BACKFILL_RULE_ENTRYPOINT),
+        ("successful", "update_monthly_forecast"),
     ]
 
 
@@ -400,3 +448,7 @@ def _extract_csrf(html: str) -> str:
     if match is None:
         raise AssertionError("CSRF token was not rendered")
     return match.group(1)
+
+
+def json_bytes(value: dict[str, object]) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()

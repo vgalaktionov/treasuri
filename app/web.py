@@ -14,6 +14,7 @@ from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
 from app.exports.xlsx import generate_budget_export, list_export_runs, load_export_file
 from app.forecast.service import update_monthly_forecast
+from app.jobs.enqueue import enqueue_backfill_rule
 from app.month import FALLBACK_MONTH_SUMMARY, load_month_summary
 from app.recurring import confirm_recurring_series, disable_recurring_series, list_recurring_series
 from app.review import (
@@ -25,7 +26,6 @@ from app.review import (
 from app.rules import (
     RULE_FIELDS,
     RULE_OPERATORS,
-    backfill_rule,
     create_rule,
     create_rule_from_input,
     draft_rule_from_transaction,
@@ -284,7 +284,7 @@ def register_routes(app: Flask) -> None:
         app_config: AppConfig = app.config["APP_CONFIG"]
         if not app_config.database_url:
             abort(400)
-        backfill_rule(app_config.database_url, rule_id)
+        enqueue_backfill_rule(app_config.database_url, rule_id)
         return redirect(url_for("rules"))
 
     @app.post("/rules/<int:rule_id>/active")
