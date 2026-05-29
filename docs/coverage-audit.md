@@ -18,11 +18,15 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 | Rule preview and historical backfill | `tests/integration/test_rule_routes.py`, rule E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Rule create, edit, disable UI | `tests/integration/test_rule_routes.py`, rule E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | XLSX generation, blob storage, and download | `tests/integration/test_exports.py`, export E2E in `e2e/tests/dashboard-review.spec.mjs` |
-| Auth and allowed-user behavior | `tests/unit/test_web.py`, route tests using `OIDC_TESTING_PROFILE_JSON`, CSRF checks in review/rule/settings/export route tests |
+| Failed export visibility and recovery | `tests/integration/test_exports.py` |
+| Auth, logout, and allowed-user behavior | `tests/unit/test_web.py`, route tests using `OIDC_TESTING_PROFILE_JSON`, CSRF checks in review/rule/settings/export route tests |
+| Session lifetime configuration | `tests/unit/test_config.py`, `tests/unit/test_web.py` |
 | PWA installability and offline shell | `tests/unit/test_pwa.py`, PWA E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Mobile UX and no horizontal overflow | mobile E2E assertions across dashboard, month, review, transactions, categories, settings, export, and recurring |
+| Worker observability logs | `tests/integration/test_jobs.py` |
 | Docker image command behavior | static checks in `tests/unit/test_container_runtime.py`, opt-in image smoke in `tests/integration/test_docker_image.py`, CI workflow invocation |
 | GHCR workflow behavior | `tests/unit/test_ci_workflow.py`, `.github/workflows/ci.yml` |
+| Runtime version and git SHA visibility | `tests/unit/test_config.py`, `tests/unit/test_container_runtime.py`, `tests/unit/test_ci_workflow.py`, `tests/integration/test_status_routes.py`, status E2E in `e2e/tests/dashboard-review.spec.mjs` |
 
 ## Gaps Found And Filled
 
@@ -41,6 +45,10 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Forecast settings previously exposed only money assumptions. Added salary-day, baseline-month, and sync-lookback controls with route and E2E coverage.
 - Settings previously hid operational context. Added account, category taxonomy, and sync schedule readouts with route and E2E coverage.
 - XLSX recurring expenses previously exported only headers. Added recurring-series rows and workbook value assertions.
+- Export failure handling previously showed failed runs but did not prove recovery. Added a Testcontainers-backed route test that keeps the failed run visible, generates a new workbook, drains the worker, and downloads the recovered Postgres blob.
+- Worker logs previously emitted ad hoc summaries. Added structured stdout logs for job start, completion, sanitized failure, classification method counts, forecast recalculation, and generated exports.
+- Auth previously lacked an explicit sign-out path and bounded session lifetime. Added logout route coverage, public signed-out page coverage, and session lifetime configuration tests.
+- Runtime identity previously was not visible in the artifact. Added app version and git SHA configuration, image build args, CI build-arg coverage, and status-page visibility.
 
 ## Residual Risk
 
