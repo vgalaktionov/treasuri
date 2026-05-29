@@ -36,9 +36,9 @@ from app.rules import (
     update_rule_from_input,
 )
 from app.settings import (
-    DEFAULT_FORECAST_SETTINGS,
     DEFAULT_SETTINGS_OVERVIEW,
     default_classification_settings,
+    default_forecast_settings,
     load_classification_settings,
     load_forecast_settings,
     load_settings_overview,
@@ -343,7 +343,9 @@ def register_routes(app: Flask) -> None:
     def settings() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]
         forecast_settings_model = (
-            load_forecast_settings(app_config.database_url) if app_config.database_url else DEFAULT_FORECAST_SETTINGS
+            load_forecast_settings(app_config.database_url, app_config)
+            if app_config.database_url
+            else default_forecast_settings(app_config)
         )
         forecast_settings = forecast_settings_model.as_form_values()
         classification_settings = (

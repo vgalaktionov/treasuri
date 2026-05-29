@@ -173,7 +173,24 @@ def load_settings_overview(database_url: str, forecast_settings: ForecastSetting
     )
 
 
-def load_forecast_settings(database_url: str) -> ForecastSettings:
+def default_forecast_settings(config: AppConfig | None = None) -> ForecastSettings:
+    if config is None:
+        return DEFAULT_FORECAST_SETTINGS
+    return ForecastSettings(
+        current_liquid_balance=DEFAULT_FORECAST_SETTINGS.current_liquid_balance,
+        target_monthly_savings=DEFAULT_FORECAST_SETTINGS.target_monthly_savings,
+        safety_buffer=DEFAULT_FORECAST_SETTINGS.safety_buffer,
+        salary_day=DEFAULT_FORECAST_SETTINGS.salary_day,
+        baseline_months=DEFAULT_FORECAST_SETTINGS.baseline_months,
+        sync_lookback_days=config.sync_lookback_days,
+        fixed_costs_upcoming=DEFAULT_FORECAST_SETTINGS.fixed_costs_upcoming,
+        variable_baseline_3m=DEFAULT_FORECAST_SETTINGS.variable_baseline_3m,
+        variable_baseline_6m=DEFAULT_FORECAST_SETTINGS.variable_baseline_6m,
+    )
+
+
+def load_forecast_settings(database_url: str, config: AppConfig | None = None) -> ForecastSettings:
+    defaults = default_forecast_settings(config)
     with psycopg.connect(database_url) as connection:
         rows = connection.execute(
             "SELECT key, value_json FROM app_settings WHERE key = ANY(%s)",
@@ -183,30 +200,30 @@ def load_forecast_settings(database_url: str) -> ForecastSettings:
     return ForecastSettings(
         current_liquid_balance=_setting_decimal(
             values.get("current_liquid_balance"),
-            DEFAULT_FORECAST_SETTINGS.current_liquid_balance,
+            defaults.current_liquid_balance,
         ),
         target_monthly_savings=_setting_decimal(
             values.get("target_monthly_savings"),
-            DEFAULT_FORECAST_SETTINGS.target_monthly_savings,
+            defaults.target_monthly_savings,
         ),
-        safety_buffer=_setting_decimal(values.get("safety_buffer"), DEFAULT_FORECAST_SETTINGS.safety_buffer),
-        salary_day=_setting_int(values.get("salary_day"), DEFAULT_FORECAST_SETTINGS.salary_day),
-        baseline_months=_setting_int(values.get("baseline_months"), DEFAULT_FORECAST_SETTINGS.baseline_months),
+        safety_buffer=_setting_decimal(values.get("safety_buffer"), defaults.safety_buffer),
+        salary_day=_setting_int(values.get("salary_day"), defaults.salary_day),
+        baseline_months=_setting_int(values.get("baseline_months"), defaults.baseline_months),
         sync_lookback_days=_setting_int(
             values.get("sync_lookback_days"),
-            DEFAULT_FORECAST_SETTINGS.sync_lookback_days,
+            defaults.sync_lookback_days,
         ),
         fixed_costs_upcoming=_setting_decimal(
             values.get("fixed_costs_upcoming"),
-            DEFAULT_FORECAST_SETTINGS.fixed_costs_upcoming,
+            defaults.fixed_costs_upcoming,
         ),
         variable_baseline_3m=_setting_decimal(
             values.get("variable_baseline_3m"),
-            DEFAULT_FORECAST_SETTINGS.variable_baseline_3m,
+            defaults.variable_baseline_3m,
         ),
         variable_baseline_6m=_setting_decimal(
             values.get("variable_baseline_6m"),
-            DEFAULT_FORECAST_SETTINGS.variable_baseline_6m,
+            defaults.variable_baseline_6m,
         ),
     )
 

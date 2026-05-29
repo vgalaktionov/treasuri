@@ -25,6 +25,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 | PWA installability and offline shell | `tests/unit/test_pwa.py`, PWA E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Mobile UX and no horizontal overflow | mobile E2E assertions across dashboard, month, review, transactions, categories, settings, export, and recurring |
 | Worker observability logs | `tests/integration/test_jobs.py` |
+| Runtime env defaults and retention settings | `tests/unit/test_config.py`, `tests/integration/test_settings_routes.py`, `tests/integration/test_exports.py`, `tests/integration/test_status_routes.py` |
 | Docker image command behavior | static checks in `tests/unit/test_container_runtime.py`, opt-in image smoke in `tests/integration/test_docker_image.py`, CI workflow invocation |
 | GHCR workflow behavior | `tests/unit/test_ci_workflow.py`, `.github/workflows/ci.yml` |
 | Runtime version and git SHA visibility | `tests/unit/test_config.py`, `tests/unit/test_container_runtime.py`, `tests/unit/test_ci_workflow.py`, `tests/integration/test_status_routes.py`, status E2E in `e2e/tests/dashboard-review.spec.mjs` |
@@ -51,6 +52,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Auth previously lacked an explicit sign-out path and bounded session lifetime. Added logout route coverage, public signed-out page coverage, and session lifetime configuration tests.
 - Runtime identity previously was not visible in the artifact. Added app version and git SHA configuration, image build args, CI build-arg coverage, and status-page visibility.
 - Sync lookback days previously appeared in settings without constraining fetched mutations. Added sync filtering, metadata, worker logging, and tests that prove the saved setting reaches foreground and worker sync paths.
+- `SYNC_LOOKBACK_DAYS` and `EXPORT_RETENTION_DAYS` previously existed only in the PRD runtime contract. Added env-backed defaults, retention pruning for old finished exports, status visibility, and Testcontainers coverage.
 
 ## Residual Risk
 

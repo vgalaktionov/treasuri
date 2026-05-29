@@ -13,12 +13,16 @@ def test_load_config_parses_oidc_testing_profile(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("ALLOWED_EMAILS", "dev-user@example.test,other@example.test")
     monkeypatch.setenv("OIDC_OPENID_REALM", "test-realm")
     monkeypatch.setenv("WORKER_CONCURRENCY", "4")
+    monkeypatch.setenv("SYNC_LOOKBACK_DAYS", "45")
+    monkeypatch.setenv("EXPORT_RETENTION_DAYS", "30")
 
     config = load_config()
 
     assert config.oidc_enabled is False
     assert config.oidc_openid_realm == "test-realm"
     assert config.worker_concurrency == 4
+    assert config.sync_lookback_days == 45
+    assert config.export_retention_days == 30
     assert config.oidc_testing_profile["email"] == "dev-user@example.test"
     assert config.allowed_emails == ("dev-user@example.test", "other@example.test")
     assert str(config.llm_confidence_threshold) == "0.60"
@@ -108,6 +112,22 @@ def test_load_config_rejects_non_positive_worker_concurrency(monkeypatch: pytest
     monkeypatch.setenv("WORKER_CONCURRENCY", "0")
 
     with pytest.raises(ConfigError, match="WORKER_CONCURRENCY"):
+        load_config()
+
+
+def test_load_config_rejects_non_positive_sync_lookback_days(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("SYNC_LOOKBACK_DAYS", "0")
+
+    with pytest.raises(ConfigError, match="SYNC_LOOKBACK_DAYS"):
+        load_config()
+
+
+def test_load_config_rejects_non_positive_export_retention_days(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("EXPORT_RETENTION_DAYS", "0")
+
+    with pytest.raises(ConfigError, match="EXPORT_RETENTION_DAYS"):
         load_config()
 
 

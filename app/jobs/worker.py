@@ -164,6 +164,7 @@ def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
                 config.database_url,
                 created_by=created_by,
                 run_id=run_id,
+                retention_days=config.export_retention_days,
             )
         except Exception as exc:
             _log_job_failed(GENERATE_XLSX_EXPORT_ENTRYPOINT, job, exc)
@@ -201,7 +202,7 @@ def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
 
 def _sync_bank_transactions(config: AppConfig) -> SyncResult:
     adapter, account_iban = build_bank_adapter(config)
-    sync_settings = load_forecast_settings(config.database_url)
+    sync_settings = load_forecast_settings(config.database_url, config)
     return sync_bank_transactions(
         config.database_url,
         adapter,

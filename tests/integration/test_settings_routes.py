@@ -12,6 +12,7 @@ from testcontainers.postgres import PostgresContainer
 from app.config import AppConfig
 from app.migrate import run_migrations
 from app.sample_data import SAMPLE_FORECAST_DATE, load_sample_data
+from app.settings import load_forecast_settings
 from app.web import create_app
 
 
@@ -117,6 +118,35 @@ def test_settings_route_renders_operating_and_llm_controls(sample_app: Flask) ->
     assert b"fake completed" in response.data
     assert b"LLM fallback" in response.data
     assert b'name="llm_confidence_threshold"' in response.data
+
+
+def test_forecast_settings_use_configured_sync_lookback_default() -> None:
+    with PostgresContainer(
+        image="postgres:16-alpine",
+        username="treasuri",
+        password="treasuri",
+        dbname="treasuri",
+        driver=None,
+    ) as postgres:
+        database_url = postgres.get_connection_url(driver=None)
+        run_migrations(database_url)
+
+        settings = load_forecast_settings(
+            database_url,
+            AppConfig(
+                app_env="test",
+                secret_key="test-secret",
+                database_url=database_url,
+                allowed_emails=("dev-user@example.test",),
+                oidc_enabled=False,
+                oidc_testing_profile={"sub": "dev-user", "email": "dev-user@example.test"},
+                oidc_cookie_secure=False,
+                sync_lookback_days=45,
+                llm_enabled=False,
+            ),
+        )
+
+    assert settings.sync_lookback_days == 45
 
 
 def test_settings_update_requires_csrf(sample_app: Flask) -> None:

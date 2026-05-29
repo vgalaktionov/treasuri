@@ -39,7 +39,7 @@ class SyncNowResult:
 
 def run_sync_now(config: AppConfig) -> SyncNowResult:
     adapter, account_iban = build_bank_adapter(config)
-    sync_settings = load_forecast_settings(config.database_url)
+    sync_settings = load_forecast_settings(config.database_url, config)
     sync_result = sync_bank_transactions(
         config.database_url,
         adapter,

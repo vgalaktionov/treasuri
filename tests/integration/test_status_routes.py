@@ -39,6 +39,10 @@ def test_status_route_shows_runtime_state_without_secrets() -> None:
     assert "treasuri-test" in body
     assert "Worker concurrency" in body
     assert "3" in body
+    assert "Sync lookback default" in body
+    assert "45 days" in body
+    assert "Export retention" in body
+    assert "30 days" in body
     assert "Migration version" in body
     assert "0004_classification_runtime" in body
     assert "Last sync" in body
@@ -111,6 +115,8 @@ def _sample_app() -> Iterator[Flask]:
                 oidc_testing_profile={"sub": "dev-user", "email": "dev-user@example.test"},
                 oidc_cookie_secure=False,
                 worker_concurrency=3,
+                sync_lookback_days=45,
+                export_retention_days=30,
                 llm_enabled=True,
                 llm_base_url="http://llama-secret:password@llama:8080/v1?token=secret",
                 bank_provider="abn",

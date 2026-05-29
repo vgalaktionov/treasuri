@@ -246,6 +246,34 @@ def test_failed_export_can_be_recovered_by_generating_new_blob(sample_app: Flask
     assert download_response.data
 
 
+def test_generate_budget_export_prunes_old_finished_exports(sample_app: Flask) -> None:
+    _insert_old_exports(sample_app.config["DATABASE_URL"])
+
+    generate_budget_export(
+        sample_app.config["DATABASE_URL"],
+        created_by="dev-user@example.test",
+        retention_days=30,
+    )
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        rows = connection.execute(
+            """
+            SELECT status, metadata_json->>'retention_case', export_files.id IS NOT NULL
+            FROM export_runs
+            LEFT JOIN export_files ON export_files.export_run_id = export_runs.id
+            WHERE metadata_json ? 'retention_case'
+            ORDER BY metadata_json->>'retention_case'
+            """
+        ).fetchall()
+
+    assert rows == [("pending", "old-pending", True), ("completed", "recent-completed", True)]
+
+
+def test_generate_budget_export_rejects_invalid_retention_days(sample_app: Flask) -> None:
+    with pytest.raises(ValueError, match="retention_days"):
+        generate_budget_export(sample_app.config["DATABASE_URL"], retention_days=0)
+
+
 def _insert_failed_export(database_url: str) -> None:
     with psycopg.connect(database_url) as connection:
         with connection.transaction():
@@ -270,6 +298,74 @@ def _insert_failed_export(database_url: str) -> None:
                     'sample export failure'
                 )
                 """
+            )
+
+
+def _insert_old_exports(database_url: str) -> None:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                INSERT INTO export_runs (
+                    export_type,
+                    period_start,
+                    period_end,
+                    status,
+                    started_at,
+                    finished_at,
+                    metadata_json
+                )
+                VALUES
+                    (
+                        'budget_averages',
+                        '2026-05-01',
+                        '2026-05-31',
+                        'completed',
+                        now() - interval '45 days',
+                        now() - interval '45 days',
+                        '{"retention_case":"old-completed"}'::jsonb
+                    ),
+                    (
+                        'budget_averages',
+                        '2026-05-01',
+                        '2026-05-31',
+                        'completed',
+                        now() - interval '5 days',
+                        now() - interval '5 days',
+                        '{"retention_case":"recent-completed"}'::jsonb
+                    ),
+                    (
+                        'budget_averages',
+                        '2026-05-01',
+                        '2026-05-31',
+                        'pending',
+                        NULL,
+                        NULL,
+                        '{"retention_case":"old-pending"}'::jsonb
+                    )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO export_files (
+                    export_run_id,
+                    filename,
+                    content_type,
+                    content,
+                    size_bytes,
+                    sha256
+                )
+                SELECT
+                    id,
+                    metadata_json->>'retention_case' || '.xlsx',
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                FROM export_runs
+                WHERE metadata_json ? 'retention_case'
+                """,
+                (XLSX_CONTENT_TYPE, b"retention-test", len(b"retention-test"), sha256(b"retention-test").hexdigest()),
             )
 
 

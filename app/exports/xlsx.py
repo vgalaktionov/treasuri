@@ -57,7 +57,14 @@ def create_pending_budget_export(database_url: str, *, created_by: str | None = 
             return _create_export_run(connection, period_start, period_end, created_by, status="pending")
 
 
-def generate_budget_export(database_url: str, *, created_by: str | None = None, run_id: int | None = None) -> int:
+def generate_budget_export(
+    database_url: str,
+    *,
+    created_by: str | None = None,
+    run_id: int | None = None,
+    retention_days: int | None = None,
+) -> int:
+    _validate_retention_days(retention_days)
     with psycopg.connect(database_url, autocommit=True) as connection:
         prepared_run_id, year_month = _prepare_export_run(connection, created_by=created_by, run_id=run_id)
         try:
@@ -66,6 +73,7 @@ def generate_budget_export(database_url: str, *, created_by: str | None = None, 
             with connection.transaction():
                 _store_export_file(connection, prepared_run_id, filename, content)
                 _finish_export_run(connection, prepared_run_id, "completed", None)
+                _prune_old_export_runs(connection, retention_days)
         except Exception as exc:
             with connection.transaction():
                 _finish_export_run(connection, prepared_run_id, "failed", sanitize_error_message(exc))
@@ -466,6 +474,25 @@ def _finish_export_run(
         WHERE id = %s
         """,
         (status, error_message, run_id),
+    )
+
+
+def _validate_retention_days(retention_days: int | None) -> None:
+    if retention_days is not None and retention_days < 1:
+        raise ValueError("retention_days must be at least 1")
+
+
+def _prune_old_export_runs(connection: Connection[tuple[object, ...]], retention_days: int | None) -> None:
+    if retention_days is None:
+        return
+    connection.execute(
+        """
+        DELETE FROM export_runs
+        WHERE status IN ('completed', 'failed')
+            AND finished_at IS NOT NULL
+            AND finished_at < now() - (%s * interval '1 day')
+        """,
+        (retention_days,),
     )
 
 

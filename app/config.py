@@ -37,6 +37,16 @@ def _read_int(name: str, default: int) -> int:
         raise ConfigError(f"{name} must be an integer") from exc
 
 
+def _read_optional_int(name: str) -> int | None:
+    raw_value = os.environ.get(name)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    try:
+        return int(raw_value)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be an integer") from exc
+
+
 def _read_decimal(name: str, default: str) -> Decimal:
     raw_value = os.environ.get(name, default)
     try:
@@ -113,6 +123,8 @@ class AppConfig:
     oidc_cookie_secure: bool = field(default_factory=lambda: _read_bool("OIDC_ID_TOKEN_COOKIE_SECURE", True))
     session_lifetime_minutes: int = field(default_factory=lambda: _read_int("SESSION_LIFETIME_MINUTES", 480))
     worker_concurrency: int = field(default_factory=lambda: _read_int("WORKER_CONCURRENCY", 2))
+    sync_lookback_days: int = field(default_factory=lambda: _read_int("SYNC_LOOKBACK_DAYS", 90))
+    export_retention_days: int | None = field(default_factory=lambda: _read_optional_int("EXPORT_RETENTION_DAYS"))
     llm_enabled: bool = field(default_factory=lambda: _read_bool("LLM_ENABLED", True))
     llm_base_url: str = field(default_factory=lambda: os.environ.get("LLM_BASE_URL", "http://llama:8080/v1"))
     llm_model: str = field(
@@ -142,6 +154,10 @@ class AppConfig:
             raise ConfigError("SESSION_LIFETIME_MINUTES must be at least 1")
         if self.worker_concurrency < 1:
             raise ConfigError("WORKER_CONCURRENCY must be at least 1")
+        if self.sync_lookback_days < 1:
+            raise ConfigError("SYNC_LOOKBACK_DAYS must be at least 1")
+        if self.export_retention_days is not None and self.export_retention_days < 1:
+            raise ConfigError("EXPORT_RETENTION_DAYS must be at least 1")
         if self.llm_timeout_seconds < 1:
             raise ConfigError("LLM_TIMEOUT_SECONDS must be at least 1")
         if self.llm_temperature < 0:

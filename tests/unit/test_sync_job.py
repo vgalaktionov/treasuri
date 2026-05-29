@@ -28,7 +28,7 @@ def test_sync_now_uses_saved_sync_lookback_setting(monkeypatch) -> None:
     monkeypatch.setattr(
         sync_job,
         "load_forecast_settings",
-        lambda _database_url: SimpleNamespace(sync_lookback_days=42),
+        lambda _database_url, _config: SimpleNamespace(sync_lookback_days=42),
     )
     monkeypatch.setattr(sync_job, "sync_bank_transactions", sync_bank_transactions)
     monkeypatch.setattr(sync_job, "normalize_raw_transactions", lambda _database_url: SimpleNamespace(created_count=1))
