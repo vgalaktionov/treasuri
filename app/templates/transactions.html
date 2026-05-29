@@ -8,31 +8,60 @@
     <h1 id="transactions-title">{{ title }}</h1>
     {% if show_filters %}
       <form class="transaction-filters" method="get" action="/transactions">
-        <label>
-          Search
-          <input type="search" name="q" value="{{ filters.query }}" autocomplete="off">
-        </label>
-        <label>
-          Month
-          <input type="month" name="month" value="{{ filters.month }}">
-        </label>
-        <label>
-          Category
-          <select name="category">
-            <option value="">All</option>
-            {% for category in categories %}
-              <option value="{{ category }}" {% if category == filters.category %}selected{% endif %}>{{ category }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="checkbox-label">
-          <input type="checkbox" name="needs_review" value="1" {% if filters.needs_review is true %}checked{% endif %}>
-          Review
-        </label>
-        <div class="filter-actions">
-          <button type="submit">Filter</button>
-          {% if filters.has_any %}<a role="button" class="secondary" href="/transactions">Clear</a>{% endif %}
+        <div class="filter-primary">
+          <label>
+            Search
+            <input type="search" name="q" value="{{ filters.query }}" autocomplete="off" placeholder="Merchant or description">
+          </label>
+          <div class="filter-actions">
+            <button type="submit">Filter</button>
+            {% if filters.has_any %}<a role="button" class="secondary" href="/transactions">Clear</a>{% endif %}
+          </div>
         </div>
+        <details class="advanced-filters" {% if filters.has_advanced %}open{% endif %}>
+          <summary>More filters</summary>
+          <div class="advanced-filter-grid">
+            <label>
+              Month
+              <input type="month" name="month" value="{{ filters.month }}">
+            </label>
+            <label>
+              Category
+              <select name="category">
+                <option value="">All</option>
+                {% for category in categories %}
+                  <option value="{{ category }}" {% if category == filters.category %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              Type
+              <select name="kind">
+                <option value="">All</option>
+                <option value="income" {% if filters.kind == "income" %}selected{% endif %}>Income</option>
+                <option value="spending" {% if filters.kind == "spending" %}selected{% endif %}>Spending</option>
+                <option value="transfer" {% if filters.kind == "transfer" %}selected{% endif %}>Transfers</option>
+                <option value="savings" {% if filters.kind == "savings" %}selected{% endif %}>Savings</option>
+                <option value="fixed" {% if filters.kind == "fixed" %}selected{% endif %}>Fixed costs</option>
+                <option value="recurring" {% if filters.kind == "recurring" %}selected{% endif %}>Recurring</option>
+                <option value="one_off" {% if filters.kind == "one_off" %}selected{% endif %}>One-off</option>
+                <option value="excluded" {% if filters.kind == "excluded" %}selected{% endif %}>Excluded</option>
+              </select>
+            </label>
+            <label>
+              Amount at least
+              <input type="number" name="min_amount" min="0" step="0.01" inputmode="decimal" value="{{ filters.min_amount }}">
+            </label>
+            <label>
+              Amount at most
+              <input type="number" name="max_amount" min="0" step="0.01" inputmode="decimal" value="{{ filters.max_amount }}">
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="needs_review" value="1" {% if filters.needs_review is true %}checked{% endif %}>
+              Review only
+            </label>
+          </div>
+        </details>
       </form>
     {% endif %}
     {% if transactions %}

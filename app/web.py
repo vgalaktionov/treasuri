@@ -102,6 +102,9 @@ def register_routes(app: Flask) -> None:
             query=request.args.get("q", "").strip(),
             month=request.args.get("month", "").strip(),
             category=request.args.get("category", "").strip(),
+            min_amount=request.args.get("min_amount", "").strip(),
+            max_amount=request.args.get("max_amount", "").strip(),
+            kind=request.args.get("kind", "").strip(),
             needs_review=True if request.args.get("needs_review") == "1" else None,
         )
         transactions = list_transactions(app_config.database_url, filters=filters) if app_config.database_url else []

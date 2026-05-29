@@ -333,10 +333,8 @@ header nav a {
 }
 
 .transaction-filters {
-  align-items: end;
   display: grid;
-  gap: 0.75rem;
-  grid-template-columns: minmax(12rem, 2fr) minmax(9rem, 1fr) minmax(10rem, 1fr) auto auto;
+  gap: 0.6rem;
   margin-block: 0 1rem;
 }
 
@@ -344,6 +342,13 @@ header nav a {
 .transaction-filters button,
 .transaction-filters a {
   margin: 0;
+}
+
+.filter-primary {
+  align-items: end;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .checkbox-label {
@@ -356,6 +361,28 @@ header nav a {
 .filter-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.advanced-filters {
+  border-block-start: 1px solid var(--treasuri-line);
+  margin: 0;
+  padding-block-start: 0.45rem;
+}
+
+.advanced-filters summary {
+  color: var(--treasuri-accent);
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1.2;
+  width: max-content;
+}
+
+.advanced-filter-grid {
+  align-items: end;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin-block-start: 0.6rem;
 }
 
 .transaction-card {
@@ -953,13 +980,30 @@ header nav a {
     grid-template-columns: 1fr;
   }
 
+  .filter-primary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .filter-actions {
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .filter-actions button,
   .filter-actions a {
-    inline-size: 100%;
+    flex: 0 0 auto;
+  }
+
+  .transaction-filters:has(.filter-actions a) .filter-primary {
+    grid-template-columns: 1fr;
+  }
+
+  .transaction-filters:has(.filter-actions a) .filter-actions button,
+  .transaction-filters:has(.filter-actions a) .filter-actions a {
+    flex: 1 1 0;
+  }
+
+  .advanced-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .transaction-main strong {

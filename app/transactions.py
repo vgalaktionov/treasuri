@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import LiteralString, cast
 
 import psycopg
@@ -28,11 +28,26 @@ class TransactionFilters:
     query: str = ""
     month: str = ""
     category: str = ""
+    min_amount: str = ""
+    max_amount: str = ""
+    kind: str = ""
     needs_review: bool | None = None
 
     @property
     def has_any(self) -> bool:
-        return bool(self.query or self.month or self.category or self.needs_review is not None)
+        return bool(
+            self.query
+            or self.month
+            or self.category
+            or self.min_amount
+            or self.max_amount
+            or self.kind
+            or self.needs_review is not None
+        )
+
+    @property
+    def has_advanced(self) -> bool:
+        return bool(self.month or self.category or self.min_amount or self.max_amount or self.kind or self.needs_review)
 
 
 def list_transactions(
@@ -47,6 +62,9 @@ def list_transactions(
             query=active_filters.query,
             month=active_filters.month,
             category=active_filters.category,
+            min_amount=active_filters.min_amount,
+            max_amount=active_filters.max_amount,
+            kind=active_filters.kind,
             needs_review=needs_review,
         )
     where_clause, params = _build_where_clause(active_filters)
@@ -110,9 +128,50 @@ def _build_where_clause(filters: TransactionFilters) -> tuple[str, list[object]]
     if filters.category:
         clauses.append("categories.name = %s")
         params.append(filters.category)
+    min_amount = _parse_amount_filter(filters.min_amount)
+    if min_amount is not None:
+        clauses.append("ABS(raw_transactions.amount) >= %s")
+        params.append(min_amount)
+    elif filters.min_amount:
+        clauses.append("FALSE")
+    max_amount = _parse_amount_filter(filters.max_amount)
+    if max_amount is not None:
+        clauses.append("ABS(raw_transactions.amount) <= %s")
+        params.append(max_amount)
+    elif filters.max_amount:
+        clauses.append("FALSE")
+    kind_clause = _kind_clause(filters.kind)
+    if kind_clause:
+        clauses.append(kind_clause)
     if not clauses:
         return "", params
     return "WHERE " + " AND ".join(clauses), params
+
+
+def _parse_amount_filter(value: str) -> Decimal | None:
+    if not value:
+        return None
+    try:
+        return abs(Decimal(value.strip().replace(",", "")))
+    except InvalidOperation:
+        return None
+
+
+def _kind_clause(kind: str) -> str:
+    return {
+        "income": "enriched_transactions.is_income",
+        "spending": (
+            "raw_transactions.amount < 0 "
+            "AND NOT enriched_transactions.is_transfer "
+            "AND NOT enriched_transactions.is_excluded_from_budget"
+        ),
+        "transfer": "enriched_transactions.is_transfer",
+        "savings": "enriched_transactions.is_savings",
+        "fixed": "enriched_transactions.is_fixed_cost",
+        "recurring": "enriched_transactions.is_recurring",
+        "one_off": "enriched_transactions.is_one_off",
+        "excluded": "enriched_transactions.is_excluded_from_budget",
+    }.get(kind, "")
 
 
 def _row_to_transaction(row: tuple[object, ...]) -> TransactionListItem:

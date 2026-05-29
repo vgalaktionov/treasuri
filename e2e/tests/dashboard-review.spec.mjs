@@ -148,26 +148,45 @@ uiTest("transactions can be filtered on mobile without horizontal overflow", asy
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
 
+  await page.locator(".advanced-filters summary").click();
+  await page.select(".advanced-filter-grid select[name='kind']", "excluded");
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+    page.locator(".transaction-filters button[type='submit']").click(),
+  ]);
+  let bodyText = await page.$eval("body", (body) => body.innerText);
+  assert.match(bodyText, /Sample Furniture/);
+  assert.match(bodyText, /excluded/);
+  assert.doesNotMatch(bodyText, /Sample Employer/);
+
+  await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
   await page.locator(".transaction-filters input[name='q']").fill("supermarket");
   await Promise.all([
-    page.waitForNavigation({ waitUntil: "networkidle0" }),
+    page.waitForNavigation({ waitUntil: "domcontentloaded" }),
     page.locator(".transaction-filters button[type='submit']").click(),
   ]);
 
-  let bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  bodyText = await page.$eval("body", (body) => body.innerText);
   assert.match(bodyText, /Sample Supermarket/);
   assert.doesNotMatch(bodyText, /Sample Employer/);
 
-  await page.locator(".transaction-edit summary").click();
+  await page.$eval(".transaction-edit", (details) => {
+    details.open = true;
+  });
   await page.select(".transaction-edit-form select[name='category']", "Shopping");
   await page.locator(".transaction-edit-form input[name='merchant']").fill("Sample Edited Shop");
-  await page.locator(".transaction-edit-form input[name='is_excluded_from_budget']").click();
+  await page.$eval(".transaction-edit-form input[name='is_excluded_from_budget']", (input) => {
+    input.checked = true;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   await Promise.all([
-    page.waitForNavigation({ waitUntil: "networkidle0" }),
-    page.locator(".transaction-edit-form button[type='submit']").click(),
+    page.waitForResponse(
+      (response) => response.url().includes("/transactions?q=supermarket") && response.status() === 200,
+    ),
+    page.$eval(".transaction-edit-form", (form) => form.requestSubmit()),
   ]);
-
-  bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  await page.waitForFunction(() => document.body.innerText.includes("Sample Edited Shop"), { timeout: 5000 });
+  bodyText = await page.evaluate(() => document.body.innerText);
   assert.match(bodyText, /Sample Edited Shop/);
   assert.match(bodyText, /Shopping/);
   assert.match(bodyText, /excluded/);

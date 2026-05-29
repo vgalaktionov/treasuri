@@ -68,6 +68,10 @@ def test_transactions_route_filters_by_search_and_category(sample_app) -> None:
     search_response = client.get("/transactions?q=supermarket")
     category_response = client.get("/transactions?category=Dog")
     review_response = client.get("/transactions?needs_review=1")
+    income_response = client.get("/transactions?kind=income")
+    transfer_response = client.get("/transactions?kind=transfer")
+    excluded_response = client.get("/transactions?kind=excluded")
+    amount_response = client.get("/transactions?min_amount=300&max_amount=400")
 
     assert search_response.status_code == 200
     assert b"Sample Supermarket" in search_response.data
@@ -78,6 +82,18 @@ def test_transactions_route_filters_by_search_and_category(sample_app) -> None:
     assert review_response.status_code == 200
     assert b"Unknown Sample Merchant" in review_response.data
     assert b"Sample Supermarket" not in review_response.data
+    assert income_response.status_code == 200
+    assert b"Sample Employer" in income_response.data
+    assert b"Sample Supermarket" not in income_response.data
+    assert transfer_response.status_code == 200
+    assert b"Sample Own Savings" in transfer_response.data
+    assert b"Sample Employer" not in transfer_response.data
+    assert excluded_response.status_code == 200
+    assert b"Sample Furniture" in excluded_response.data
+    assert b"Sample Supermarket" not in excluded_response.data
+    assert amount_response.status_code == 200
+    assert b"Sample Furniture" in amount_response.data
+    assert b"Sample Own Savings" not in amount_response.data
 
 
 def test_transactions_route_filters_by_month(sample_app) -> None:
