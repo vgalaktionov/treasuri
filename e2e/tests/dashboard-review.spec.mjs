@@ -116,6 +116,8 @@ uiTest("review page keeps action controls usable on narrow screens", async () =>
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.equal(overflow <= 1, true, `review page overflows horizontally by ${overflow}px`);
+  const bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Save and apply similar/);
   const aliasChecked = await page.locator("form.review-form input[name='create_alias']").map((input) => input.checked).wait();
   assert.equal(aliasChecked, true);
 
@@ -126,7 +128,7 @@ uiTest("review page keeps action controls usable on narrow screens", async () =>
       return { buttonWidth: rect.width, parentWidth: parent?.width ?? 0 };
     }),
   );
-  assert.equal(buttonWidths.length, 2);
+  assert.equal(buttonWidths.length, 3);
   for (const { buttonWidth, parentWidth } of buttonWidths) {
     assert.equal(Math.abs(buttonWidth - parentWidth) <= 1, true);
   }

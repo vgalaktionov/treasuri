@@ -22,13 +22,19 @@ class ReviewCorrection:
     is_excluded_from_budget: bool = False
 
 
+@dataclass(frozen=True)
+class ReviewCorrectionResult:
+    corrected_count: int
+    similar_count: int = 0
+
+
 def list_category_names(database_url: str) -> list[str]:
     with psycopg.connect(database_url) as connection:
         rows = connection.execute("SELECT name FROM categories ORDER BY name").fetchall()
     return [str(row[0]) for row in rows]
 
 
-def apply_review_correction(database_url: str, correction: ReviewCorrection) -> None:
+def apply_review_correction(database_url: str, correction: ReviewCorrection) -> ReviewCorrectionResult:
     with psycopg.connect(database_url) as connection:
         with connection.transaction():
             category_id = _category_id(connection, correction.category_name)
@@ -37,6 +43,34 @@ def apply_review_correction(database_url: str, correction: ReviewCorrection) -> 
             if correction.create_alias and merchant_id is not None:
                 _upsert_merchant_alias(connection, correction.transaction_id, merchant_id)
             _update_enriched_transaction(connection, correction, category_id, merchant_id)
+    return ReviewCorrectionResult(corrected_count=1)
+
+
+def apply_review_correction_to_similar(database_url: str, correction: ReviewCorrection) -> ReviewCorrectionResult:
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            category_id = _category_id(connection, correction.category_name)
+            merchant_id = _merchant_id(connection, correction.merchant_name, category_id)
+            similar_ids = _similar_transaction_ids(connection, correction.transaction_id)
+            _upsert_manual_override(connection, correction, category_id, merchant_id)
+            if correction.create_alias and merchant_id is not None:
+                _upsert_merchant_alias(connection, correction.transaction_id, merchant_id)
+            _update_enriched_transaction(connection, correction, category_id, merchant_id)
+            for transaction_id in similar_ids:
+                similar_correction = ReviewCorrection(
+                    transaction_id=transaction_id,
+                    category_name=correction.category_name,
+                    merchant_name=correction.merchant_name,
+                    notes=correction.notes,
+                    create_alias=False,
+                    is_transfer=correction.is_transfer,
+                    is_savings=correction.is_savings,
+                    is_one_off=correction.is_one_off,
+                    is_excluded_from_budget=correction.is_excluded_from_budget,
+                )
+                _upsert_manual_override(connection, similar_correction, category_id, merchant_id)
+                _update_enriched_transaction(connection, similar_correction, category_id, merchant_id)
+    return ReviewCorrectionResult(corrected_count=1 + len(similar_ids), similar_count=len(similar_ids))
 
 
 def _category_id(connection: Connection[tuple[object, ...]], category_name: str) -> int:
@@ -136,6 +170,58 @@ def _upsert_merchant_alias(
         """,
         (merchant_id, match_text, merchant_id, match_text),
     )
+
+
+def _similar_transaction_ids(connection: Connection[tuple[object, ...]], transaction_id: int) -> list[int]:
+    row = connection.execute(
+        """
+        SELECT
+            NULLIF(trim(raw_transactions.counterparty_name), ''),
+            NULLIF(trim(raw_transactions.description), '')
+        FROM enriched_transactions
+        JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+        WHERE enriched_transactions.id = %s
+        """,
+        (transaction_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"unknown transaction: {transaction_id}")
+
+    counterparty = _optional_str(row[0])
+    description = _optional_str(row[1])
+    if counterparty is not None:
+        rows = connection.execute(
+            """
+            SELECT enriched_transactions.id
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            LEFT JOIN manual_overrides
+                ON manual_overrides.enriched_transaction_id = enriched_transactions.id
+            WHERE enriched_transactions.id <> %s
+                AND manual_overrides.id IS NULL
+                AND lower(raw_transactions.counterparty_name) = lower(%s)
+            ORDER BY raw_transactions.booking_date DESC, enriched_transactions.id DESC
+            """,
+            (transaction_id, counterparty),
+        ).fetchall()
+    elif description is not None:
+        rows = connection.execute(
+            """
+            SELECT enriched_transactions.id
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            LEFT JOIN manual_overrides
+                ON manual_overrides.enriched_transaction_id = enriched_transactions.id
+            WHERE enriched_transactions.id <> %s
+                AND manual_overrides.id IS NULL
+                AND lower(raw_transactions.description) = lower(%s)
+            ORDER BY raw_transactions.booking_date DESC, enriched_transactions.id DESC
+            """,
+            (transaction_id, description),
+        ).fetchall()
+    else:
+        return []
+    return [_read_int(row[0]) for row in rows]
 
 
 def _update_enriched_transaction(

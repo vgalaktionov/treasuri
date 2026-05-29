@@ -144,6 +144,52 @@ def test_review_category_update_can_skip_merchant_alias(sample_app: Flask) -> No
     assert alias_count[0] == 0
 
 
+def test_review_category_update_can_apply_to_similar_transactions(sample_app: Flask) -> None:
+    similar_id = _insert_similar_review_transaction(sample_app)
+    client = sample_app.test_client()
+    review_response = client.get("/review")
+    csrf_token = _extract_csrf(review_response.get_data(as_text=True))
+
+    response = client.post(
+        _review_action(sample_app),
+        data={
+            "csrf_token": csrf_token,
+            "category": "Dog",
+            "merchant": "Sample Pet Care",
+            "next": "apply-similar",
+        },
+        follow_redirects=True,
+    )
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                enriched_transactions.id,
+                categories.name,
+                merchants.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                manual_overrides.id IS NOT NULL
+            FROM enriched_transactions
+            JOIN categories ON categories.id = enriched_transactions.category_id
+            LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+            LEFT JOIN manual_overrides
+                ON manual_overrides.enriched_transaction_id = enriched_transactions.id
+            WHERE enriched_transactions.id IN (%s, %s)
+            ORDER BY enriched_transactions.id
+            """,
+            (_review_transaction_id(sample_app), similar_id),
+        ).fetchall()
+
+    assert response.status_code == 200
+    assert b"Unknown Sample Merchant" not in response.data
+    assert rows == [
+        (_review_transaction_id(sample_app), "Dog", "Sample Pet Care", False, "manual_override", True),
+        (similar_id, "Dog", "Sample Pet Care", False, "manual_override", True),
+    ]
+
+
 def _review_action(app: Flask) -> str:
     return f"/review/{_review_transaction_id(app)}/category"
 
@@ -161,6 +207,71 @@ def _review_transaction_id(app: Flask) -> int:
     if row is None:
         raise AssertionError("review transaction was not found")
     return int(row[0])
+
+
+def _insert_similar_review_transaction(app: Flask) -> int:
+    with psycopg.connect(app.config["DATABASE_URL"]) as connection:
+        with connection.transaction():
+            raw_row = connection.execute(
+                """
+                INSERT INTO raw_transactions (
+                    account_id,
+                    provider,
+                    provider_transaction_id,
+                    source_hash,
+                    booking_date,
+                    value_date,
+                    amount,
+                    currency,
+                    counterparty_name,
+                    description,
+                    raw_payload_json
+                )
+                SELECT
+                    accounts.id,
+                    'fake',
+                    'similar-review-2026-05',
+                    'similar-review-2026-05',
+                    '2026-05-22',
+                    '2026-05-22',
+                    -35.00,
+                    'EUR',
+                    'Unknown Sample Merchant',
+                    'Similar needs review sample',
+                    '{"source":"test"}'::jsonb
+                FROM accounts
+                WHERE accounts.provider = 'fake'
+                LIMIT 1
+                RETURNING id
+                """
+            ).fetchone()
+            if raw_row is None:
+                raise AssertionError("similar raw transaction was not inserted")
+            enriched_row = connection.execute(
+                """
+                INSERT INTO enriched_transactions (
+                    raw_transaction_id,
+                    category_id,
+                    needs_review,
+                    classification_method,
+                    classification_confidence,
+                    classification_reason
+                )
+                VALUES (
+                    %s,
+                    (SELECT id FROM categories WHERE name = 'Unknown'),
+                    true,
+                    'uncategorized',
+                    0,
+                    'Similar test transaction.'
+                )
+                RETURNING id
+                """,
+                (raw_row[0],),
+            ).fetchone()
+            if enriched_row is None:
+                raise AssertionError("similar enriched transaction was not inserted")
+            return int(enriched_row[0])
 
 
 def _extract_csrf(html: str) -> str:

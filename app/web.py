@@ -16,7 +16,12 @@ from app.exports.xlsx import generate_budget_export, list_export_runs, load_expo
 from app.forecast.service import update_monthly_forecast
 from app.month import FALLBACK_MONTH_SUMMARY, load_month_summary
 from app.recurring import confirm_recurring_series, disable_recurring_series, list_recurring_series
-from app.review import ReviewCorrection, apply_review_correction, list_category_names
+from app.review import (
+    ReviewCorrection,
+    apply_review_correction,
+    apply_review_correction_to_similar,
+    list_category_names,
+)
 from app.rules import (
     RULE_FIELDS,
     RULE_OPERATORS,
@@ -206,19 +211,22 @@ def register_routes(app: Flask) -> None:
         if not category_name:
             abort(400)
         merchant_name = request.form.get("merchant", "").strip() or None
-        apply_review_correction(
-            app_config.database_url,
-            ReviewCorrection(
-                transaction_id=transaction_id,
-                category_name=category_name,
-                merchant_name=merchant_name,
-                create_alias=request.form.get("create_alias") == "1",
-                is_transfer=request.form.get("is_transfer") == "1",
-                is_savings=request.form.get("is_savings") == "1",
-                is_one_off=request.form.get("is_one_off") == "1",
-                is_excluded_from_budget=request.form.get("is_excluded_from_budget") == "1",
-            ),
+        correction = ReviewCorrection(
+            transaction_id=transaction_id,
+            category_name=category_name,
+            merchant_name=merchant_name,
+            create_alias=request.form.get("create_alias") == "1",
+            is_transfer=request.form.get("is_transfer") == "1",
+            is_savings=request.form.get("is_savings") == "1",
+            is_one_off=request.form.get("is_one_off") == "1",
+            is_excluded_from_budget=request.form.get("is_excluded_from_budget") == "1",
         )
+        if request.form.get("next") == "apply-similar":
+            apply_review_correction_to_similar(app_config.database_url, correction)
+            _refresh_forecast(app, app_config)
+            return redirect(url_for("review"))
+        apply_review_correction(app_config.database_url, correction)
+        _refresh_forecast(app, app_config)
         if request.form.get("next") == "rule-preview":
             return redirect(url_for("preview_rule_from_transaction", transaction_id=transaction_id))
         return redirect(url_for("review"))

@@ -840,6 +840,11 @@ header nav a {
     justify-self: stretch;
   }
 
+  .transaction-card > .review-form {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
   .recurring-card {
     grid-template-columns: minmax(18rem, 1fr) minmax(12rem, auto) auto auto;
   }
