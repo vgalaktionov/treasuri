@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from dataclasses import replace
 
 import psycopg
 
@@ -32,6 +33,10 @@ def sync_now(config: AppConfig) -> None:
     print(run_sync_now(config).as_summary())
 
 
+def with_database_url(config: AppConfig, database_url: str) -> AppConfig:
+    return replace(config, database_url=database_url)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.admin")
     parser.add_argument(
@@ -52,29 +57,7 @@ def main() -> None:
     database_url = args.database_url or config.database_url
     if not database_url:
         parser.error("DATABASE_URL or --database-url is required")
-    config = AppConfig(
-        app_env=config.app_env,
-        secret_key=config.secret_key,
-        database_url=database_url,
-        http_host=config.http_host,
-        http_port=config.http_port,
-        allowed_emails=config.allowed_emails,
-        oidc_enabled=config.oidc_enabled,
-        oidc_client_secrets=config.oidc_client_secrets,
-        oidc_scopes=config.oidc_scopes,
-        oidc_testing_profile=config.oidc_testing_profile,
-        oidc_cookie_secure=config.oidc_cookie_secure,
-        llm_enabled=config.llm_enabled,
-        llm_base_url=config.llm_base_url,
-        llm_model=config.llm_model,
-        llm_timeout_seconds=config.llm_timeout_seconds,
-        llm_temperature=config.llm_temperature,
-        bank_provider=config.bank_provider,
-        abn_account_iban=config.abn_account_iban,
-        abn_card_number=config.abn_card_number,
-        abn_soft_token=config.abn_soft_token,
-        abn_sync_pages=config.abn_sync_pages,
-    )
+    config = with_database_url(config, database_url)
 
     if args.command == "seed-categories":
         count = seed_categories(database_url)
