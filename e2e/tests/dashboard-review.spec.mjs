@@ -205,6 +205,22 @@ uiTest("settings expose forecast and llm controls on mobile", async () => {
   assert.equal(bottomMetrics.buttonBottom < bottomMetrics.tabbarTop, true);
 });
 
+uiTest("status page summarizes setup on mobile without exposing secrets", async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
+  await page.goto(`${baseUrl}/status`, { waitUntil: "networkidle0" });
+
+  const bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Status/);
+  assert.match(bodyText, /Migration version\s+0003_pgqueuer/);
+  assert.match(bodyText, /Last sync\s+completed/);
+  assert.match(bodyText, /LLM model\s+unsloth\/gemma-4-E4B-it-GGUF/);
+  assert.doesNotMatch(bodyText, /SECRET_KEY|ABN_SOFT_TOKEN|OIDC_CLIENT_SECRETS/);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.equal(overflow <= 1, true, `status page overflows horizontally by ${overflow}px`);
+});
+
 uiTest("export flow generates and downloads an xlsx on mobile", async () => {
   const page = await browser.newPage();
   const downloadPath = mkdtempSync(join(tmpdir(), "treasuri-export-"));

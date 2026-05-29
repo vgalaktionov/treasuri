@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+import psycopg
+from flask import Flask
+from testcontainers.postgres import PostgresContainer
+
+from app.config import AppConfig
+from app.exports.xlsx import generate_budget_export
+from app.jobs.enqueue import enqueue_sync_now
+from app.migrate import run_migrations
+from app.sample_data import load_sample_data
+from app.web import create_app
+
+
+def test_status_route_shows_runtime_state_without_secrets() -> None:
+    with _sample_app() as sample_app:
+        enqueue_sync_now(sample_app.config["DATABASE_URL"])
+        generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
+        with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+            connection.execute(
+                """
+                INSERT INTO pgqueuer_log (job_id, status, priority, entrypoint)
+                VALUES (1, 'successful', 0, 'sync-now')
+                """
+            )
+
+        response = sample_app.test_client().get("/status")
+        body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Migration version" in body
+    assert "0003_pgqueuer" in body
+    assert "Last sync" in body
+    assert "completed" in body
+    assert "fake, 7 new, 0 updated" in body
+    assert "Queued jobs" in body
+    assert "queued 1" in body
+    assert "Latest worker result" in body
+    assert "sync-now" in body
+    assert "Latest export" in body
+    assert "budget-averages-2026-05.xlsx" in body
+
+    assert "super-secret" not in body
+    assert "client-secret.json" not in body
+    assert "card-secret" not in body
+    assert "soft-token-secret" not in body
+    assert "llama-secret" not in body
+    assert "token=secret" not in body
+
+
+def test_status_route_handles_missing_database() -> None:
+    app = create_app(
+        AppConfig(
+            app_env="test",
+            secret_key="test-secret",
+            allowed_emails=("dev-user@example.test",),
+            oidc_enabled=False,
+            oidc_testing_profile={"sub": "dev-user", "email": "dev-user@example.test"},
+            oidc_cookie_secure=False,
+        ),
+        {"TESTING": True},
+    )
+
+    response = app.test_client().get("/status")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Connection" in body
+    assert "not configured" in body
+
+
+@contextmanager
+def _sample_app() -> Iterator[Flask]:
+    with PostgresContainer(
+        image="postgres:16-alpine",
+        username="treasuri",
+        password="treasuri",
+        dbname="treasuri",
+        driver=None,
+    ) as postgres:
+        database_url = postgres.get_connection_url(driver=None)
+        run_migrations(database_url)
+        load_sample_data(database_url)
+        yield create_app(
+            AppConfig(
+                app_env="test",
+                secret_key="super-secret",
+                database_url=database_url,
+                allowed_emails=("dev-user@example.test",),
+                oidc_enabled=False,
+                oidc_client_secrets="client-secret.json",
+                oidc_testing_profile={"sub": "dev-user", "email": "dev-user@example.test"},
+                oidc_cookie_secure=False,
+                llm_enabled=True,
+                llm_base_url="http://llama-secret:password@llama:8080/v1?token=secret",
+                bank_provider="abn",
+                abn_account_iban="NL00ABNA0000000000",
+                abn_card_number="card-secret",
+                abn_soft_token="soft-token-secret",
+            ),
+            {"TESTING": True},
+        )

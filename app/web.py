@@ -28,6 +28,7 @@ from app.settings import (
     save_classification_settings,
     save_forecast_settings,
 )
+from app.status import load_status_sections
 from app.transactions import TransactionFilters, list_transactions
 
 
@@ -76,7 +77,7 @@ def register_routes(app: Flask) -> None:
     @app.get("/status")
     def status() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]
-        return render_template("status.html", config=app_config)
+        return render_template("status.html", sections=load_status_sections(app_config))
 
     @app.get("/more")
     def more() -> str:
