@@ -53,6 +53,7 @@ uv run python -m app.admin sync-now
 uv run python -m app.admin enqueue-sync
 uv run pytest
 uv run pytest tests/integration
+TREASURI_LLM_SMOKE=1 uv run pytest tests/integration/test_llm_smoke.py
 uv run ruff check .
 uv run ruff format --check .
 uv run ty check
@@ -137,5 +138,7 @@ ABN_SOFT_TOKEN
 ## Development Notes
 
 The dashboard can render deterministic sample values from Postgres after `load-sample-data`, or a no-database fallback for early smoke tests. This proves the runtime shape, mobile layout, local static assets, and OIDC test-profile route protection before real bank sync, review workflows, export, and worker slices are connected.
+
+`tests/integration/test_llm_smoke.py` is skipped by default. Run it only when the local llama service is up on `LLM_BASE_URL`, usually after starting Docker Compose.
 
 Do not use real financial details in local fixtures, browser sessions, tests, or screenshots.
