@@ -11,10 +11,12 @@ def test_load_config_parses_oidc_testing_profile(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("OIDC_ENABLED", "false")
     monkeypatch.setenv("OIDC_TESTING_PROFILE_JSON", '{"email":"dev-user@example.test"}')
     monkeypatch.setenv("ALLOWED_EMAILS", "dev-user@example.test,other@example.test")
+    monkeypatch.setenv("OIDC_OPENID_REALM", "test-realm")
 
     config = load_config()
 
     assert config.oidc_enabled is False
+    assert config.oidc_openid_realm == "test-realm"
     assert config.oidc_testing_profile["email"] == "dev-user@example.test"
     assert config.allowed_emails == ("dev-user@example.test", "other@example.test")
     assert str(config.llm_confidence_threshold) == "0.60"

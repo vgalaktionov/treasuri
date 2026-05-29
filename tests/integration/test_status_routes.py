@@ -35,6 +35,8 @@ def test_status_route_shows_runtime_state_without_secrets() -> None:
     assert "0.1.test" in body
     assert "Git SHA" in body
     assert "abcdef123456" in body
+    assert "OIDC realm" in body
+    assert "treasuri-test" in body
     assert "Migration version" in body
     assert "0004_classification_runtime" in body
     assert "Last sync" in body
@@ -103,6 +105,7 @@ def _sample_app() -> Iterator[Flask]:
                 allowed_emails=("dev-user@example.test",),
                 oidc_enabled=False,
                 oidc_client_secrets="client-secret.json",
+                oidc_openid_realm="treasuri-test",
                 oidc_testing_profile={"sub": "dev-user", "email": "dev-user@example.test"},
                 oidc_cookie_secure=False,
                 llm_enabled=True,

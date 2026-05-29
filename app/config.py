@@ -105,6 +105,7 @@ class AppConfig:
     oidc_client_secrets: str = field(
         default_factory=lambda: os.environ.get("OIDC_CLIENT_SECRETS", "client_secrets.json")
     )
+    oidc_openid_realm: str = field(default_factory=lambda: os.environ.get("OIDC_OPENID_REALM", "treasuri"))
     oidc_scopes: str = field(default_factory=lambda: os.environ.get("OIDC_SCOPES", "openid email profile"))
     oidc_testing_profile: dict[str, Any] = field(
         default_factory=lambda: _read_json_object("OIDC_TESTING_PROFILE_JSON", {})

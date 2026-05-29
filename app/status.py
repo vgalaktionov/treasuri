@@ -33,6 +33,7 @@ def load_status_sections(config: AppConfig) -> list[StatusSection]:
             StatusRow("Git SHA", _short_sha(config.git_sha)),
             StatusRow("Environment", config.app_env),
             StatusRow("OIDC", "enabled" if config.oidc_enabled else "disabled"),
+            StatusRow("OIDC realm", config.oidc_openid_realm),
             StatusRow("OIDC client secrets", _configured(config.oidc_client_secrets)),
             StatusRow("Allowed emails", f"{len(config.allowed_emails)} configured"),
             StatusRow("Bank provider", config.bank_provider),
