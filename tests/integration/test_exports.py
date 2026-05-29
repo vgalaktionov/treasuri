@@ -199,7 +199,55 @@ def test_export_download_requires_allowed_user(sample_app: Flask) -> None:
 def test_export_route_shows_previous_exports_and_failed_runs(sample_app: Flask) -> None:
     generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
     generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
-    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+    _insert_failed_export(sample_app.config["DATABASE_URL"])
+
+    response = sample_app.test_client().get("/export")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert body.count("budget-averages-2026-05.xlsx") == 2
+    assert "failed: sample export failure" in body
+    assert body.count("Download") == 2
+
+
+def test_failed_export_can_be_recovered_by_generating_new_blob(sample_app: Flask) -> None:
+    _insert_failed_export(sample_app.config["DATABASE_URL"])
+    client = sample_app.test_client()
+    export_page = client.get("/export")
+    csrf_token = _extract_csrf(export_page.get_data(as_text=True))
+
+    generate_response = client.post(
+        "/export/generate",
+        data={"csrf_token": csrf_token},
+        follow_redirects=True,
+    )
+
+    assert generate_response.status_code == 200
+    assert b"failed: sample export failure" in generate_response.data
+    assert b"pending" in generate_response.data
+
+    run_until_drained(sample_app.config["APP_CONFIG"])
+
+    recovered_response = client.get("/export")
+    body = recovered_response.get_data(as_text=True)
+
+    assert recovered_response.status_code == 200
+    assert "failed: sample export failure" in body
+    assert "budget-averages-2026-05.xlsx" in body
+    assert body.count("Download") == 1
+
+    match = re.search(rb'href="/export/files/(\d+)"', recovered_response.data)
+    assert match is not None
+
+    download_response = client.get(f"/export/files/{match.group(1).decode()}")
+
+    assert download_response.status_code == 200
+    assert download_response.headers["Content-Type"] == XLSX_CONTENT_TYPE
+    assert download_response.data
+
+
+def _insert_failed_export(database_url: str) -> None:
+    with psycopg.connect(database_url) as connection:
         with connection.transaction():
             connection.execute(
                 """
@@ -223,14 +271,6 @@ def test_export_route_shows_previous_exports_and_failed_runs(sample_app: Flask) 
                 )
                 """
             )
-
-    response = sample_app.test_client().get("/export")
-    body = response.get_data(as_text=True)
-
-    assert response.status_code == 200
-    assert body.count("budget-averages-2026-05.xlsx") == 2
-    assert "failed: sample export failure" in body
-    assert body.count("Download") == 2
 
 
 def _extract_csrf(html: str) -> str:
