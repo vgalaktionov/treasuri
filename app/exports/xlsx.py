@@ -129,7 +129,7 @@ def _build_workbook(connection: Connection[tuple[object, ...]], year_month: str)
     _write_summary_sheet(connection, summary, year_month)
     _write_category_averages_sheet(connection, workbook.create_sheet(REQUIRED_SHEETS[1]))
     _write_monthly_history_sheet(connection, workbook.create_sheet(REQUIRED_SHEETS[2]))
-    _write_recurring_sheet(workbook.create_sheet(REQUIRED_SHEETS[3]))
+    _write_recurring_sheet(connection, workbook.create_sheet(REQUIRED_SHEETS[3]))
     _write_excluded_one_offs_sheet(connection, workbook.create_sheet(REQUIRED_SHEETS[4]))
     _write_raw_transactions_sheet(connection, workbook.create_sheet(REQUIRED_SHEETS[5]))
     _write_rules_sheet(connection, workbook.create_sheet(REQUIRED_SHEETS[6]))
@@ -223,8 +223,25 @@ def _write_monthly_history_sheet(connection: Connection[tuple[object, ...]], she
         sheet.append(list(row))
 
 
-def _write_recurring_sheet(sheet) -> None:
+def _write_recurring_sheet(connection: Connection[tuple[object, ...]], sheet) -> None:
     sheet.append(["Name", "Category", "Cadence", "Expected amount", "Next expected date", "Confidence", "Confirmed"])
+    rows = connection.execute(
+        """
+        SELECT
+            recurring_series.name,
+            COALESCE(categories.name, 'Unknown'),
+            recurring_series.cadence,
+            recurring_series.expected_amount,
+            recurring_series.next_expected_date,
+            recurring_series.confidence,
+            recurring_series.is_confirmed
+        FROM recurring_series
+        LEFT JOIN categories ON categories.id = recurring_series.category_id
+        ORDER BY recurring_series.name
+        """
+    ).fetchall()
+    for row in rows:
+        sheet.append(list(row))
 
 
 def _write_excluded_one_offs_sheet(connection: Connection[tuple[object, ...]], sheet) -> None:

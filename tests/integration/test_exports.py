@@ -74,6 +74,10 @@ def test_generate_budget_export_stores_required_xlsx_sheets(sample_app: Flask) -
     assert workbook["Summary"]["A1"].value == "generated_at"
     assert workbook["Category averages"]["A1"].value == "Category"
     assert workbook["Category averages"]["A2"].value == "Car"
+    assert workbook["Recurring expenses"]["A1"].value == "Name"
+    assert workbook["Recurring expenses"]["A2"].value == "Sample Streaming"
+    assert workbook["Recurring expenses"]["B2"].value == "Subscriptions"
+    assert workbook["Recurring expenses"]["C2"].value == "monthly"
     assert workbook["Raw transactions"]["A1"].value == "Date"
 
 
