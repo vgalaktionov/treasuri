@@ -21,6 +21,7 @@ from app.jobs.enqueue import (
 )
 from app.jobs.worker import run_until_drained
 from app.migrate import run_migrations
+from app.sample_data import load_sample_data
 
 
 @pytest.fixture
@@ -123,3 +124,44 @@ def test_worker_drains_sync_abn_transaction_chain(migrated_postgres_url: str) ->
     ]
     assert raw_count == (3,)
     assert forecast_count == (1,)
+
+
+def test_worker_drains_generate_xlsx_export_job(migrated_postgres_url: str) -> None:
+    load_sample_data(migrated_postgres_url)
+    job_id = enqueue_generate_xlsx_export(migrated_postgres_url, created_by="dev-user@example.test")
+    config = AppConfig(
+        app_env="test",
+        secret_key="test-secret",
+        database_url=migrated_postgres_url,
+        oidc_enabled=False,
+        llm_enabled=False,
+        bank_provider="fake",
+    )
+
+    run_until_drained(config)
+
+    with psycopg.connect(migrated_postgres_url) as connection:
+        job_status = connection.execute("SELECT status FROM pgqueuer WHERE id = %s", (job_id,)).fetchone()
+        job_log_status = connection.execute(
+            "SELECT status FROM pgqueuer_log WHERE job_id = %s ORDER BY created DESC LIMIT 1",
+            (job_id,),
+        ).fetchone()
+        row = connection.execute(
+            """
+            SELECT
+                export_runs.status,
+                export_runs.created_by,
+                export_files.filename,
+                export_files.size_bytes,
+                export_files.content IS NOT NULL
+            FROM export_runs
+            JOIN export_files ON export_files.export_run_id = export_runs.id
+            """
+        ).fetchone()
+
+    assert job_status is None
+    assert job_log_status == ("successful",)
+    assert row is not None
+    assert row[:3] == ("completed", "dev-user@example.test", "budget-averages-2026-05.xlsx")
+    assert row[3] > 0
+    assert row[4] is True
