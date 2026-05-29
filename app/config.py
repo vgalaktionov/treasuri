@@ -45,6 +45,14 @@ def _read_decimal(name: str, default: str) -> Decimal:
         raise ConfigError(f"{name} must be a decimal value") from exc
 
 
+def _read_float(name: str, default: str) -> float:
+    raw_value = os.environ.get(name, default)
+    try:
+        return float(raw_value)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a number") from exc
+
+
 def _read_json_object(name: str, default: dict[str, Any]) -> dict[str, Any]:
     raw_value = os.environ.get(name)
     if raw_value is None or raw_value.strip() == "":
@@ -109,7 +117,7 @@ class AppConfig:
         default_factory=lambda: os.environ.get("LLM_MODEL", "unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL")
     )
     llm_timeout_seconds: int = field(default_factory=lambda: _read_int("LLM_TIMEOUT_SECONDS", 10))
-    llm_temperature: float = field(default_factory=lambda: float(os.environ.get("LLM_CLASSIFICATION_TEMPERATURE", "0")))
+    llm_temperature: float = field(default_factory=lambda: _read_float("LLM_CLASSIFICATION_TEMPERATURE", "0"))
     llm_confidence_threshold: Decimal = field(
         default_factory=lambda: _read_decimal("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "0.60")
     )
@@ -130,6 +138,14 @@ class AppConfig:
             raise ConfigError("SECRET_KEY is required")
         if self.session_lifetime_minutes < 1:
             raise ConfigError("SESSION_LIFETIME_MINUTES must be at least 1")
+        if self.llm_timeout_seconds < 1:
+            raise ConfigError("LLM_TIMEOUT_SECONDS must be at least 1")
+        if self.llm_temperature < 0:
+            raise ConfigError("LLM_CLASSIFICATION_TEMPERATURE must be at least 0")
+        if self.llm_confidence_threshold < 0 or self.llm_confidence_threshold > 1:
+            raise ConfigError("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD must be between 0 and 1")
+        if self.abn_sync_pages < 1:
+            raise ConfigError("ABN_SYNC_PAGES must be at least 1")
         if self.oidc_enabled and not self.oidc_client_secrets:
             raise ConfigError("OIDC_CLIENT_SECRETS is required when OIDC_ENABLED=true")
 

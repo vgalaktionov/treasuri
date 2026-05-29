@@ -35,10 +35,12 @@ def test_load_config_parses_runtime_identity(monkeypatch: pytest.MonkeyPatch) ->
 def test_load_config_parses_llm_confidence_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OIDC_ENABLED", "false")
     monkeypatch.setenv("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "0.72")
+    monkeypatch.setenv("LLM_CLASSIFICATION_TEMPERATURE", "0.1")
 
     config = load_config()
 
     assert str(config.llm_confidence_threshold) == "0.72"
+    assert config.llm_temperature == 0.1
 
 
 def test_load_config_rejects_invalid_llm_confidence_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -46,6 +48,46 @@ def test_load_config_rejects_invalid_llm_confidence_threshold(monkeypatch: pytes
     monkeypatch.setenv("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "high")
 
     with pytest.raises(ConfigError, match="LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD"):
+        load_config()
+
+
+def test_load_config_rejects_out_of_range_llm_confidence_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "1.2")
+
+    with pytest.raises(ConfigError, match="between 0 and 1"):
+        load_config()
+
+
+def test_load_config_rejects_invalid_llm_temperature(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("LLM_CLASSIFICATION_TEMPERATURE", "warm")
+
+    with pytest.raises(ConfigError, match="LLM_CLASSIFICATION_TEMPERATURE"):
+        load_config()
+
+
+def test_load_config_rejects_negative_llm_temperature(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("LLM_CLASSIFICATION_TEMPERATURE", "-0.1")
+
+    with pytest.raises(ConfigError, match="LLM_CLASSIFICATION_TEMPERATURE"):
+        load_config()
+
+
+def test_load_config_rejects_non_positive_llm_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "0")
+
+    with pytest.raises(ConfigError, match="LLM_TIMEOUT_SECONDS"):
+        load_config()
+
+
+def test_load_config_rejects_non_positive_abn_sync_pages(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("ABN_SYNC_PAGES", "0")
+
+    with pytest.raises(ConfigError, match="ABN_SYNC_PAGES"):
         load_config()
 
 
