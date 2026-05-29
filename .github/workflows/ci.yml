@@ -59,6 +59,9 @@ jobs:
       - name: Run Python tests
         run: uv run pytest
 
+      - name: Run Docker image smoke test
+        run: TREASURI_DOCKER_SMOKE=1 uv run pytest tests/integration/test_docker_image.py
+
       - name: Run Puppeteer E2E
         run: npm test --prefix e2e
         env:
