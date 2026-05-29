@@ -76,6 +76,7 @@ The first schema slice creates the PRD core tables for accounts, raw and enriche
 Postgres integration tests use Testcontainers and start a disposable `postgres:16-alpine` container.
 
 Puppeteer E2E tests also use deterministic sample data. The test harness starts a disposable Postgres container, applies migrations, loads sample data, and launches the Flask app before opening Chrome.
+If a Puppeteer assertion fails, the harness writes screenshots and the thrown stack to `E2E_ARTIFACT_DIR`, or `/tmp/treasuri-e2e-artifacts` when the variable is not set.
 
 `uv run python -m app.admin load-sample-data` loads deterministic fake financial data into Postgres. It is safe to rerun and is intended for local UI development and automated tests only.
 

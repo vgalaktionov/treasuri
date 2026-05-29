@@ -1,15 +1,16 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, test } from "node:test";
+import { after, before, test as nodeTest } from "node:test";
 import readline from "node:readline";
 import puppeteer from "puppeteer-core";
 
 let serverProcess;
 let baseUrl;
 let browser;
+const openPages = new Set();
 
 before(async () => {
   ({ process: serverProcess, url: baseUrl } = await startSampleServer());
@@ -18,6 +19,7 @@ before(async () => {
     headless: true,
     args: ["--no-sandbox", "--disable-gpu"],
   });
+  trackPages(browser);
 });
 
 after(async () => {
@@ -30,7 +32,7 @@ after(async () => {
   }
 });
 
-test("dashboard answers the main money question on mobile without horizontal overflow", async () => {
+uiTest("dashboard answers the main money question on mobile without horizontal overflow", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(baseUrl, { waitUntil: "networkidle0" });
@@ -49,7 +51,7 @@ test("dashboard answers the main money question on mobile without horizontal ove
   assert.equal(overflow <= 1, true, `mobile page overflows horizontally by ${overflow}px`);
 });
 
-test("mobile navigation uses a compact bottom tab bar", async () => {
+uiTest("mobile navigation uses a compact bottom tab bar", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 320, height: 700, deviceScaleFactor: 1, isMobile: true });
   await page.goto(baseUrl, { waitUntil: "networkidle0" });
@@ -84,7 +86,7 @@ test("mobile navigation uses a compact bottom tab bar", async () => {
   assert.match(moreText, /Settings/);
 });
 
-test("month page explains forecast drivers on mobile without horizontal overflow", async () => {
+uiTest("month page explains forecast drivers on mobile without horizontal overflow", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/month`, { waitUntil: "networkidle0" });
@@ -103,7 +105,7 @@ test("month page explains forecast drivers on mobile without horizontal overflow
   assert.equal(overflow <= 1, true, `month page overflows horizontally by ${overflow}px`);
 });
 
-test("review page keeps action controls usable on narrow screens", async () => {
+uiTest("review page keeps action controls usable on narrow screens", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/review`, { waitUntil: "networkidle0" });
@@ -137,7 +139,7 @@ test("review page keeps action controls usable on narrow screens", async () => {
   assert.equal(bottomMetrics.buttonBottom < bottomMetrics.tabbarTop, true);
 });
 
-test("transactions can be filtered on mobile without horizontal overflow", async () => {
+uiTest("transactions can be filtered on mobile without horizontal overflow", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
@@ -156,7 +158,7 @@ test("transactions can be filtered on mobile without horizontal overflow", async
   assert.equal(overflow <= 1, true, `transactions page overflows horizontally by ${overflow}px`);
 });
 
-test("categories show budget averages on mobile without horizontal overflow", async () => {
+uiTest("categories show budget averages on mobile without horizontal overflow", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/categories`, { waitUntil: "networkidle0" });
@@ -171,7 +173,7 @@ test("categories show budget averages on mobile without horizontal overflow", as
   assert.equal(overflow <= 1, true, `categories page overflows horizontally by ${overflow}px`);
 });
 
-test("settings expose forecast and llm controls on mobile", async () => {
+uiTest("settings expose forecast and llm controls on mobile", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/settings`, { waitUntil: "networkidle0" });
@@ -203,7 +205,7 @@ test("settings expose forecast and llm controls on mobile", async () => {
   assert.equal(bottomMetrics.buttonBottom < bottomMetrics.tabbarTop, true);
 });
 
-test("export flow generates and downloads an xlsx on mobile", async () => {
+uiTest("export flow generates and downloads an xlsx on mobile", async () => {
   const page = await browser.newPage();
   const downloadPath = mkdtempSync(join(tmpdir(), "treasuri-export-"));
   const client = await page.target().createCDPSession();
@@ -236,7 +238,7 @@ test("export flow generates and downloads an xlsx on mobile", async () => {
   assert.equal(signature, "PK");
 });
 
-test("recurring commitments can be confirmed and disabled on mobile", async () => {
+uiTest("recurring commitments can be confirmed and disabled on mobile", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/recurring`, { waitUntil: "networkidle0" });
@@ -265,7 +267,7 @@ test("recurring commitments can be confirmed and disabled on mobile", async () =
   assert.match(bodyText, /No recurring payments detected/);
 });
 
-test("review correction previews a reusable rule before showing it in the rules list", async () => {
+uiTest("review correction previews a reusable rule before showing it in the rules list", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${baseUrl}/review`, { waitUntil: "networkidle0" });
@@ -294,7 +296,7 @@ test("review correction previews a reusable rule before showing it in the rules 
   assert.match(rulesText, /Would change\s+0/);
 });
 
-test("pwa is installable and falls back offline without cached financial data", async () => {
+uiTest("pwa is installable and falls back offline without cached financial data", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(baseUrl, { waitUntil: "networkidle0" });
@@ -343,6 +345,46 @@ test("pwa is installable and falls back offline without cached financial data", 
   assert.doesNotMatch(bodyText, /EUR 558/);
   assert.doesNotMatch(bodyText, /Sample Supermarket/);
 });
+
+function uiTest(name, run) {
+  nodeTest(name, async () => {
+    try {
+      await run();
+    } catch (error) {
+      await captureFailureArtifacts(name, error);
+      throw error;
+    }
+  });
+}
+
+function trackPages(activeBrowser) {
+  const originalNewPage = activeBrowser.newPage.bind(activeBrowser);
+  activeBrowser.newPage = async () => {
+    const page = await originalNewPage();
+    openPages.add(page);
+    page.once("close", () => openPages.delete(page));
+    return page;
+  };
+}
+
+async function captureFailureArtifacts(testName, error) {
+  const outputDirectory = process.env.E2E_ARTIFACT_DIR || join(tmpdir(), "treasuri-e2e-artifacts");
+  mkdirSync(outputDirectory, { recursive: true });
+  const slug = testName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+  const errorPath = join(outputDirectory, `${slug}.txt`);
+  writeFileSync(errorPath, error?.stack || String(error), "utf8");
+
+  let index = 0;
+  for (const page of openPages) {
+    if (page.isClosed()) {
+      continue;
+    }
+    const screenshotPath = join(outputDirectory, `${slug}-${index}.png`);
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    index += 1;
+  }
+  console.error(`Saved E2E failure artifacts for "${testName}" in ${outputDirectory}`);
+}
 
 async function startSampleServer() {
   const child = spawn("uv", ["run", "python", "-m", "e2e.support.sample_server"], {
