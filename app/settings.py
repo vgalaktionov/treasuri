@@ -15,6 +15,9 @@ FORECAST_SETTING_KEYS = (
     "current_liquid_balance",
     "target_monthly_savings",
     "safety_buffer",
+    "salary_day",
+    "baseline_months",
+    "sync_lookback_days",
     "fixed_costs_upcoming",
     "variable_baseline_3m",
     "variable_baseline_6m",
@@ -31,18 +34,34 @@ class ForecastSettings:
     current_liquid_balance: Decimal
     target_monthly_savings: Decimal
     safety_buffer: Decimal
+    salary_day: int
+    baseline_months: int
+    sync_lookback_days: int
     fixed_costs_upcoming: Decimal
     variable_baseline_3m: Decimal
     variable_baseline_6m: Decimal
 
-    def as_form_values(self) -> dict[str, str]:
-        return {key: _format_decimal(getattr(self, key)) for key in FORECAST_SETTING_KEYS}
+    def as_form_values(self) -> dict[str, object]:
+        return {
+            "current_liquid_balance": _format_decimal(self.current_liquid_balance),
+            "target_monthly_savings": _format_decimal(self.target_monthly_savings),
+            "safety_buffer": _format_decimal(self.safety_buffer),
+            "salary_day": self.salary_day,
+            "baseline_months": self.baseline_months,
+            "sync_lookback_days": self.sync_lookback_days,
+            "fixed_costs_upcoming": _format_decimal(self.fixed_costs_upcoming),
+            "variable_baseline_3m": _format_decimal(self.variable_baseline_3m),
+            "variable_baseline_6m": _format_decimal(self.variable_baseline_6m),
+        }
 
 
 DEFAULT_FORECAST_SETTINGS = ForecastSettings(
     current_liquid_balance=Decimal("0.00"),
     target_monthly_savings=Decimal("1000.00"),
     safety_buffer=Decimal("1000.00"),
+    salary_day=24,
+    baseline_months=6,
+    sync_lookback_days=90,
     fixed_costs_upcoming=Decimal("0.00"),
     variable_baseline_3m=Decimal("0.00"),
     variable_baseline_6m=Decimal("0.00"),
@@ -74,14 +93,35 @@ def load_forecast_settings(database_url: str) -> ForecastSettings:
             "SELECT key, value_json FROM app_settings WHERE key = ANY(%s)",
             (list(FORECAST_SETTING_KEYS),),
         ).fetchall()
-    values = {str(row[0]): Decimal(str(row[1])) for row in rows}
+    values = {str(row[0]): row[1] for row in rows}
     return ForecastSettings(
-        current_liquid_balance=values.get("current_liquid_balance", DEFAULT_FORECAST_SETTINGS.current_liquid_balance),
-        target_monthly_savings=values.get("target_monthly_savings", DEFAULT_FORECAST_SETTINGS.target_monthly_savings),
-        safety_buffer=values.get("safety_buffer", DEFAULT_FORECAST_SETTINGS.safety_buffer),
-        fixed_costs_upcoming=values.get("fixed_costs_upcoming", DEFAULT_FORECAST_SETTINGS.fixed_costs_upcoming),
-        variable_baseline_3m=values.get("variable_baseline_3m", DEFAULT_FORECAST_SETTINGS.variable_baseline_3m),
-        variable_baseline_6m=values.get("variable_baseline_6m", DEFAULT_FORECAST_SETTINGS.variable_baseline_6m),
+        current_liquid_balance=_setting_decimal(
+            values.get("current_liquid_balance"),
+            DEFAULT_FORECAST_SETTINGS.current_liquid_balance,
+        ),
+        target_monthly_savings=_setting_decimal(
+            values.get("target_monthly_savings"),
+            DEFAULT_FORECAST_SETTINGS.target_monthly_savings,
+        ),
+        safety_buffer=_setting_decimal(values.get("safety_buffer"), DEFAULT_FORECAST_SETTINGS.safety_buffer),
+        salary_day=_setting_int(values.get("salary_day"), DEFAULT_FORECAST_SETTINGS.salary_day),
+        baseline_months=_setting_int(values.get("baseline_months"), DEFAULT_FORECAST_SETTINGS.baseline_months),
+        sync_lookback_days=_setting_int(
+            values.get("sync_lookback_days"),
+            DEFAULT_FORECAST_SETTINGS.sync_lookback_days,
+        ),
+        fixed_costs_upcoming=_setting_decimal(
+            values.get("fixed_costs_upcoming"),
+            DEFAULT_FORECAST_SETTINGS.fixed_costs_upcoming,
+        ),
+        variable_baseline_3m=_setting_decimal(
+            values.get("variable_baseline_3m"),
+            DEFAULT_FORECAST_SETTINGS.variable_baseline_3m,
+        ),
+        variable_baseline_6m=_setting_decimal(
+            values.get("variable_baseline_6m"),
+            DEFAULT_FORECAST_SETTINGS.variable_baseline_6m,
+        ),
     )
 
 
@@ -151,6 +191,14 @@ def parse_forecast_settings(form: dict[str, str]) -> ForecastSettings:
         current_liquid_balance=_parse_money(form["current_liquid_balance"]),
         target_monthly_savings=_parse_money(form["target_monthly_savings"]),
         safety_buffer=_parse_money(form["safety_buffer"]),
+        salary_day=_parse_int(form["salary_day"], field_name="salary day", minimum=1, maximum=31),
+        baseline_months=_parse_int(form["baseline_months"], field_name="baseline months", minimum=1, maximum=24),
+        sync_lookback_days=_parse_int(
+            form["sync_lookback_days"],
+            field_name="sync lookback days",
+            minimum=1,
+            maximum=3650,
+        ),
         fixed_costs_upcoming=_parse_money(form["fixed_costs_upcoming"]),
         variable_baseline_3m=_parse_money(form["variable_baseline_3m"]),
         variable_baseline_6m=_parse_money(form["variable_baseline_6m"]),
@@ -180,6 +228,16 @@ def _parse_threshold(value: str) -> Decimal:
     return threshold
 
 
+def _parse_int(value: str, *, field_name: str, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value.strip())
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be an integer") from exc
+    if not minimum <= parsed <= maximum:
+        raise ValueError(f"{field_name} must be between {minimum} and {maximum}")
+    return parsed
+
+
 def _setting_bool(value: object, default: bool) -> bool:
     if isinstance(value, bool):
         return value
@@ -192,6 +250,14 @@ def _setting_decimal(value: object, default: Decimal) -> Decimal:
     if value is None:
         return default
     return Decimal(str(value))
+
+
+def _setting_int(value: object, default: int) -> int:
+    if value is None:
+        return default
+    if isinstance(value, int):
+        return value
+    return int(str(value))
 
 
 def _format_decimal(value: Decimal) -> str:

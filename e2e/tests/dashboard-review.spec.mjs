@@ -199,16 +199,25 @@ uiTest("settings expose forecast and llm controls on mobile", async () => {
   const bodyText = await page.locator("body").map((body) => body.innerText).wait();
   assert.match(bodyText, /Settings/);
   assert.match(bodyText, /Current liquid balance/);
+  assert.match(bodyText, /Salary day/);
+  assert.match(bodyText, /Baseline months/);
+  assert.match(bodyText, /Sync lookback days/);
   assert.match(bodyText, /LLM fallback/);
   assert.match(bodyText, /LLM confidence threshold/);
 
   const controls = await page.evaluate(() => ({
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     hasSwitch: document.querySelector("input[name='llm_enabled'][role='switch']") !== null,
+    salaryDay: document.querySelector("input[name='salary_day']")?.value,
+    baselineMonths: document.querySelector("input[name='baseline_months']")?.value,
+    syncLookbackDays: document.querySelector("input[name='sync_lookback_days']")?.value,
     thresholdValue: document.querySelector("input[name='llm_confidence_threshold']")?.value,
   }));
   assert.equal(controls.overflow <= 1, true, `settings page overflows horizontally by ${controls.overflow}px`);
   assert.equal(controls.hasSwitch, true);
+  assert.equal(controls.salaryDay, "24");
+  assert.equal(controls.baselineMonths, "6");
+  assert.equal(controls.syncLookbackDays, "90");
   assert.equal(controls.thresholdValue, "0.60");
 
   const bottomMetrics = await page.evaluate(() => {

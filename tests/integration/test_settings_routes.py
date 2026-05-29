@@ -57,6 +57,9 @@ def test_settings_update_persists_assumptions_and_recalculates_dashboard(sample_
             "current_liquid_balance": "3215.77",
             "target_monthly_savings": "900.00",
             "safety_buffer": "1000.00",
+            "salary_day": "25",
+            "baseline_months": "12",
+            "sync_lookback_days": "120",
             "fixed_costs_upcoming": "620.00",
             "variable_baseline_3m": "0.00",
             "variable_baseline_6m": "0.00",
@@ -81,18 +84,30 @@ def test_settings_update_persists_assumptions_and_recalculates_dashboard(sample_
             ORDER BY key
             """
         ).fetchall()
+        operating_settings = connection.execute(
+            """
+            SELECT key, value_json
+            FROM app_settings
+            WHERE key IN ('salary_day', 'baseline_months', 'sync_lookback_days')
+            ORDER BY key
+            """
+        ).fetchall()
 
     assert response.status_code == 200
     assert target_setting == ("900.00",)
     assert forecast_row == (Decimal("900.00"), Decimal("658.00"))
     assert llm_settings == [("llm_confidence_threshold", "0.75"), ("llm_enabled", True)]
+    assert operating_settings == [("baseline_months", 12), ("salary_day", 25), ("sync_lookback_days", 120)]
     assert b"EUR 658" in response.data
 
 
-def test_settings_route_renders_llm_controls(sample_app: Flask) -> None:
+def test_settings_route_renders_operating_and_llm_controls(sample_app: Flask) -> None:
     response = sample_app.test_client().get("/settings")
 
     assert response.status_code == 200
+    assert b"Salary day" in response.data
+    assert b'name="baseline_months"' in response.data
+    assert b'name="sync_lookback_days"' in response.data
     assert b"LLM fallback" in response.data
     assert b'name="llm_confidence_threshold"' in response.data
 
