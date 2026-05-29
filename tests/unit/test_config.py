@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
@@ -38,6 +39,45 @@ def test_load_config_parses_runtime_identity(monkeypatch: pytest.MonkeyPatch) ->
 
     assert config.app_version == "1.2.3-test"
     assert config.git_sha == "abcdef1234567890"
+
+
+def test_load_config_reads_mounted_secret_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    secret_key_file = tmp_path / "secret-key"
+    card_file = tmp_path / "abn-card"
+    token_file = tmp_path / "abn-token"
+    secret_key_file.write_text("file-secret\n", encoding="utf-8")
+    card_file.write_text("card-from-file\n", encoding="utf-8")
+    token_file.write_text("token-from-file\n", encoding="utf-8")
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("BANK_PROVIDER", "abn")
+    monkeypatch.setenv("ABN_ACCOUNT_IBAN", "NL01ABNA0123456789")
+    monkeypatch.setenv("SECRET_KEY_FILE", str(secret_key_file))
+    monkeypatch.setenv("ABN_CARD_NUMBER_FILE", str(card_file))
+    monkeypatch.setenv("ABN_SOFT_TOKEN_FILE", str(token_file))
+
+    config = load_config()
+
+    assert config.secret_key == "file-secret"
+    assert config.abn_card_number == "card-from-file"
+    assert config.abn_soft_token == "token-from-file"
+
+
+def test_load_config_rejects_ambiguous_secret_sources(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    secret_key_file = tmp_path / "secret-key"
+    secret_key_file.write_text("file-secret\n", encoding="utf-8")
+    monkeypatch.setenv("SECRET_KEY", "env-secret")
+    monkeypatch.setenv("SECRET_KEY_FILE", str(secret_key_file))
+
+    with pytest.raises(ConfigError, match="SECRET_KEY and SECRET_KEY_FILE"):
+        load_config()
+
+
+def test_load_config_rejects_unreadable_secret_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("SECRET_KEY_FILE", str(tmp_path / "missing"))
+
+    with pytest.raises(ConfigError, match="SECRET_KEY_FILE"):
+        load_config()
 
 
 def test_load_config_parses_llm_confidence_threshold(monkeypatch: pytest.MonkeyPatch) -> None:

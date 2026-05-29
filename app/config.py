@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any
 
 
@@ -83,6 +84,22 @@ def _read_csv(name: str, default: tuple[str, ...] = ()) -> tuple[str, ...]:
     return tuple(value.strip().lower() for value in raw_value.split(",") if value.strip())
 
 
+def _read_secret(name: str, default: str = "") -> str:
+    file_name = f"{name}_FILE"
+    raw_value = os.environ.get(name)
+    file_value = os.environ.get(file_name)
+    if raw_value is not None and file_value is not None:
+        raise ConfigError(f"{name} and {file_name} cannot both be set")
+    if raw_value is not None:
+        return raw_value
+    if file_value is None or file_value.strip() == "":
+        return default
+    try:
+        return Path(file_value).read_text(encoding="utf-8").rstrip("\r\n")
+    except OSError as exc:
+        raise ConfigError(f"{file_name} could not be read") from exc
+
+
 def _read_git_sha() -> str:
     return (
         os.environ.get("GIT_SHA", "") or os.environ.get("SOURCE_COMMIT", "") or os.environ.get("GITHUB_SHA", "")
@@ -106,7 +123,7 @@ class AppConfig:
     app_version: str = field(default_factory=_read_app_version)
     git_sha: str = field(default_factory=_read_git_sha)
     app_env: str = field(default_factory=lambda: os.environ.get("APP_ENV", "development"))
-    secret_key: str = field(default_factory=lambda: os.environ.get("SECRET_KEY", "dev-secret-change-me"))
+    secret_key: str = field(default_factory=lambda: _read_secret("SECRET_KEY", "dev-secret-change-me"))
     database_url: str = field(default_factory=lambda: os.environ.get("DATABASE_URL", ""))
     http_host: str = field(default_factory=lambda: os.environ.get("HTTP_HOST", "127.0.0.1"))
     http_port: int = field(default_factory=lambda: _read_int("HTTP_PORT", 5000))
@@ -137,8 +154,8 @@ class AppConfig:
     )
     bank_provider: str = field(default_factory=lambda: os.environ.get("BANK_PROVIDER", "fake"))
     abn_account_iban: str = field(default_factory=lambda: os.environ.get("ABN_ACCOUNT_IBAN", ""))
-    abn_card_number: str = field(default_factory=lambda: os.environ.get("ABN_CARD_NUMBER", ""))
-    abn_soft_token: str = field(default_factory=lambda: os.environ.get("ABN_SOFT_TOKEN", ""))
+    abn_card_number: str = field(default_factory=lambda: _read_secret("ABN_CARD_NUMBER"))
+    abn_soft_token: str = field(default_factory=lambda: _read_secret("ABN_SOFT_TOKEN"))
     abn_sync_pages: int = field(default_factory=lambda: _read_int("ABN_SYNC_PAGES", 1))
 
     @property

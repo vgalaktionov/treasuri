@@ -86,6 +86,7 @@ If a Puppeteer assertion fails, the harness writes screenshots and the thrown st
 The Docker image is intentionally one artifact. Override the Compose command to run the same image as `python -m app.web`, `python -m app.worker`, `python -m app.migrate`, or `python -m app.admin <command>`.
 
 Bank sync defaults to the deterministic fake provider. To use ABN AMRO, set `BANK_PROVIDER=abn`, `ABN_ACCOUNT_IBAN`, `ABN_CARD_NUMBER`, and `ABN_SOFT_TOKEN`; the app keeps `abna` usage inside the bank adapter boundary.
+For mounted secret files, use `SECRET_KEY_FILE`, `ABN_CARD_NUMBER_FILE`, or `ABN_SOFT_TOKEN_FILE` instead of the direct value variables. Do not set both forms for the same secret.
 
 Classification runs deterministic methods first. If `LLM_ENABLED=true`, uncategorized transactions can receive a local llama suggestion from the OpenAI-compatible endpoint, but they still stay in review until confirmed.
 
@@ -112,6 +113,7 @@ Required runtime environment:
 
 ```text
 SECRET_KEY
+SECRET_KEY_FILE instead of SECRET_KEY, when using mounted secret files
 DATABASE_URL
 ALLOWED_EMAILS
 OIDC_ENABLED
@@ -141,7 +143,9 @@ LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD
 BANK_PROVIDER
 ABN_ACCOUNT_IBAN
 ABN_CARD_NUMBER
+ABN_CARD_NUMBER_FILE instead of ABN_CARD_NUMBER, when using mounted secret files
 ABN_SOFT_TOKEN
+ABN_SOFT_TOKEN_FILE instead of ABN_SOFT_TOKEN, when using mounted secret files
 ```
 
 ## Development Notes
