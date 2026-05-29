@@ -64,6 +64,7 @@ def test_status_route_shows_runtime_state_without_secrets() -> None:
     assert "sync-now" in body
     assert "Latest export" in body
     assert "budget-averages-2026-05.xlsx" in body
+    assert "<dt>ABN sync pages</dt>\n              <dd>4</dd>" in body
 
     assert "super-secret" not in body
     assert "client-secret.json" not in body
@@ -131,6 +132,7 @@ def _sample_app() -> Iterator[Flask]:
                 abn_account_iban="NL00ABNA0000000000",
                 abn_card_number="card-secret",
                 abn_soft_token="soft-token-secret",
+                abn_sync_pages=4,
             ),
             {"TESTING": True},
         )

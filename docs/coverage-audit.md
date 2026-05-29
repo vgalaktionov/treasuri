@@ -68,6 +68,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Review and transaction correction tests previously asserted the corrected rows but not the PRD forecast-refresh contract. Added regression coverage that manual corrections refresh the current-month forecast.
 - Worker sync previously skipped forecast refresh when bank sync found only already-seen transactions. Added a queued-chain regression that refreshes the forecast after raw updates without new normalized rows.
 - Status previously hid safe sync metadata that explains the import window. Added lookback and skipped-old counts to `/status` with Testcontainers and mobile E2E coverage.
+- ABN sync page count was configurable but not visible in runtime diagnostics. Added `/status` and README coverage for `ABN_SYNC_PAGES`.
 
 ## Residual Risk
 

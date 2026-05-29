@@ -148,6 +148,7 @@ ABN_CARD_NUMBER
 ABN_CARD_NUMBER_FILE instead of ABN_CARD_NUMBER, when using mounted secret files
 ABN_SOFT_TOKEN
 ABN_SOFT_TOKEN_FILE instead of ABN_SOFT_TOKEN, when using mounted secret files
+ABN_SYNC_PAGES
 ```
 
 ## Development Notes

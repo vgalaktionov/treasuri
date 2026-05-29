@@ -47,6 +47,7 @@ def load_status_sections(config: AppConfig) -> list[StatusSection]:
             StatusRow("ABN account", _configured(config.abn_account_iban)),
             StatusRow("ABN card", _configured(config.abn_card_number)),
             StatusRow("ABN token", _configured(config.abn_soft_token)),
+            StatusRow("ABN sync pages", str(config.abn_sync_pages)),
             StatusRow("LLM", "enabled" if config.llm_enabled else "disabled"),
             StatusRow("LLM endpoint", _redact_url(config.llm_base_url)),
             StatusRow("LLM model", config.llm_model),
