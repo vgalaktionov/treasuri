@@ -12,7 +12,7 @@
     <script defer src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
     <script>
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}");
+        navigator.serviceWorker.register("{{ url_for('service_worker') }}");
       }
     </script>
   </head>

@@ -10,9 +10,10 @@ def test_manifest_is_public_static_asset(client) -> None:
 
 
 def test_service_worker_avoids_precaching_financial_pages(client) -> None:
-    response = client.get("/static/service-worker.js")
+    response = client.get("/service-worker.js")
 
     assert response.status_code == 200
+    assert response.headers["Service-Worker-Allowed"] == "/"
     body = response.get_data(as_text=True)
     assert "/static/offline.html" in body
     assert '"/"' not in body

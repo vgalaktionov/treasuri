@@ -281,6 +281,56 @@ test("review correction previews a reusable rule before showing it in the rules 
   assert.match(rulesText, /Would change\s+0/);
 });
 
+test("pwa is installable and falls back offline without cached financial data", async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
+  await page.goto(baseUrl, { waitUntil: "networkidle0" });
+
+  const manifest = await page.evaluate(async () => {
+    const response = await fetch("/static/site.webmanifest");
+    return response.json();
+  });
+  assert.equal(manifest.name, "Treasuri");
+  assert.equal(manifest.display, "standalone");
+  assert.deepEqual(manifest.icons, [
+    {
+      src: "/static/icons/icon.svg",
+      sizes: "any",
+      type: "image/svg+xml",
+      purpose: "any maskable",
+    },
+  ]);
+
+  const client = await page.target().createCDPSession();
+  const installability = await withTimeout(
+    client.send("Page.getInstallabilityErrors"),
+    5000,
+    "installability check timed out",
+  );
+  assert.deepEqual(installability.installabilityErrors, []);
+
+  await page.waitForFunction(
+    async () => {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      return registrations.some((registration) => registration.active);
+    },
+    { timeout: 5000 },
+  );
+  await page.reload({ waitUntil: "networkidle0", timeout: 10000 });
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null, { timeout: 5000 });
+
+  serverProcess.stdin.write("stop\n");
+  await waitForExit(serverProcess, 8000);
+  serverProcess = undefined;
+
+  await page.goto(`${baseUrl}/transactions?offline=1`, { waitUntil: "domcontentloaded", timeout: 10000 });
+  const bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Treasuri is offline/);
+  assert.match(bodyText, /Reconnect to view financial data/);
+  assert.doesNotMatch(bodyText, /EUR 558/);
+  assert.doesNotMatch(bodyText, /Sample Supermarket/);
+});
+
 async function startSampleServer() {
   const child = spawn("uv", ["run", "python", "-m", "e2e.support.sample_server"], {
     cwd: new URL("../..", import.meta.url),
@@ -312,6 +362,14 @@ function findChromeExecutable() {
     }
   }
   throw new Error("Set PUPPETEER_EXECUTABLE_PATH or install google-chrome/chromium");
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 async function waitForDownloadedFile(downloadPath, filename) {

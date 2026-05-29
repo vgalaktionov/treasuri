@@ -13,7 +13,7 @@ from flask_oidc import OpenIDConnect
 
 oidc = OpenIDConnect()
 
-PUBLIC_ENDPOINTS = {"health", "static"}
+PUBLIC_ENDPOINTS = {"health", "service_worker", "static"}
 PUBLIC_PATHS = {"/favicon.ico"}
 
 

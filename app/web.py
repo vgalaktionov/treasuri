@@ -52,6 +52,13 @@ def register_routes(app: Flask) -> None:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/service-worker.js")
+    def service_worker() -> Response:
+        response = app.send_static_file("service-worker.js")
+        response.headers["Service-Worker-Allowed"] = "/"
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
     @app.get("/")
     def dashboard() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]
