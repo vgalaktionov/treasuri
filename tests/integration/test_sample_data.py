@@ -82,4 +82,8 @@ def test_dashboard_renders_database_backed_sample_summary(migrated_postgres_url:
     assert b"1 transaction needs review" in response.data
     assert b"Review needed" in response.data
     assert b"No completed sync" not in response.data
+    assert b"Top category changes" in response.data
+    assert b"Dog" in response.data
+    assert b"EUR 90 above usual" in response.data
+    assert b"Upcoming fixed costs: EUR 620" in response.data
     assert b"fake completed at 2026-05-28 08:00" in response.data

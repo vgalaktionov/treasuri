@@ -37,6 +37,26 @@
       <p>Projected from the current month’s variable spend pace and the configured budget assumptions.</p>
     </article>
     <article>
+      <strong>Top category changes</strong>
+      {% if summary.top_variances %}
+        <ul class="variance-list">
+          {% for variance in summary.top_variances %}
+            <li>
+              <span>{{ variance.category }}</span>
+              <strong>{{ variance.amount }}</strong>
+              <small>{{ variance.detail }}</small>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No unusual category spend detected yet.</p>
+      {% endif %}
+    </article>
+    <article>
+      <strong>Upcoming fixed costs: {{ summary.fixed_costs_upcoming }}</strong>
+      <p>Confirmed recurring payments and configured fixed-cost assumptions still expected this month.</p>
+    </article>
+    <article>
       <strong>{{ summary.review_count }} transaction{% if summary.review_count != 1 %}s{% endif %} {% if summary.review_count == 1 %}needs{% else %}need{% endif %} review</strong>
       <p>Unknown or low-confidence transactions stay visible until confirmed because they can change the forecast.</p>
     </article>

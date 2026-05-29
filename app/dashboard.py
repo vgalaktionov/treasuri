@@ -9,11 +9,22 @@ from typing import Any, cast
 
 import psycopg
 
+from app.budget import CategoryBudgetRow, load_category_budgets_in_connection
+
+VARIANCE_EXCLUDED_CATEGORIES = frozenset({"Rent / Mortgage", "Utilities", "Insurance", "Subscriptions"})
+
 
 @dataclass(frozen=True)
 class DashboardMetric:
     label: str
     value: str
+
+
+@dataclass(frozen=True)
+class DashboardVariance:
+    category: str
+    amount: str
+    detail: str
 
 
 @dataclass(frozen=True)
@@ -28,6 +39,8 @@ class DashboardSummary:
     pace: str
     review_count: int
     last_sync: str
+    fixed_costs_upcoming: str
+    top_variances: tuple[DashboardVariance, ...]
     breakdown: tuple[DashboardMetric, ...]
     formula: str
 
@@ -43,6 +56,8 @@ class DashboardSummary:
             "pace": self.pace,
             "review_count": self.review_count,
             "last_sync": self.last_sync,
+            "fixed_costs_upcoming": self.fixed_costs_upcoming,
+            "top_variances": self.top_variances,
             "breakdown": self.breakdown,
             "formula": self.formula,
         }
@@ -59,6 +74,11 @@ FALLBACK_DASHBOARD_SUMMARY = DashboardSummary(
     pace="EUR 142 ahead of normal pace",
     review_count=7,
     last_sync="Sample data only",
+    fixed_costs_upcoming="EUR 620",
+    top_variances=(
+        DashboardVariance("Eating out", "EUR 38 above usual", "EUR 118 spent vs EUR 80 usual"),
+        DashboardVariance("Shopping", "EUR 120 above usual", "EUR 220 spent vs EUR 100 usual"),
+    ),
     breakdown=(
         DashboardMetric("Income received", "EUR 5,258"),
         DashboardMetric("Expected income left", "EUR 0"),
@@ -113,6 +133,7 @@ def load_dashboard_summary(database_url: str) -> DashboardSummary:
             LIMIT 1
             """
         ).fetchone()
+        budget_rows = load_category_budgets_in_connection(connection)
 
     review_count = int(review_count_row[0]) if review_count_row is not None else 0
     explanation = _read_json_object(forecast[13])
@@ -127,6 +148,8 @@ def load_dashboard_summary(database_url: str) -> DashboardSummary:
         pace=_format_pace(explanation),
         review_count=review_count,
         last_sync=_format_sync(last_sync_row),
+        fixed_costs_upcoming=_format_money(forecast[9]),
+        top_variances=_top_variances(budget_rows),
         breakdown=(
             DashboardMetric("Income received", _format_money(forecast[6])),
             DashboardMetric("Expected income left", _format_money(forecast[7])),
@@ -190,6 +213,29 @@ def _format_pace(explanation: dict[str, Any]) -> str:
     if pace_projection is None:
         return FALLBACK_DASHBOARD_SUMMARY.pace
     return f"Variable pace projects {_format_money(pace_projection)} this month"
+
+
+def _top_variances(rows: list[CategoryBudgetRow]) -> tuple[DashboardVariance, ...]:
+    variances: list[tuple[Decimal, DashboardVariance]] = []
+    for row in rows:
+        if not row.included_in_forecast or row.category in VARIANCE_EXCLUDED_CATEGORIES:
+            continue
+        usual = max(row.average_3m, row.average_6m)
+        delta = row.current_month - usual
+        if delta <= 0:
+            continue
+        variances.append(
+            (
+                delta,
+                DashboardVariance(
+                    category=row.category,
+                    amount=f"{_format_money(delta)} above usual",
+                    detail=f"{_format_money(row.current_month)} spent vs {_format_money(usual)} usual",
+                ),
+            )
+        )
+    variances.sort(key=lambda item: item[0], reverse=True)
+    return tuple(item[1] for item in variances[:3])
 
 
 def _format_confidence_note(explanation: dict[str, Any], review_count: int) -> str:

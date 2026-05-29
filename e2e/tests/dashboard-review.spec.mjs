@@ -43,6 +43,9 @@ uiTest("dashboard answers the main money question on mobile without horizontal o
   assert.match(bodyText, /Safe per day\s+EUR 93\/day/);
   assert.match(bodyText, /Projected savings\s+EUR 1,558/);
   assert.match(bodyText, /Confidence\s+Low\s+Review needed/);
+  assert.match(bodyText, /Top category changes/);
+  assert.match(bodyText, /Dog\s+EUR 90 above usual/);
+  assert.match(bodyText, /Upcoming fixed costs:\s+EUR 620/);
   assert.match(bodyText, /Forecast inputs/);
   assert.match(bodyText, /Fixed costs upcoming\s+EUR 620/);
   assert.match(bodyText, /Formula/);
