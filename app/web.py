@@ -8,7 +8,7 @@ from typing import Any, cast
 from flask import Flask, Response, abort, redirect, render_template, request, url_for
 from whitenoise import WhiteNoise
 
-from app.auth import init_auth, require_post_csrf
+from app.auth import current_user_email, init_auth, require_post_csrf
 from app.budget import load_category_budgets
 from app.config import AppConfig, load_config
 from app.dashboard import FALLBACK_DASHBOARD_SUMMARY, load_dashboard_summary
@@ -308,7 +308,7 @@ def register_routes(app: Flask) -> None:
         app_config: AppConfig = app.config["APP_CONFIG"]
         if not app_config.database_url:
             abort(400)
-        generate_budget_export(app_config.database_url)
+        generate_budget_export(app_config.database_url, created_by=current_user_email())
         return redirect(url_for("export"))
 
     @app.get("/export/files/<int:file_id>")

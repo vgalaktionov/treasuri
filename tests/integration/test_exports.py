@@ -112,9 +112,10 @@ def test_export_routes_generate_and_download_postgres_blob(sample_app: Flask) ->
     with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
         row = connection.execute(
             """
-            SELECT sha256, content
+            SELECT export_runs.created_by, export_files.sha256, export_files.content
             FROM export_files
-            WHERE id = %s
+            JOIN export_runs ON export_runs.id = export_files.export_run_id
+            WHERE export_files.id = %s
             """,
             (int(match.group(1).decode()),),
         ).fetchone()
@@ -123,10 +124,17 @@ def test_export_routes_generate_and_download_postgres_blob(sample_app: Flask) ->
     assert download_response.headers["Content-Type"] == XLSX_CONTENT_TYPE
     assert "budget-averages-2026-05.xlsx" in download_response.headers["Content-Disposition"]
     assert row is not None
-    assert download_response.data == row[1]
-    assert sha256(download_response.data).hexdigest() == row[0]
+    assert row[0] == "dev-user@example.test"
+    assert download_response.data == row[2]
+    assert sha256(download_response.data).hexdigest() == row[1]
     workbook = load_workbook(BytesIO(download_response.data), read_only=True)
     assert workbook.sheetnames == list(REQUIRED_SHEETS)
+
+
+def test_export_download_returns_404_for_unknown_file(sample_app: Flask) -> None:
+    response = sample_app.test_client().get("/export/files/99999")
+
+    assert response.status_code == 404
 
 
 def test_export_route_shows_previous_exports_and_failed_runs(sample_app: Flask) -> None:
