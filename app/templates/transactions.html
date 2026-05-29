@@ -55,6 +55,34 @@
                 <span>{{ flag }}</span>
               {% endfor %}
             </div>
+            {% if show_inline_edit %}
+              <details class="transaction-edit">
+                <summary>Edit</summary>
+                <form class="review-form transaction-edit-form" method="post" action="/transactions/{{ transaction.transaction_id }}/category">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="return_to" value="{{ return_to }}">
+                  <label>
+                    Category
+                    <select name="category" required>
+                      {% for category in categories %}
+                        <option value="{{ category }}" {% if category == transaction.category %}selected{% endif %}>{{ category }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label>
+                    Merchant
+                    <input name="merchant" value="{{ transaction.merchant }}" autocomplete="off">
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="create_alias" value="1">
+                    Remember merchant
+                  </label>
+                  <div class="review-actions">
+                    <button type="submit">Save changes</button>
+                  </div>
+                </form>
+              </details>
+            {% endif %}
             {% if show_review_actions and transaction.needs_review %}
               <form class="review-form" method="post" action="/review/{{ transaction.transaction_id }}/category">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

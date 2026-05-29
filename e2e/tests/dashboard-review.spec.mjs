@@ -145,15 +145,27 @@ uiTest("transactions can be filtered on mobile without horizontal overflow", asy
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
 
-  await page.locator(".transaction-filters input[name='q']").fill("supermarket");
+  await page.locator(".transaction-filters input[name='q']").fill("one-off");
   await Promise.all([
     page.waitForNavigation({ waitUntil: "networkidle0" }),
     page.locator(".transaction-filters button[type='submit']").click(),
   ]);
 
-  const bodyText = await page.locator("body").map((body) => body.innerText).wait();
-  assert.match(bodyText, /Sample Supermarket/);
+  let bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Sample Furniture/);
   assert.doesNotMatch(bodyText, /Sample Employer/);
+
+  await page.locator(".transaction-edit summary").click();
+  await page.select(".transaction-edit-form select[name='category']", "Shopping");
+  await page.locator(".transaction-edit-form input[name='merchant']").fill("Sample Edited Shop");
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "networkidle0" }),
+    page.locator(".transaction-edit-form button[type='submit']").click(),
+  ]);
+
+  bodyText = await page.locator("body").map((body) => body.innerText).wait();
+  assert.match(bodyText, /Sample Edited Shop/);
+  assert.match(bodyText, /Shopping/);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.equal(overflow <= 1, true, `transactions page overflows horizontally by ${overflow}px`);

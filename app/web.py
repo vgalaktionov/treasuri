@@ -102,7 +102,9 @@ def register_routes(app: Flask) -> None:
             categories=categories,
             filters=filters,
             show_filters=True,
+            show_inline_edit=True,
             show_review_actions=False,
+            return_to=request.full_path,
         )
 
     @app.get("/review")
@@ -118,7 +120,9 @@ def register_routes(app: Flask) -> None:
             categories=categories,
             filters=TransactionFilters(needs_review=True),
             show_filters=False,
+            show_inline_edit=False,
             show_review_actions=True,
+            return_to=url_for("review"),
         )
 
     @app.get("/rules")
@@ -155,6 +159,28 @@ def register_routes(app: Flask) -> None:
         if request.form.get("next") == "rule-preview":
             return redirect(url_for("preview_rule_from_transaction", transaction_id=transaction_id))
         return redirect(url_for("review"))
+
+    @app.post("/transactions/<int:transaction_id>/category")
+    @require_post_csrf
+    def update_transaction_category(transaction_id: int):
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        category_name = request.form.get("category", "").strip()
+        if not category_name:
+            abort(400)
+        merchant_name = request.form.get("merchant", "").strip() or None
+        apply_review_correction(
+            app_config.database_url,
+            ReviewCorrection(
+                transaction_id=transaction_id,
+                category_name=category_name,
+                merchant_name=merchant_name,
+                create_alias=request.form.get("create_alias") == "1",
+            ),
+        )
+        _refresh_forecast(app, app_config)
+        return redirect(_safe_transactions_return(request.form.get("return_to", "")))
 
     @app.get("/rules/preview/from-transaction/<int:transaction_id>")
     def preview_rule_from_transaction(transaction_id: int) -> str:
@@ -314,6 +340,12 @@ def _refresh_forecast(app: Flask, app_config: AppConfig) -> None:
         app_config.database_url,
         as_of=forecast_as_of if isinstance(forecast_as_of, date) else None,
     )
+
+
+def _safe_transactions_return(path: str) -> str:
+    if path == "/transactions" or path.startswith("/transactions?"):
+        return path
+    return url_for("transactions")
 
 
 def main() -> None:

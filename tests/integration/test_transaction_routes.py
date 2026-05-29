@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 
+import psycopg
 import pytest
 from testcontainers.postgres import PostgresContainer
 
@@ -83,3 +85,68 @@ def test_transactions_route_filters_by_month(sample_app) -> None:
 
     assert response.status_code == 200
     assert b"No transactions to show." in response.data
+
+
+def test_transactions_route_can_apply_manual_edit(sample_app) -> None:
+    client = sample_app.test_client()
+    transaction_id = _transaction_id(sample_app, "Large one-off sample purchase")
+    response = client.get("/transactions?q=one-off")
+    csrf_token = _extract_csrf(response.get_data(as_text=True))
+
+    edit_response = client.post(
+        f"/transactions/{transaction_id}/category",
+        data={
+            "csrf_token": csrf_token,
+            "return_to": "/transactions?q=one-off",
+            "category": "Shopping",
+            "merchant": "Sample Edited Shop",
+        },
+        follow_redirects=True,
+    )
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                categories.name,
+                merchants.name,
+                enriched_transactions.needs_review,
+                enriched_transactions.classification_method,
+                manual_overrides.id IS NOT NULL
+            FROM enriched_transactions
+            JOIN categories ON categories.id = enriched_transactions.category_id
+            LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+            LEFT JOIN manual_overrides
+                ON manual_overrides.enriched_transaction_id = enriched_transactions.id
+            WHERE enriched_transactions.id = %s
+            """,
+            (transaction_id,),
+        ).fetchone()
+
+    assert edit_response.status_code == 200
+    assert b"Sample Edited Shop" in edit_response.data
+    assert b"Shopping" in edit_response.data
+    assert row == ("Shopping", "Sample Edited Shop", False, "manual_override", True)
+
+
+def _transaction_id(app, description: str) -> int:
+    with psycopg.connect(app.config["DATABASE_URL"]) as connection:
+        row = connection.execute(
+            """
+            SELECT enriched_transactions.id
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            WHERE raw_transactions.description = %s
+            """,
+            (description,),
+        ).fetchone()
+    if row is None:
+        raise AssertionError(f"transaction was not found: {description}")
+    return int(row[0])
+
+
+def _extract_csrf(html: str) -> str:
+    match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+    if match is None:
+        raise AssertionError("CSRF token was not rendered")
+    return match.group(1)

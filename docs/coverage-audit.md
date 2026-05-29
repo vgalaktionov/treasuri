@@ -7,8 +7,9 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 | Flow | Evidence |
 | --- | --- |
 | Forecast formula and safe-to-spend math | `tests/unit/forecast/test_calculator.py`, `tests/integration/test_forecast_service.py`, `tests/integration/test_month_routes.py`, `e2e/tests/dashboard-review.spec.mjs` dashboard and month tests |
+| Forecast confidence from review and sync freshness | `tests/integration/test_forecast_service.py`, `tests/integration/test_sample_data.py`, dashboard E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Classification priority order | `tests/unit/classify/test_pipeline.py`, `tests/integration/test_classify_service.py` |
-| Manual overrides and review correction | `tests/integration/test_review_actions.py`, `tests/integration/test_rule_routes.py`, review E2E in `e2e/tests/dashboard-review.spec.mjs` |
+| Manual overrides and review correction | `tests/integration/test_review_actions.py`, `tests/integration/test_rule_routes.py`, `tests/integration/test_transaction_routes.py`, review and transaction E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Merchant aliases from review | `tests/integration/test_review_actions.py`, alias classifier coverage in `tests/unit/classify/test_pipeline.py` |
 | Historical similarity suggestions | `tests/unit/classify/test_pipeline.py`, `tests/integration/test_classify_service.py` |
 | Local llama fallback behavior | `tests/unit/classify/test_llm.py`, `tests/integration/test_classify_service.py`, settings route tests |
@@ -28,6 +29,8 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Docker image behavior was previously static-only. Added an opt-in smoke test that builds the image, runs migrations, serves packaged web/static assets, and starts the worker against Testcontainers Postgres.
 - Merchant alias creation existed only as classifier support. Added a review-form flow and coverage for creating or skipping aliases.
 - E2E failures previously had no visual artifacts. Added screenshot and stack capture under `E2E_ARTIFACT_DIR` or `/tmp/treasuri-e2e-artifacts`.
+- Forecast confidence previously ignored stale sync state. Added sync-freshness confidence reasons and dashboard visibility.
+- The transactions screen previously filtered only. Added manual edit coverage from `/transactions` itself.
 
 ## Residual Risk
 
