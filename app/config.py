@@ -167,6 +167,13 @@ class AppConfig:
 
         if not self.secret_key:
             raise ConfigError("SECRET_KEY is required")
+        if not self.is_development:
+            if self.secret_key == "dev-secret-change-me":
+                raise ConfigError("SECRET_KEY must be changed outside development")
+            if not self.database_url:
+                raise ConfigError("DATABASE_URL is required outside development")
+            if not self.allowed_emails:
+                raise ConfigError("ALLOWED_EMAILS is required outside development")
         if self.session_lifetime_minutes < 1:
             raise ConfigError("SESSION_LIFETIME_MINUTES must be at least 1")
         if self.worker_concurrency < 1:

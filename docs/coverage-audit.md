@@ -63,6 +63,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - The classification pipeline previously skipped the PRD's recurring matcher stage. Added recurring-series matching before historical similarity and LLM fallback, including persistence of recurring flags and series links.
 - Status previously showed sync completion without transaction classification health. Added transaction totals, classified count, review count, and classification-method counts with Testcontainers and mobile E2E coverage.
 - Runtime secrets previously supported direct environment values only. Added mounted-file support for `SECRET_KEY`, `ABN_CARD_NUMBER`, and `ABN_SOFT_TOKEN` with ambiguity and missing-file coverage.
+- Production startup previously accepted development defaults. Added fail-fast config checks for default secret, missing database URL, and missing allowed-email allowlist outside development/test.
 
 ## Residual Risk
 

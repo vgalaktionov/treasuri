@@ -80,6 +80,36 @@ def test_load_config_rejects_unreadable_secret_file(monkeypatch: pytest.MonkeyPa
         load_config()
 
 
+def test_load_config_rejects_dev_secret_outside_development(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.test/treasuri")
+    monkeypatch.setenv("ALLOWED_EMAILS", "dev-user@example.test")
+
+    with pytest.raises(ConfigError, match="SECRET_KEY must be changed"):
+        load_config()
+
+
+def test_load_config_requires_database_url_outside_development(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("SECRET_KEY", "production-secret")
+    monkeypatch.setenv("ALLOWED_EMAILS", "dev-user@example.test")
+
+    with pytest.raises(ConfigError, match="DATABASE_URL"):
+        load_config()
+
+
+def test_load_config_requires_allowed_emails_outside_development(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("SECRET_KEY", "production-secret")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.test/treasuri")
+
+    with pytest.raises(ConfigError, match="ALLOWED_EMAILS"):
+        load_config()
+
+
 def test_load_config_parses_llm_confidence_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OIDC_ENABLED", "false")
     monkeypatch.setenv("LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD", "0.72")

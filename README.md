@@ -124,6 +124,8 @@ OIDC_SCOPES
 SESSION_LIFETIME_MINUTES
 ```
 
+Outside `APP_ENV=development` or `APP_ENV=test`, startup rejects the default development secret and requires `DATABASE_URL` and `ALLOWED_EMAILS`.
+
 Common optional environment:
 
 ```text
