@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Raw transaction - Treasuri{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="raw-transaction-title">
+    <p class="muted">Raw transaction data</p>
+    <h1 id="raw-transaction-title">{{ transaction.merchant }}</h1>
+
+    <div class="raw-summary">
+      <strong>{{ transaction.amount }}</strong>
+      <span>{{ transaction.booking_date.strftime("%d %b %Y") }}</span>
+      <span>{{ transaction.category }}</span>
+      <span>{{ transaction.description }}</span>
+    </div>
+
+    <dl class="raw-detail-list">
+      {% for label, value in transaction.details %}
+        <div>
+          <dt>{{ label }}</dt>
+          <dd>{{ value }}</dd>
+        </div>
+      {% endfor %}
+    </dl>
+
+    <h2>Payload</h2>
+    <pre class="raw-payload"><code>{{ transaction.payload_json }}</code></pre>
+
+    <p><a href="/transactions">Back to transactions</a></p>
+  </section>
+{% endblock %}

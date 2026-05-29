@@ -41,7 +41,7 @@ from app.settings import (
     save_forecast_settings,
 )
 from app.status import load_status_sections
-from app.transactions import TransactionFilters, list_transactions
+from app.transactions import TransactionFilters, get_transaction_raw_details, list_transactions
 
 
 def create_app(config: AppConfig | None = None, overrides: dict[str, Any] | None = None) -> Flask:
@@ -121,6 +121,17 @@ def register_routes(app: Flask) -> None:
             show_review_actions=False,
             return_to=request.full_path,
         )
+
+    @app.get("/transactions/<int:transaction_id>/raw")
+    def transaction_raw(transaction_id: int) -> str:
+        app_config: AppConfig = app.config["APP_CONFIG"]
+        if not app_config.database_url:
+            abort(400)
+        try:
+            transaction = get_transaction_raw_details(app_config.database_url, transaction_id)
+        except ValueError:
+            abort(404)
+        return render_template("transaction_raw.html", transaction=transaction)
 
     @app.get("/review")
     def review() -> str:

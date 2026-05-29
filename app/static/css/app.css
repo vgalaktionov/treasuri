@@ -445,6 +445,19 @@ header nav a {
   color: #9a3412;
 }
 
+.transaction-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-block-start: 0.75rem;
+}
+
+.transaction-actions a {
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .review-form {
   border-block-start: 1px solid var(--treasuri-line);
   display: grid;
@@ -493,6 +506,52 @@ header nav a {
 
 .flag-fieldset .checkbox-label {
   min-block-size: auto;
+}
+
+.raw-summary {
+  align-items: baseline;
+  border-block: 1px solid var(--treasuri-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-block: 0 1rem;
+  padding-block: 0.75rem;
+}
+
+.raw-summary strong {
+  font-size: 1.15rem;
+}
+
+.raw-summary span {
+  color: var(--treasuri-muted);
+}
+
+.raw-detail-list {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  margin-block-end: 1.25rem;
+}
+
+.raw-detail-list div {
+  border-block-start: 1px solid var(--treasuri-line);
+  padding-block-start: 0.55rem;
+}
+
+.raw-detail-list dt {
+  color: var(--treasuri-muted);
+  font-size: 0.9rem;
+}
+
+.raw-detail-list dd {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.raw-payload {
+  max-inline-size: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
 }
 
 .review-actions {
@@ -727,7 +786,9 @@ header nav a {
   .transaction-card {
     display: grid;
     gap: 0.75rem;
-    grid-template-columns: minmax(16rem, 1fr) minmax(12rem, 0.8fr) auto minmax(3rem, auto);
+    grid-template-columns:
+      minmax(16rem, 1fr) minmax(7rem, auto) minmax(12rem, 0.7fr) minmax(10rem, auto)
+      minmax(3rem, auto);
   }
 
   .transaction-main {
@@ -741,6 +802,8 @@ header nav a {
 
   .transaction-main strong {
     align-self: start;
+    grid-column: 2;
+    grid-row: 1;
     justify-self: end;
     padding-block-start: 0.15rem;
   }
@@ -752,12 +815,19 @@ header nav a {
 
   .transaction-meta {
     align-content: start;
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 1;
     margin-block-start: 0.1rem;
   }
 
   .transaction-edit {
+    grid-column: 5;
+    grid-row: 1;
+    justify-self: end;
+    margin-block-start: 0.15rem;
+  }
+
+  .transaction-actions {
     grid-column: 4;
     grid-row: 1;
     justify-self: end;

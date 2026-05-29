@@ -51,6 +51,8 @@ def test_transactions_route_renders_sample_history(sample_app) -> None:
     assert b"Sample Employer" in response.data
     assert b"Sample Supermarket" in response.data
     assert b"EUR 5,258.00" in response.data
+    assert b"Preview rule" in response.data
+    assert b"Raw data" in response.data
 
 
 def test_review_route_only_renders_transactions_needing_review(sample_app) -> None:
@@ -162,6 +164,19 @@ def test_transactions_route_can_apply_manual_edit(sample_app) -> None:
         },
         True,
     )
+
+
+def test_transaction_raw_route_shows_source_payload(sample_app) -> None:
+    transaction_id = _transaction_id(sample_app, "Groceries sample")
+
+    response = sample_app.test_client().get(f"/transactions/{transaction_id}/raw")
+
+    assert response.status_code == 200
+    assert b"Raw transaction data" in response.data
+    assert b"Sample Supermarket" in response.data
+    assert b"Provider transaction ID" in response.data
+    assert b"sample-groceries-2026-05" in response.data
+    assert b"source" in response.data
 
 
 def _transaction_id(app, description: str) -> int:

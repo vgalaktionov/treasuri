@@ -85,6 +85,12 @@
               {% endfor %}
             </div>
             {% if show_inline_edit %}
+              <div class="transaction-actions">
+                <a href="/rules/preview/from-transaction/{{ transaction.transaction_id }}">Preview rule</a>
+                <a href="/transactions/{{ transaction.transaction_id }}/raw">Raw data</a>
+              </div>
+            {% endif %}
+            {% if show_inline_edit %}
               <details class="transaction-edit">
                 <summary>Edit</summary>
                 <form class="review-form transaction-edit-form" method="post" action="/transactions/{{ transaction.transaction_id }}/category">

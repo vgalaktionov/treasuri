@@ -148,13 +148,23 @@ uiTest("transactions can be filtered on mobile without horizontal overflow", asy
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
   await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
 
+  const rawHref = await page.$eval(".transaction-actions a[href$='/raw']", (link) => link.href);
+  await page.goto(rawHref, { waitUntil: "domcontentloaded" });
+  let bodyText = await page.$eval("body", (body) => body.innerText);
+  assert.match(bodyText, /Raw transaction data/);
+  assert.match(bodyText, /Provider transaction ID/);
+  assert.match(bodyText, /"source": "sample"/);
+  let overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.equal(overflow <= 1, true, `raw transaction page overflows horizontally by ${overflow}px`);
+
+  await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
   await page.locator(".advanced-filters summary").click();
   await page.select(".advanced-filter-grid select[name='kind']", "excluded");
   await Promise.all([
     page.waitForNavigation({ waitUntil: "domcontentloaded" }),
     page.locator(".transaction-filters button[type='submit']").click(),
   ]);
-  let bodyText = await page.$eval("body", (body) => body.innerText);
+  bodyText = await page.$eval("body", (body) => body.innerText);
   assert.match(bodyText, /Sample Furniture/);
   assert.match(bodyText, /excluded/);
   assert.doesNotMatch(bodyText, /Sample Employer/);
@@ -191,7 +201,7 @@ uiTest("transactions can be filtered on mobile without horizontal overflow", asy
   assert.match(bodyText, /Shopping/);
   assert.match(bodyText, /excluded/);
 
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.equal(overflow <= 1, true, `transactions page overflows horizontally by ${overflow}px`);
 });
 

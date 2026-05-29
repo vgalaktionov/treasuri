@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -21,6 +22,18 @@ class TransactionListItem:
     classification_method: str
     needs_review: bool
     flags: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RawTransactionDetails:
+    transaction_id: int
+    booking_date: date
+    amount: str
+    merchant: str
+    description: str
+    category: str
+    details: tuple[tuple[str, str], ...]
+    payload_json: str
 
 
 @dataclass(frozen=True)
@@ -102,6 +115,43 @@ def list_transactions(
         ).fetchall()
 
     return [_row_to_transaction(row) for row in rows]
+
+
+def get_transaction_raw_details(database_url: str, transaction_id: int) -> RawTransactionDetails:
+    with psycopg.connect(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                enriched_transactions.id,
+                raw_transactions.booking_date,
+                raw_transactions.amount,
+                COALESCE(merchants.name, raw_transactions.counterparty_name, 'Unknown'),
+                raw_transactions.description,
+                COALESCE(categories.name, 'Unknown'),
+                accounts.name,
+                accounts.iban,
+                raw_transactions.provider,
+                raw_transactions.provider_transaction_id,
+                raw_transactions.source_hash,
+                raw_transactions.value_date,
+                raw_transactions.currency,
+                raw_transactions.counterparty_name,
+                raw_transactions.counterparty_iban,
+                raw_transactions.raw_payload_json,
+                raw_transactions.first_seen_at,
+                raw_transactions.last_seen_at
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            JOIN accounts ON accounts.id = raw_transactions.account_id
+            LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+            LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+            WHERE enriched_transactions.id = %s
+            """,
+            (transaction_id,),
+        ).fetchone()
+    if row is None:
+        raise ValueError(f"transaction not found: {transaction_id}")
+    return _row_to_raw_details(row)
 
 
 def _build_where_clause(filters: TransactionFilters) -> tuple[str, list[object]]:
@@ -188,6 +238,32 @@ def _row_to_transaction(row: tuple[object, ...]) -> TransactionListItem:
     )
 
 
+def _row_to_raw_details(row: tuple[object, ...]) -> RawTransactionDetails:
+    payload = row[15] if row[15] is not None else {}
+    return RawTransactionDetails(
+        transaction_id=_expect_int(row[0]),
+        booking_date=_expect_date(row[1]),
+        amount=_format_money(row[2]),
+        merchant=str(row[3]),
+        description=str(row[4]),
+        category=str(row[5]),
+        details=(
+            ("Account", str(row[6])),
+            ("IBAN", _display_optional(row[7])),
+            ("Provider", str(row[8])),
+            ("Provider transaction ID", _display_optional(row[9])),
+            ("Source hash", str(row[10])),
+            ("Value date", _display_optional(row[11])),
+            ("Currency", str(row[12])),
+            ("Counterparty", _display_optional(row[13])),
+            ("Counterparty IBAN", _display_optional(row[14])),
+            ("First seen", str(row[16])),
+            ("Last seen", str(row[17])),
+        ),
+        payload_json=json.dumps(payload, indent=2, sort_keys=True),
+    )
+
+
 def _flags(row: tuple[object, ...]) -> tuple[str, ...]:
     flags: list[str] = []
     flag_columns = (
@@ -222,3 +298,9 @@ def _expect_date(value: object) -> date:
     if not isinstance(value, date):
         raise RuntimeError(f"expected date, got {type(value).__name__}")
     return value
+
+
+def _display_optional(value: object) -> str:
+    if value is None or value == "":
+        return "None"
+    return str(value)
