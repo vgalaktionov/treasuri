@@ -14,6 +14,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 | Historical similarity suggestions | `tests/unit/classify/test_pipeline.py`, `tests/integration/test_classify_service.py` |
 | Local llama fallback behavior | `tests/unit/classify/test_llm.py`, `tests/integration/test_classify_service.py`, settings route tests |
 | Idempotent bank import and normalization | `tests/integration/test_bank_sync.py`, `tests/integration/test_normalize.py`, `tests/unit/bank/test_abn.py` |
+| Configured sync lookback window | `tests/integration/test_bank_sync.py`, `tests/unit/test_sync_job.py` |
 | Recurring detection and confirmation | `tests/integration/test_recurring.py`, recurring E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Rule preview and historical backfill | `tests/integration/test_rule_routes.py`, rule E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Rule create, edit, disable UI | `tests/integration/test_rule_routes.py`, rule E2E in `e2e/tests/dashboard-review.spec.mjs` |
@@ -49,6 +50,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Worker logs previously emitted ad hoc summaries. Added structured stdout logs for job start, completion, sanitized failure, classification method counts, forecast recalculation, and generated exports.
 - Auth previously lacked an explicit sign-out path and bounded session lifetime. Added logout route coverage, public signed-out page coverage, and session lifetime configuration tests.
 - Runtime identity previously was not visible in the artifact. Added app version and git SHA configuration, image build args, CI build-arg coverage, and status-page visibility.
+- Sync lookback days previously appeared in settings without constraining fetched mutations. Added sync filtering, metadata, worker logging, and tests that prove the saved setting reaches foreground and worker sync paths.
 
 ## Residual Risk
 
