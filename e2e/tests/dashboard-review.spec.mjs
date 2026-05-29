@@ -88,6 +88,20 @@ uiTest("mobile navigation uses a compact bottom tab bar", async () => {
   assert.match(moreText, /More/);
   assert.match(moreText, /Categories/);
   assert.match(moreText, /Settings/);
+  assert.match(moreText, /Sign out/);
+  const logoutMetrics = await page.evaluate(() => {
+    const form = document.querySelector(".more-logout");
+    const button = form?.querySelector("button");
+    return {
+      formWidth: Math.round(form?.getBoundingClientRect().width ?? 0),
+      buttonWidth: Math.round(button?.getBoundingClientRect().width ?? 0),
+      buttonHeight: Math.round(button?.getBoundingClientRect().height ?? 0),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  assert.equal(logoutMetrics.overflow <= 1, true, `more page overflows by ${logoutMetrics.overflow}px`);
+  assert.equal(Math.abs(logoutMetrics.formWidth - logoutMetrics.buttonWidth) <= 1, true);
+  assert.equal(logoutMetrics.buttonHeight <= 78, true, `logout row is too tall: ${logoutMetrics.buttonHeight}px`);
 });
 
 uiTest("month page explains forecast drivers on mobile without horizontal overflow", async () => {

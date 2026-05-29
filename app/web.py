@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, cast
 
-from flask import Flask, Response, abort, redirect, render_template, request, url_for
+from flask import Flask, Response, abort, redirect, render_template, request, session, url_for
 from whitenoise import WhiteNoise
 
 from app.auth import current_user_email, init_auth, require_post_csrf
@@ -101,6 +101,16 @@ def register_routes(app: Flask) -> None:
     @app.get("/more")
     def more() -> str:
         return render_template("more.html")
+
+    @app.post("/logout")
+    @require_post_csrf
+    def logout():
+        session.clear()
+        return redirect(url_for("logged_out"))
+
+    @app.get("/logged-out")
+    def logged_out() -> str:
+        return render_template("logged_out.html")
 
     @app.get("/transactions")
     def transactions() -> str:

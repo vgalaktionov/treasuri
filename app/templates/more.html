@@ -30,6 +30,13 @@
         <strong>Status</strong>
         <span>Runtime configuration</span>
       </a>
+      <form method="post" action="/logout" class="more-logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">
+          <strong>Sign out</strong>
+          <span>Clear this browser session</span>
+        </button>
+      </form>
     </div>
   </section>
 {% endblock %}

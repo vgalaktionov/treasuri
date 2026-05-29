@@ -777,11 +777,30 @@ header nav a {
   display: grid;
 }
 
-.more-list a {
+.more-list a,
+.more-logout button {
   border-block-end: 1px solid var(--treasuri-line);
+  color: inherit;
   display: block;
+  inline-size: 100%;
+  margin: 0;
   padding-block: 0.9rem;
+  padding-inline: 0;
+  text-align: start;
   text-decoration: none;
+}
+
+.more-logout {
+  margin: 0;
+}
+
+.more-logout button {
+  background: transparent;
+  border-inline: 0;
+  border-block-start: 0;
+  border-radius: 0;
+  line-height: 1.25;
+  padding-block: 0.75rem;
 }
 
 .more-list strong {
