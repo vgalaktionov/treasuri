@@ -11,6 +11,7 @@ import psycopg
 from psycopg import Connection
 
 from app.bank.base import BankAdapter, BankMutation
+from app.sanitize import sanitize_error_message
 
 
 @dataclass(frozen=True)
@@ -226,7 +227,7 @@ def _insert_failed_sync_run(database_url: str, provider: str, error: Exception) 
 
 
 def _safe_error_message(error: Exception) -> str:
-    return str(error).splitlines()[0][:500] or type(error).__name__
+    return sanitize_error_message(error)
 
 
 def _read_int_id(value: object) -> int:

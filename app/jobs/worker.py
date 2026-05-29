@@ -33,6 +33,7 @@ from app.jobs.sync import run_sync_now
 from app.normalize import normalize_raw_transactions
 from app.recurring import detect_recurring
 from app.rules import backfill_rule as backfill_rule_for_job
+from app.sanitize import sanitize_error_message
 from app.settings import load_forecast_settings
 
 type JobPayload = dict[str, object]
@@ -265,7 +266,7 @@ def _log_event(event: str, **fields: object) -> None:
 
 
 def _safe_log_error(error: Exception) -> str:
-    return str(error).splitlines()[0][:500] or type(error).__name__
+    return sanitize_error_message(error)
 
 
 def _install_signal_handlers(pgq: PgQueuer) -> None:

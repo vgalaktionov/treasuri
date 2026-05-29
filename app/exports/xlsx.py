@@ -13,6 +13,7 @@ from openpyxl import Workbook
 from psycopg import Connection
 
 from app.budget import load_category_budgets_in_connection
+from app.sanitize import sanitize_error_message
 
 XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 REQUIRED_SHEETS = (
@@ -67,7 +68,7 @@ def generate_budget_export(database_url: str, *, created_by: str | None = None, 
                 _finish_export_run(connection, prepared_run_id, "completed", None)
         except Exception as exc:
             with connection.transaction():
-                _finish_export_run(connection, prepared_run_id, "failed", str(exc))
+                _finish_export_run(connection, prepared_run_id, "failed", sanitize_error_message(exc))
             raise
     return prepared_run_id
 

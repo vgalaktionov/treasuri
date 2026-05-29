@@ -9,6 +9,7 @@ from urllib.parse import urlsplit, urlunsplit
 import psycopg
 
 from app.config import AppConfig
+from app.sanitize import sanitize_error_message
 
 
 @dataclass(frozen=True)
@@ -59,7 +60,7 @@ def load_status_sections(config: AppConfig) -> list[StatusSection]:
         ]
     except psycopg.Error as exc:
         return [
-            StatusSection("Database", [StatusRow("Connection", "error", str(exc).splitlines()[0])]),
+            StatusSection("Database", [StatusRow("Connection", "error", sanitize_error_message(exc))]),
             runtime_section,
         ]
 

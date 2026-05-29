@@ -171,6 +171,33 @@ def test_bank_sync_records_failed_sync_run(migrated_postgres_url: str) -> None:
     assert raw_count == (0,)
 
 
+def test_bank_sync_sanitizes_failed_sync_run_errors(migrated_postgres_url: str) -> None:
+    with pytest.raises(RuntimeError, match="sample adapter failure"):
+        sync_bank_transactions(
+            migrated_postgres_url,
+            SecretFailingBankAdapter(),
+            account_iban="NL00SECRET0123456789",
+        )
+
+    with psycopg.connect(migrated_postgres_url) as connection:
+        row = connection.execute(
+            """
+            SELECT error_message
+            FROM sync_runs
+            WHERE provider = 'secret_failing'
+            """
+        ).fetchone()
+
+    assert row is not None
+    error_message = row[0]
+    assert isinstance(error_message, str)
+    assert "sample adapter failure" in error_message
+    assert "card-secret" not in error_message
+    assert "soft-secret" not in error_message
+    assert "bearer-secret" not in error_message
+    assert "url-secret" not in error_message
+
+
 class StaticAbnSession:
     def __init__(self, _iban: str) -> None:
         pass
@@ -201,6 +228,16 @@ class FailingBankAdapter:
 
     def fetch_recent_mutations(self) -> list[BankMutation]:
         raise RuntimeError("sample adapter failure")
+
+
+class SecretFailingBankAdapter:
+    provider = "secret_failing"
+
+    def fetch_recent_mutations(self) -> list[BankMutation]:
+        raise RuntimeError(
+            "sample adapter failure card_number=card-secret soft_token=soft-secret "
+            "Authorization: Bearer bearer-secret http://user:pass@example.test/sync?token=url-secret"
+        )
 
 
 class LookbackBankAdapter:
