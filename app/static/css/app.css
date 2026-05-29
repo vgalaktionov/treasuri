@@ -702,6 +702,45 @@ header nav a {
   align-self: end;
 }
 
+.settings-readout {
+  border-block-start: 1px solid var(--treasuri-line);
+  margin-block-start: 1.5rem;
+  padding-block-start: 1rem;
+}
+
+.settings-readout h2 {
+  font-size: 1.25rem;
+  margin-block: 0 0.65rem;
+}
+
+.settings-readout p {
+  margin-block: 0.25rem 0;
+}
+
+.settings-row-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.settings-row-list div {
+  align-items: baseline;
+  border-block-start: 1px solid var(--treasuri-line);
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(10rem, 0.35fr) minmax(0, 1fr);
+  padding-block-start: 0.55rem;
+}
+
+.settings-row-list dt {
+  color: var(--treasuri-muted);
+}
+
+.settings-row-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .status-list {
   display: grid;
   gap: 0.75rem;
@@ -1123,5 +1162,9 @@ header nav a {
 
   .settings-form button {
     inline-size: 100%;
+  }
+
+  .settings-row-list div {
+    grid-template-columns: 1fr;
   }
 }

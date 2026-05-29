@@ -108,6 +108,13 @@ def test_settings_route_renders_operating_and_llm_controls(sample_app: Flask) ->
     assert b"Salary day" in response.data
     assert b'name="baseline_months"' in response.data
     assert b'name="sync_lookback_days"' in response.data
+    assert b"Accounts" in response.data
+    assert b"Sample current account" in response.data
+    assert b"Category taxonomy" in response.data
+    assert b"22 categories" in response.data
+    assert b"Sync schedule" in response.data
+    assert b"90 days" in response.data
+    assert b"fake completed" in response.data
     assert b"LLM fallback" in response.data
     assert b'name="llm_confidence_threshold"' in response.data
 

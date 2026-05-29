@@ -233,6 +233,12 @@ uiTest("settings expose forecast and llm controls on mobile", async () => {
   assert.match(bodyText, /Salary day/);
   assert.match(bodyText, /Baseline months/);
   assert.match(bodyText, /Sync lookback days/);
+  assert.match(bodyText, /Accounts/);
+  assert.match(bodyText, /Sample current account/);
+  assert.match(bodyText, /Category taxonomy/);
+  assert.match(bodyText, /22 categories/);
+  assert.match(bodyText, /Sync schedule/);
+  assert.match(bodyText, /Manual sync/);
   assert.match(bodyText, /LLM fallback/);
   assert.match(bodyText, /LLM confidence threshold/);
 

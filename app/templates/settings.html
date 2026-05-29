@@ -56,4 +56,47 @@
       <button type="submit">Save and recalculate</button>
     </form>
   </section>
+
+  <section class="settings-readout" aria-labelledby="settings-accounts-title">
+    <p class="muted">Runtime context</p>
+    <h2 id="settings-accounts-title">Accounts</h2>
+    {% if overview.accounts %}
+      <dl class="settings-row-list">
+        {% for account in overview.accounts %}
+          <div>
+            <dt>{{ account.name }}</dt>
+            <dd>{{ account.provider }} - {{ account.iban }} - {{ account.currency }} - {{ account.status }}</dd>
+          </div>
+        {% endfor %}
+      </dl>
+    {% else %}
+      <p class="muted">No accounts configured yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="settings-readout" aria-labelledby="settings-taxonomy-title">
+    <h2 id="settings-taxonomy-title">Category taxonomy</h2>
+    <p>{{ overview.taxonomy.category_count }} categories</p>
+    {% if overview.taxonomy.sample_categories %}
+      <p class="muted">{{ overview.taxonomy.sample_categories | join(", ") }}</p>
+    {% endif %}
+  </section>
+
+  <section class="settings-readout" aria-labelledby="settings-sync-title">
+    <h2 id="settings-sync-title">Sync schedule</h2>
+    <dl class="settings-row-list">
+      <div>
+        <dt>Schedule</dt>
+        <dd>{{ overview.sync.schedule }}</dd>
+      </div>
+      <div>
+        <dt>Lookback</dt>
+        <dd>{{ overview.sync.lookback_days }} days</dd>
+      </div>
+      <div>
+        <dt>Last sync</dt>
+        <dd>{{ overview.sync.last_sync }}</dd>
+      </div>
+    </dl>
+  </section>
 {% endblock %}

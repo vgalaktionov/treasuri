@@ -80,10 +80,96 @@ class ClassificationSettings:
         }
 
 
+@dataclass(frozen=True)
+class SettingsAccount:
+    name: str
+    provider: str
+    iban: str
+    currency: str
+    status: str
+
+
+@dataclass(frozen=True)
+class SettingsTaxonomy:
+    category_count: int
+    sample_categories: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SettingsSync:
+    schedule: str
+    lookback_days: int
+    last_sync: str
+
+
+@dataclass(frozen=True)
+class SettingsOverview:
+    accounts: tuple[SettingsAccount, ...]
+    taxonomy: SettingsTaxonomy
+    sync: SettingsSync
+
+
+DEFAULT_SETTINGS_OVERVIEW = SettingsOverview(
+    accounts=(),
+    taxonomy=SettingsTaxonomy(category_count=0, sample_categories=()),
+    sync=SettingsSync(
+        schedule="Manual sync", lookback_days=DEFAULT_FORECAST_SETTINGS.sync_lookback_days, last_sync="No sync runs yet"
+    ),
+)
+
+
 def default_classification_settings(config: AppConfig) -> ClassificationSettings:
     return ClassificationSettings(
         llm_enabled=config.llm_enabled,
         llm_confidence_threshold=config.llm_confidence_threshold,
+    )
+
+
+def load_settings_overview(database_url: str, forecast_settings: ForecastSettings) -> SettingsOverview:
+    with psycopg.connect(database_url) as connection:
+        account_rows = connection.execute(
+            """
+            SELECT name, provider, iban, currency, is_active
+            FROM accounts
+            ORDER BY is_active DESC, provider, name
+            """
+        ).fetchall()
+        category_rows = connection.execute(
+            """
+            SELECT name
+            FROM categories
+            ORDER BY name
+            """
+        ).fetchall()
+        sync_row = connection.execute(
+            """
+            SELECT provider, status, finished_at
+            FROM sync_runs
+            ORDER BY started_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    categories = tuple(str(row[0]) for row in category_rows)
+    return SettingsOverview(
+        accounts=tuple(
+            SettingsAccount(
+                name=str(row[0]),
+                provider=str(row[1]),
+                iban=str(row[2]),
+                currency=str(row[3]),
+                status="Active" if bool(row[4]) else "Inactive",
+            )
+            for row in account_rows
+        ),
+        taxonomy=SettingsTaxonomy(
+            category_count=len(categories),
+            sample_categories=categories[:6],
+        ),
+        sync=SettingsSync(
+            schedule="Manual sync",
+            lookback_days=forecast_settings.sync_lookback_days,
+            last_sync=_format_sync_row(sync_row),
+        ),
     )
 
 
@@ -262,3 +348,14 @@ def _setting_int(value: object, default: int) -> int:
 
 def _format_decimal(value: Decimal) -> str:
     return f"{value:.2f}"
+
+
+def _format_sync_row(row: tuple[object, ...] | None) -> str:
+    if row is None:
+        return "No sync runs yet"
+    provider = str(row[0])
+    status = str(row[1])
+    finished_at = row[2]
+    if finished_at is None:
+        return f"{provider} {status}"
+    return f"{provider} {status} at {finished_at}"

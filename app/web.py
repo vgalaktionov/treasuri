@@ -37,9 +37,11 @@ from app.rules import (
 )
 from app.settings import (
     DEFAULT_FORECAST_SETTINGS,
+    DEFAULT_SETTINGS_OVERVIEW,
     default_classification_settings,
     load_classification_settings,
     load_forecast_settings,
+    load_settings_overview,
     parse_classification_settings,
     parse_forecast_settings,
     save_classification_settings,
@@ -328,17 +330,25 @@ def register_routes(app: Flask) -> None:
     @app.get("/settings")
     def settings() -> str:
         app_config: AppConfig = app.config["APP_CONFIG"]
-        forecast_settings = (
-            load_forecast_settings(app_config.database_url).as_form_values()
-            if app_config.database_url
-            else DEFAULT_FORECAST_SETTINGS.as_form_values()
+        forecast_settings_model = (
+            load_forecast_settings(app_config.database_url) if app_config.database_url else DEFAULT_FORECAST_SETTINGS
         )
+        forecast_settings = forecast_settings_model.as_form_values()
         classification_settings = (
             load_classification_settings(app_config.database_url, app_config).as_form_values()
             if app_config.database_url
             else default_classification_settings(app_config).as_form_values()
         )
-        return render_template("settings.html", settings={**forecast_settings, **classification_settings})
+        overview = (
+            load_settings_overview(app_config.database_url, forecast_settings_model)
+            if app_config.database_url
+            else DEFAULT_SETTINGS_OVERVIEW
+        )
+        return render_template(
+            "settings.html",
+            settings={**forecast_settings, **classification_settings},
+            overview=overview,
+        )
 
     @app.post("/settings")
     @require_post_csrf
