@@ -35,9 +35,19 @@
               </select>
             </label>
             <label>
+              Merchant
+              <select name="merchant">
+                <option value="">All</option>
+                {% for merchant in merchants %}
+                  <option value="{{ merchant }}" {% if merchant == filters.merchant %}selected{% endif %}>{{ merchant }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
               Type
               <select name="kind">
                 <option value="">All</option>
+                <option value="uncategorized" {% if filters.kind == "uncategorized" %}selected{% endif %}>Uncategorized</option>
                 <option value="income" {% if filters.kind == "income" %}selected{% endif %}>Income</option>
                 <option value="spending" {% if filters.kind == "spending" %}selected{% endif %}>Spending</option>
                 <option value="transfer" {% if filters.kind == "transfer" %}selected{% endif %}>Transfers</option>

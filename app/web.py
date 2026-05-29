@@ -48,7 +48,7 @@ from app.settings import (
     save_forecast_settings,
 )
 from app.status import load_status_sections
-from app.transactions import TransactionFilters, get_transaction_raw_details, list_transactions
+from app.transactions import TransactionFilters, get_transaction_raw_details, list_merchant_names, list_transactions
 
 
 def create_app(config: AppConfig | None = None, overrides: dict[str, Any] | None = None) -> Flask:
@@ -125,6 +125,7 @@ def register_routes(app: Flask) -> None:
             query=request.args.get("q", "").strip(),
             month=request.args.get("month", "").strip(),
             category=request.args.get("category", "").strip(),
+            merchant=request.args.get("merchant", "").strip(),
             min_amount=request.args.get("min_amount", "").strip(),
             max_amount=request.args.get("max_amount", "").strip(),
             kind=request.args.get("kind", "").strip(),
@@ -132,12 +133,14 @@ def register_routes(app: Flask) -> None:
         )
         transactions = list_transactions(app_config.database_url, filters=filters) if app_config.database_url else []
         categories = list_category_names(app_config.database_url) if app_config.database_url else []
+        merchants = list_merchant_names(app_config.database_url) if app_config.database_url else []
         return render_template(
             "transactions.html",
             title="Transactions",
             subtitle="Latest known activity",
             transactions=transactions,
             categories=categories,
+            merchants=merchants,
             filters=filters,
             show_filters=True,
             show_inline_edit=True,
@@ -167,6 +170,7 @@ def register_routes(app: Flask) -> None:
             subtitle="Transactions that can change the forecast",
             transactions=transactions,
             categories=categories,
+            merchants=(),
             filters=TransactionFilters(needs_review=True),
             show_filters=False,
             show_inline_edit=False,

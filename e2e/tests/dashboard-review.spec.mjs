@@ -183,7 +183,29 @@ uiTest("transactions can be filtered on mobile without horizontal overflow", asy
   bodyText = await page.$eval("body", (body) => body.innerText);
   assert.match(bodyText, /Sample Furniture/);
   assert.match(bodyText, /excluded/);
-  assert.doesNotMatch(bodyText, /Sample Employer/);
+  assert.deepEqual(await transactionTitles(page), ["Sample Furniture"]);
+
+  await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
+  await page.locator(".advanced-filters summary").click();
+  await page.select(".advanced-filter-grid select[name='merchant']", "Sample Pet Care");
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+    page.locator(".transaction-filters button[type='submit']").click(),
+  ]);
+  bodyText = await page.$eval("body", (body) => body.innerText);
+  assert.match(bodyText, /Sample Pet Care/);
+  assert.deepEqual(await transactionTitles(page), ["Sample Pet Care"]);
+
+  await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
+  await page.locator(".advanced-filters summary").click();
+  await page.select(".advanced-filter-grid select[name='kind']", "uncategorized");
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+    page.locator(".transaction-filters button[type='submit']").click(),
+  ]);
+  bodyText = await page.$eval("body", (body) => body.innerText);
+  assert.match(bodyText, /Unknown Sample Merchant/);
+  assert.deepEqual(await transactionTitles(page), ["Unknown Sample Merchant"]);
 
   await page.goto(`${baseUrl}/transactions`, { waitUntil: "networkidle0" });
   await page.locator(".transaction-filters input[name='q']").fill("supermarket");
@@ -194,7 +216,7 @@ uiTest("transactions can be filtered on mobile without horizontal overflow", asy
 
   bodyText = await page.$eval("body", (body) => body.innerText);
   assert.match(bodyText, /Sample Supermarket/);
-  assert.doesNotMatch(bodyText, /Sample Employer/);
+  assert.deepEqual(await transactionTitles(page), ["Sample Supermarket"]);
 
   await page.$eval(".transaction-edit", (details) => {
     details.open = true;
@@ -527,6 +549,10 @@ async function captureFailureArtifacts(testName, error) {
     index += 1;
   }
   console.error(`Saved E2E failure artifacts for "${testName}" in ${outputDirectory}`);
+}
+
+async function transactionTitles(page) {
+  return page.$$eval(".transaction-card h2", (titles) => titles.map((title) => title.innerText.trim()));
 }
 
 async function closeNewPages(existingPages) {

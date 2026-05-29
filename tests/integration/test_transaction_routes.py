@@ -69,6 +69,8 @@ def test_transactions_route_filters_by_search_and_category(sample_app) -> None:
 
     search_response = client.get("/transactions?q=supermarket")
     category_response = client.get("/transactions?category=Dog")
+    merchant_response = client.get("/transactions?merchant=Sample Pet Care")
+    uncategorized_response = client.get("/transactions?kind=uncategorized")
     review_response = client.get("/transactions?needs_review=1")
     income_response = client.get("/transactions?kind=income")
     transfer_response = client.get("/transactions?kind=transfer")
@@ -76,26 +78,32 @@ def test_transactions_route_filters_by_search_and_category(sample_app) -> None:
     amount_response = client.get("/transactions?min_amount=300&max_amount=400")
 
     assert search_response.status_code == 200
-    assert b"Sample Supermarket" in search_response.data
-    assert b"Sample Employer" not in search_response.data
+    assert b"<h2>Sample Supermarket</h2>" in search_response.data
+    assert b"<h2>Sample Employer</h2>" not in search_response.data
     assert category_response.status_code == 200
-    assert b"Sample Pet Care" in category_response.data
-    assert b"Sample Supermarket" not in category_response.data
+    assert b"<h2>Sample Pet Care</h2>" in category_response.data
+    assert b"<h2>Sample Supermarket</h2>" not in category_response.data
+    assert merchant_response.status_code == 200
+    assert b"<h2>Sample Pet Care</h2>" in merchant_response.data
+    assert b"<h2>Sample Supermarket</h2>" not in merchant_response.data
+    assert uncategorized_response.status_code == 200
+    assert b"<h2>Unknown Sample Merchant</h2>" in uncategorized_response.data
+    assert b"<h2>Sample Supermarket</h2>" not in uncategorized_response.data
     assert review_response.status_code == 200
-    assert b"Unknown Sample Merchant" in review_response.data
-    assert b"Sample Supermarket" not in review_response.data
+    assert b"<h2>Unknown Sample Merchant</h2>" in review_response.data
+    assert b"<h2>Sample Supermarket</h2>" not in review_response.data
     assert income_response.status_code == 200
-    assert b"Sample Employer" in income_response.data
-    assert b"Sample Supermarket" not in income_response.data
+    assert b"<h2>Sample Employer</h2>" in income_response.data
+    assert b"<h2>Sample Supermarket</h2>" not in income_response.data
     assert transfer_response.status_code == 200
-    assert b"Sample Own Savings" in transfer_response.data
-    assert b"Sample Employer" not in transfer_response.data
+    assert b"<h2>Sample Own Savings</h2>" in transfer_response.data
+    assert b"<h2>Sample Employer</h2>" not in transfer_response.data
     assert excluded_response.status_code == 200
-    assert b"Sample Furniture" in excluded_response.data
-    assert b"Sample Supermarket" not in excluded_response.data
+    assert b"<h2>Sample Furniture</h2>" in excluded_response.data
+    assert b"<h2>Sample Supermarket</h2>" not in excluded_response.data
     assert amount_response.status_code == 200
-    assert b"Sample Furniture" in amount_response.data
-    assert b"Sample Own Savings" not in amount_response.data
+    assert b"<h2>Sample Furniture</h2>" in amount_response.data
+    assert b"<h2>Sample Own Savings</h2>" not in amount_response.data
 
 
 def test_transactions_route_filters_by_month(sample_app) -> None:

@@ -41,6 +41,7 @@ class TransactionFilters:
     query: str = ""
     month: str = ""
     category: str = ""
+    merchant: str = ""
     min_amount: str = ""
     max_amount: str = ""
     kind: str = ""
@@ -52,6 +53,7 @@ class TransactionFilters:
             self.query
             or self.month
             or self.category
+            or self.merchant
             or self.min_amount
             or self.max_amount
             or self.kind
@@ -60,7 +62,15 @@ class TransactionFilters:
 
     @property
     def has_advanced(self) -> bool:
-        return bool(self.month or self.category or self.min_amount or self.max_amount or self.kind or self.needs_review)
+        return bool(
+            self.month
+            or self.category
+            or self.merchant
+            or self.min_amount
+            or self.max_amount
+            or self.kind
+            or self.needs_review
+        )
 
 
 def list_transactions(
@@ -75,6 +85,7 @@ def list_transactions(
             query=active_filters.query,
             month=active_filters.month,
             category=active_filters.category,
+            merchant=active_filters.merchant,
             min_amount=active_filters.min_amount,
             max_amount=active_filters.max_amount,
             kind=active_filters.kind,
@@ -115,6 +126,22 @@ def list_transactions(
         ).fetchall()
 
     return [_row_to_transaction(row) for row in rows]
+
+
+def list_merchant_names(database_url: str) -> list[str]:
+    with psycopg.connect(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT DISTINCT COALESCE(merchants.name, raw_transactions.counterparty_name)
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+            WHERE COALESCE(merchants.name, raw_transactions.counterparty_name) IS NOT NULL
+                AND COALESCE(merchants.name, raw_transactions.counterparty_name) <> ''
+            ORDER BY COALESCE(merchants.name, raw_transactions.counterparty_name)
+            """
+        ).fetchall()
+    return [str(row[0]) for row in rows]
 
 
 def get_transaction_raw_details(database_url: str, transaction_id: int) -> RawTransactionDetails:
@@ -178,6 +205,9 @@ def _build_where_clause(filters: TransactionFilters) -> tuple[str, list[object]]
     if filters.category:
         clauses.append("categories.name = %s")
         params.append(filters.category)
+    if filters.merchant:
+        clauses.append("COALESCE(merchants.name, raw_transactions.counterparty_name) = %s")
+        params.append(filters.merchant)
     min_amount = _parse_amount_filter(filters.min_amount)
     if min_amount is not None:
         clauses.append("ABS(raw_transactions.amount) >= %s")
@@ -209,6 +239,7 @@ def _parse_amount_filter(value: str) -> Decimal | None:
 
 def _kind_clause(kind: str) -> str:
     return {
+        "uncategorized": "(categories.name IS NULL OR categories.name = 'Unknown')",
         "income": "enriched_transactions.is_income",
         "spending": (
             "raw_transactions.amount < 0 "

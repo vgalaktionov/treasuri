@@ -39,7 +39,8 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - E2E failures previously had no visual artifacts. Added screenshot and stack capture under `E2E_ARTIFACT_DIR` or `/tmp/treasuri-e2e-artifacts`.
 - Forecast confidence previously ignored stale sync state. Added sync-freshness confidence reasons and dashboard visibility.
 - The transactions screen previously filtered only. Added manual edit coverage from `/transactions` itself.
-- Transaction filters previously covered only search, month, category, and review state. Added amount-range and transaction-type filters for income, transfers, recurring, excluded, and related flags.
+- Transaction filters previously covered only search, month, category, and review state. Added explicit merchant,
+  uncategorized, amount-range, and transaction-type filters for income, transfers, recurring, excluded, and related flags.
 - Transaction rows previously had no source-level troubleshooting action. Added raw transaction detail pages and row links with route and E2E coverage.
 - Transaction corrections previously edited only category and merchant. Added transfer, savings, one-off, and budget-exclusion flag editing with route and E2E coverage.
 - Review corrections previously handled only one transaction or rule preview. Added apply-to-similar review corrections that skip existing manual overrides.
