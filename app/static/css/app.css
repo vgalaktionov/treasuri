@@ -813,7 +813,7 @@ header nav a {
     border-block-end: 1px solid var(--treasuri-line);
     border-radius: 0;
     box-shadow: none;
-    padding: 0.65rem 0.25rem;
+    padding: 0.5rem 0.25rem;
   }
 
   .transaction-card.needs-review {
@@ -824,7 +824,7 @@ header nav a {
 
   .transaction-card {
     display: grid;
-    gap: 0.75rem;
+    gap: 0.5rem;
     grid-template-columns:
       minmax(16rem, 1fr) minmax(7rem, auto) minmax(12rem, 0.7fr) minmax(10rem, auto)
       minmax(3rem, auto);
@@ -836,15 +836,20 @@ header nav a {
   }
 
   .transaction-main > div {
+    align-content: start;
+    column-gap: 0.75rem;
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
     min-inline-size: 0;
   }
 
   .transaction-main strong {
     align-self: start;
+    font-size: 0.98rem;
     grid-column: 2;
     grid-row: 1;
     justify-self: end;
-    padding-block-start: 0.15rem;
+    padding-block-start: 0.05rem;
   }
 
   .transaction-main h2,
@@ -852,25 +857,82 @@ header nav a {
     font-size: 1rem;
   }
 
+  .transaction-main h2 {
+    grid-column: 2;
+    line-height: 1.2;
+    margin-block: 0.05rem;
+  }
+
+  .transaction-main time,
+  .transaction-main p {
+    display: block;
+    font-size: 0.88rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .transaction-main time {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    padding-block-start: 0.05rem;
+  }
+
+  .transaction-main p {
+    grid-column: 2;
+    line-height: 1.2;
+  }
+
   .transaction-meta {
     align-content: start;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
     grid-column: 3;
     grid-row: 1;
-    margin-block-start: 0.1rem;
+    margin-block-start: 0;
+    min-inline-size: 0;
+    overflow: hidden;
+  }
+
+  .transaction-meta span {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    max-inline-size: none;
+    overflow: hidden;
+    padding: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .transaction-meta span + span::before {
+    color: var(--treasuri-muted);
+    content: "/";
+    margin-inline: 0.25rem;
   }
 
   .transaction-edit {
     grid-column: 5;
     grid-row: 1;
     justify-self: end;
-    margin-block-start: 0.15rem;
+    margin-block-start: 0.05rem;
+  }
+
+  .transaction-edit summary,
+  .transaction-actions a {
+    font-size: 0.9rem;
   }
 
   .transaction-actions {
+    align-self: start;
+    flex-wrap: nowrap;
+    gap: 0.35rem 0.65rem;
     grid-column: 4;
     grid-row: 1;
     justify-self: end;
-    margin-block-start: 0.15rem;
+    margin-block-start: 0.05rem;
   }
 
   .transaction-edit[open] {

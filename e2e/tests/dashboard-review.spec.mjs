@@ -207,6 +207,31 @@ uiTest("transactions can be filtered on mobile without horizontal overflow", asy
   assert.equal(overflow <= 1, true, `transactions page overflows horizontally by ${overflow}px`);
 });
 
+uiTest("desktop transactions render as dense ledger rows", async () => {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await page.goto(`${baseUrl}/transactions`, { waitUntil: "domcontentloaded" });
+
+  const metrics = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll(".transaction-card")].map((row) =>
+      Math.round(row.getBoundingClientRect().height),
+    );
+    return {
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      rowCount: rows.length,
+      maxRowHeight: Math.max(...rows),
+      firstRowActions: document.querySelector(".transaction-actions")?.getBoundingClientRect().height ?? 0,
+      tabbarDisplay: getComputedStyle(document.querySelector(".mobile-tabbar")).display,
+    };
+  });
+
+  assert.equal(metrics.overflow <= 1, true, `desktop transactions page overflows by ${metrics.overflow}px`);
+  assert.equal(metrics.rowCount >= 7, true);
+  assert.equal(metrics.maxRowHeight <= 74, true, `desktop rows are too tall: ${metrics.maxRowHeight}px`);
+  assert.equal(metrics.firstRowActions <= 28, true, `desktop row actions wrapped: ${metrics.firstRowActions}px`);
+  assert.equal(metrics.tabbarDisplay, "none");
+});
+
 uiTest("categories show budget averages on mobile without horizontal overflow", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
