@@ -124,6 +124,38 @@ def test_merchant_alias_classifies_with_default_category() -> None:
     assert result.needs_review is False
 
 
+def test_merchant_alias_supports_multiple_aliases_for_one_merchant() -> None:
+    result = classify_transaction(
+        TransactionForClassification(
+            id=42,
+            account_id=7,
+            amount=Decimal("-12.50"),
+            description="AH TO GO CENTRAL STATION",
+            counterparty_name="AH TO GO",
+        ),
+        manual_overrides=[],
+        rules=[],
+        merchant_aliases=[
+            MerchantAlias(
+                merchant="Albert Heijn",
+                match_text="albert heijn",
+                match_type=MatchOperator.CONTAINS,
+                default_category="Groceries",
+            ),
+            MerchantAlias(
+                merchant="Albert Heijn",
+                match_text="ah to go",
+                match_type=MatchOperator.CONTAINS,
+                default_category="Groceries",
+            ),
+        ],
+    )
+
+    assert result.method == ClassificationMethod.MERCHANT_ALIAS
+    assert result.merchant == "Albert Heijn"
+    assert result.category == "Groceries"
+
+
 def test_alias_without_default_category_still_needs_review() -> None:
     result = classify_transaction(
         sample_transaction(),

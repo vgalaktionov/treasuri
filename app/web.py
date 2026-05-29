@@ -148,6 +148,7 @@ def register_routes(app: Flask) -> None:
                 transaction_id=transaction_id,
                 category_name=category_name,
                 merchant_name=merchant_name,
+                create_alias=request.form.get("create_alias") == "1",
             ),
         )
         if request.form.get("next") == "rule-preview":

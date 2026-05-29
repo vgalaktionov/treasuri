@@ -110,6 +110,8 @@ test("review page keeps action controls usable on narrow screens", async () => {
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.equal(overflow <= 1, true, `review page overflows horizontally by ${overflow}px`);
+  const aliasChecked = await page.locator("form.review-form input[name='create_alias']").map((input) => input.checked).wait();
+  assert.equal(aliasChecked, true);
 
   const buttonWidths = await page.$$eval(".review-actions button", (buttons) =>
     buttons.map((button) => {
@@ -122,6 +124,17 @@ test("review page keeps action controls usable on narrow screens", async () => {
   for (const { buttonWidth, parentWidth } of buttonWidths) {
     assert.equal(Math.abs(buttonWidth - parentWidth) <= 1, true);
   }
+
+  const bottomMetrics = await page.evaluate(() => {
+    document.querySelector(".review-actions button[name='next']").scrollIntoView({ block: "center" });
+    const button = document.querySelector(".review-actions button[name='next']").getBoundingClientRect();
+    const tabbar = document.querySelector(".mobile-tabbar").getBoundingClientRect();
+    return {
+      buttonBottom: Math.round(button.bottom),
+      tabbarTop: Math.round(tabbar.top),
+    };
+  });
+  assert.equal(bottomMetrics.buttonBottom < bottomMetrics.tabbarTop, true);
 });
 
 test("transactions can be filtered on mobile without horizontal overflow", async () => {

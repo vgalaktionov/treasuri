@@ -70,6 +70,10 @@
                   Merchant
                   <input name="merchant" value="{{ transaction.merchant }}" autocomplete="off">
                 </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="create_alias" value="1" checked>
+                  Remember merchant
+                </label>
                 <div class="review-actions">
                   <button type="submit">Save</button>
                   <button type="submit" name="next" value="rule-preview" class="secondary">Save and preview rule</button>

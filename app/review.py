@@ -15,6 +15,7 @@ class ReviewCorrection:
     category_name: str
     merchant_name: str | None
     notes: str | None = None
+    create_alias: bool = False
 
 
 def list_category_names(database_url: str) -> list[str]:
@@ -29,6 +30,8 @@ def apply_review_correction(database_url: str, correction: ReviewCorrection) -> 
             category_id = _category_id(connection, correction.category_name)
             merchant_id = _merchant_id(connection, correction.merchant_name, category_id)
             _upsert_manual_override(connection, correction, category_id, merchant_id)
+            if correction.create_alias and merchant_id is not None:
+                _upsert_merchant_alias(connection, correction.transaction_id, merchant_id)
             _update_enriched_transaction(connection, correction, category_id, merchant_id)
 
 
@@ -92,6 +95,45 @@ def _upsert_manual_override(
     )
 
 
+def _upsert_merchant_alias(
+    connection: Connection[tuple[object, ...]],
+    transaction_id: int,
+    merchant_id: int,
+) -> None:
+    row = connection.execute(
+        """
+        SELECT
+            NULLIF(trim(raw_transactions.counterparty_name), ''),
+            NULLIF(trim(raw_transactions.description), '')
+        FROM enriched_transactions
+        JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+        WHERE enriched_transactions.id = %s
+        """,
+        (transaction_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"unknown transaction: {transaction_id}")
+
+    match_text = _optional_str(row[0]) or _optional_str(row[1])
+    if match_text is None:
+        return
+
+    connection.execute(
+        """
+        INSERT INTO merchant_aliases (merchant_id, match_text, match_type, priority)
+        SELECT %s, %s, 'contains', 50
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM merchant_aliases
+            WHERE merchant_id = %s
+                AND match_text = %s
+                AND match_type = 'contains'
+        )
+        """,
+        (merchant_id, match_text, merchant_id, match_text),
+    )
+
+
 def _update_enriched_transaction(
     connection: Connection[tuple[object, ...]],
     correction: ReviewCorrection,
@@ -121,3 +163,9 @@ def _read_int(value: object) -> int:
     if not isinstance(value, int):
         raise RuntimeError(f"expected integer, got {type(value).__name__}")
     return value
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)

@@ -65,6 +65,7 @@ def test_review_category_update_creates_manual_override_and_clears_review(sample
             "csrf_token": csrf_token,
             "category": "Dog",
             "merchant": "Sample Pet Care",
+            "create_alias": "1",
         },
         follow_redirects=True,
     )
@@ -77,12 +78,15 @@ def test_review_category_update_creates_manual_override_and_clears_review(sample
                 merchants.name,
                 enriched_transactions.needs_review,
                 enriched_transactions.classification_method,
-                manual_overrides.id IS NOT NULL
+                manual_overrides.id IS NOT NULL,
+                merchant_aliases.match_text,
+                merchant_aliases.match_type
             FROM enriched_transactions
             JOIN categories ON categories.id = enriched_transactions.category_id
             LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
             LEFT JOIN manual_overrides
                 ON manual_overrides.enriched_transaction_id = enriched_transactions.id
+            LEFT JOIN merchant_aliases ON merchant_aliases.merchant_id = merchants.id
             WHERE enriched_transactions.id = %s
             """,
             (_review_transaction_id(sample_app),),
@@ -90,7 +94,31 @@ def test_review_category_update_creates_manual_override_and_clears_review(sample
 
     assert response.status_code == 200
     assert b"Unknown Sample Merchant" not in response.data
-    assert rows == [("Dog", "Sample Pet Care", False, "manual_override", True)]
+    assert rows == [("Dog", "Sample Pet Care", False, "manual_override", True, "Unknown Sample Merchant", "contains")]
+
+
+def test_review_category_update_can_skip_merchant_alias(sample_app: Flask) -> None:
+    client = sample_app.test_client()
+    review_response = client.get("/review")
+    csrf_token = _extract_csrf(review_response.get_data(as_text=True))
+
+    response = client.post(
+        _review_action(sample_app),
+        data={
+            "csrf_token": csrf_token,
+            "category": "Dog",
+            "merchant": "Sample Pet Care",
+        },
+        follow_redirects=True,
+    )
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        alias_count = connection.execute("SELECT count(*) FROM merchant_aliases").fetchone()
+    if alias_count is None:
+        raise AssertionError("alias count was not returned")
+
+    assert response.status_code == 200
+    assert alias_count[0] == 0
 
 
 def _review_action(app: Flask) -> str:
