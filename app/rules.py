@@ -52,6 +52,26 @@ class StoredRule:
     pattern: str
     category_name: str | None
     merchant_name: str | None
+    set_is_income: bool | None
+    set_is_transfer: bool | None
+    set_is_savings: bool | None
+    set_is_fixed_cost: bool | None
+    set_is_excluded_from_budget: bool | None
+
+    @property
+    def flags(self) -> tuple[str, ...]:
+        labels: list[str] = []
+        flag_values = (
+            ("income", self.set_is_income),
+            ("transfer", self.set_is_transfer),
+            ("savings", self.set_is_savings),
+            ("fixed", self.set_is_fixed_cost),
+            ("excluded", self.set_is_excluded_from_budget),
+        )
+        for label, enabled in flag_values:
+            if enabled is True:
+                labels.append(label)
+        return tuple(labels)
 
 
 @dataclass(frozen=True)
@@ -84,6 +104,11 @@ class RuleEditorInput:
     pattern: str
     category_name: str
     merchant_name: str | None
+    set_is_income: bool | None
+    set_is_transfer: bool | None
+    set_is_savings: bool | None
+    set_is_fixed_cost: bool | None
+    set_is_excluded_from_budget: bool | None
 
 
 def draft_rule_from_transaction(database_url: str, transaction_id: int) -> RuleDraft:
@@ -215,9 +240,14 @@ def create_rule_from_input(database_url: str, rule_input: RuleEditorInput) -> in
                     operator,
                     pattern,
                     category_id,
-                    merchant_id
+                    merchant_id,
+                    set_is_income,
+                    set_is_transfer,
+                    set_is_savings,
+                    set_is_fixed_cost,
+                    set_is_excluded_from_budget
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -229,6 +259,11 @@ def create_rule_from_input(database_url: str, rule_input: RuleEditorInput) -> in
                     rule_input.pattern,
                     category_id,
                     merchant_id,
+                    rule_input.set_is_income,
+                    rule_input.set_is_transfer,
+                    rule_input.set_is_savings,
+                    rule_input.set_is_fixed_cost,
+                    rule_input.set_is_excluded_from_budget,
                 ),
             ).fetchone()
     if row is None:
@@ -253,6 +288,11 @@ def update_rule_from_input(database_url: str, rule_id: int, rule_input: RuleEdit
                     pattern = %s,
                     category_id = %s,
                     merchant_id = %s,
+                    set_is_income = %s,
+                    set_is_transfer = %s,
+                    set_is_savings = %s,
+                    set_is_fixed_cost = %s,
+                    set_is_excluded_from_budget = %s,
                     updated_at = now()
                 WHERE id = %s
                 """,
@@ -265,6 +305,11 @@ def update_rule_from_input(database_url: str, rule_id: int, rule_input: RuleEdit
                     rule_input.pattern,
                     category_id,
                     merchant_id,
+                    rule_input.set_is_income,
+                    rule_input.set_is_transfer,
+                    rule_input.set_is_savings,
+                    rule_input.set_is_fixed_cost,
+                    rule_input.set_is_excluded_from_budget,
                     rule_id,
                 ),
             )
@@ -297,6 +342,11 @@ def parse_rule_editor_input(form: dict[str, str]) -> RuleEditorInput:
         pattern=pattern,
         category_name=category_name,
         merchant_name=merchant_name,
+        set_is_income=_optional_rule_flag(form.get("set_is_income", "")),
+        set_is_transfer=_optional_rule_flag(form.get("set_is_transfer", "")),
+        set_is_savings=_optional_rule_flag(form.get("set_is_savings", "")),
+        set_is_fixed_cost=_optional_rule_flag(form.get("set_is_fixed_cost", "")),
+        set_is_excluded_from_budget=_optional_rule_flag(form.get("set_is_excluded_from_budget", "")),
     )
 
 
@@ -366,7 +416,12 @@ def _load_stored_rules(connection: Connection[tuple[object, ...]]) -> list[Store
             categorization_rules.operator,
             categorization_rules.pattern,
             categories.name,
-            merchants.name
+            merchants.name,
+            categorization_rules.set_is_income,
+            categorization_rules.set_is_transfer,
+            categorization_rules.set_is_savings,
+            categorization_rules.set_is_fixed_cost,
+            categorization_rules.set_is_excluded_from_budget
         FROM categorization_rules
         LEFT JOIN categories ON categories.id = categorization_rules.category_id
         LEFT JOIN merchants ON merchants.id = categorization_rules.merchant_id
@@ -384,6 +439,11 @@ def _load_stored_rules(connection: Connection[tuple[object, ...]]) -> list[Store
             pattern=str(row[6]),
             category_name=_optional_str(row[7]),
             merchant_name=_optional_str(row[8]),
+            set_is_income=_optional_bool(row[9]),
+            set_is_transfer=_optional_bool(row[10]),
+            set_is_savings=_optional_bool(row[11]),
+            set_is_fixed_cost=_optional_bool(row[12]),
+            set_is_excluded_from_budget=_optional_bool(row[13]),
         )
         for row in rows
     ]
@@ -394,6 +454,11 @@ class _RuleTransactionMatch:
     transaction_id: int
     category_name: str | None
     merchant_name: str | None
+    is_income: bool
+    is_transfer: bool
+    is_savings: bool
+    is_fixed_cost: bool
+    is_excluded_from_budget: bool
     has_manual_override: bool
 
 
@@ -404,11 +469,7 @@ def _preview_stored_rule(connection: Connection[tuple[object, ...]], rule_id: in
     matches = _matching_transactions(connection, rule)
     skipped = sum(1 for match in matches if match.has_manual_override)
     eligible = [match for match in matches if not match.has_manual_override]
-    already_correct = sum(
-        1
-        for match in eligible
-        if match.category_name == rule.category and (rule.merchant is None or match.merchant_name == rule.merchant)
-    )
+    already_correct = sum(1 for match in eligible if _rule_match_already_correct(rule, match))
     return RuleHistoryPreview(
         match_count=len(matches),
         would_change_count=len(eligible) - already_correct,
@@ -479,6 +540,11 @@ def _matching_transactions(
             raw_transactions.counterparty_iban,
             merchants.name,
             categories.name,
+            enriched_transactions.is_income,
+            enriched_transactions.is_transfer,
+            enriched_transactions.is_savings,
+            enriched_transactions.is_fixed_cost,
+            enriched_transactions.is_excluded_from_budget,
             manual_overrides.id IS NOT NULL
         FROM enriched_transactions
         JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
@@ -505,10 +571,28 @@ def _matching_transactions(
                     transaction_id=transaction.id,
                     category_name=_optional_str(row[7]),
                     merchant_name=transaction.merchant_name,
-                    has_manual_override=bool(row[8]),
+                    is_income=bool(row[8]),
+                    is_transfer=bool(row[9]),
+                    is_savings=bool(row[10]),
+                    is_fixed_cost=bool(row[11]),
+                    is_excluded_from_budget=bool(row[12]),
+                    has_manual_override=bool(row[13]),
                 )
             )
     return matches
+
+
+def _rule_match_already_correct(rule: CategorizationRule, match: _RuleTransactionMatch) -> bool:
+    expected_values = (
+        (rule.category, match.category_name),
+        (rule.merchant, match.merchant_name),
+        (rule.flags.is_income, match.is_income),
+        (rule.flags.is_transfer, match.is_transfer),
+        (rule.flags.is_savings, match.is_savings),
+        (rule.flags.is_fixed_cost, match.is_fixed_cost),
+        (rule.flags.is_excluded_from_budget, match.is_excluded_from_budget),
+    )
+    return all(expected is None or expected == actual for expected, actual in expected_values)
 
 
 def _apply_rule_to_transaction(
@@ -605,6 +689,10 @@ def _parse_priority(value: str) -> int:
     if priority < 0:
         raise ValueError("rule priority must be non-negative")
     return priority
+
+
+def _optional_rule_flag(value: str) -> bool | None:
+    return True if value == "1" else None
 
 
 def _optional_str(value: object) -> str | None:

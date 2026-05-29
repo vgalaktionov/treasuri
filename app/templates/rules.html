@@ -55,6 +55,29 @@
           Merchant
           <input name="merchant" autocomplete="off">
         </label>
+        <fieldset class="flag-fieldset">
+          <legend>Set flags</legend>
+          <label class="checkbox-label">
+            <input type="checkbox" name="set_is_income" value="1">
+            Income
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="set_is_transfer" value="1">
+            Transfer
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="set_is_savings" value="1">
+            Savings
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="set_is_fixed_cost" value="1">
+            Fixed cost
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="set_is_excluded_from_budget" value="1">
+            Exclude
+          </label>
+        </fieldset>
         <div class="review-actions">
           <button type="submit">Save rule</button>
         </div>
@@ -81,6 +104,10 @@
               <div>
                 <dt>Merchant</dt>
                 <dd>{{ item.rule.merchant_name or "None" }}</dd>
+              </div>
+              <div>
+                <dt>Flags</dt>
+                <dd>{{ item.rule.flags | join(", ") if item.rule.flags else "None" }}</dd>
               </div>
               <div>
                 <dt>Matches</dt>
@@ -144,6 +171,29 @@
                   Merchant
                   <input name="merchant" value="{{ item.rule.merchant_name or '' }}" autocomplete="off">
                 </label>
+                <fieldset class="flag-fieldset">
+                  <legend>Set flags</legend>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="set_is_income" value="1" {% if item.rule.set_is_income is true %}checked{% endif %}>
+                    Income
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="set_is_transfer" value="1" {% if item.rule.set_is_transfer is true %}checked{% endif %}>
+                    Transfer
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="set_is_savings" value="1" {% if item.rule.set_is_savings is true %}checked{% endif %}>
+                    Savings
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="set_is_fixed_cost" value="1" {% if item.rule.set_is_fixed_cost is true %}checked{% endif %}>
+                    Fixed cost
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="set_is_excluded_from_budget" value="1" {% if item.rule.set_is_excluded_from_budget is true %}checked{% endif %}>
+                    Exclude
+                  </label>
+                </fieldset>
                 <div class="review-actions">
                   <button type="submit">Save rule</button>
                 </div>

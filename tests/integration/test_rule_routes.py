@@ -15,6 +15,7 @@ from app.config import AppConfig
 from app.jobs.enqueue import BACKFILL_RULE_ENTRYPOINT
 from app.jobs.worker import run_until_drained
 from app.migrate import run_migrations
+from app.rules import backfill_rule
 from app.sample_data import load_sample_data
 from app.web import create_app
 
@@ -229,6 +230,7 @@ def test_rules_route_can_create_edit_and_disable_rule(sample_app: Flask) -> None
             "pattern": "Groceries sample",
             "category": "Groceries",
             "merchant": "Sample Rule Merchant",
+            "set_is_excluded_from_budget": "1",
         },
         follow_redirects=True,
     )
@@ -246,6 +248,7 @@ def test_rules_route_can_create_edit_and_disable_rule(sample_app: Flask) -> None
             "pattern": "Sample Supermarket",
             "category": "Eating out",
             "merchant": "",
+            "set_is_transfer": "1",
         },
         follow_redirects=True,
     )
@@ -269,7 +272,12 @@ def test_rules_route_can_create_edit_and_disable_rule(sample_app: Flask) -> None
                 categorization_rules.operator,
                 categorization_rules.pattern,
                 categories.name,
-                merchants.name
+                merchants.name,
+                categorization_rules.set_is_income,
+                categorization_rules.set_is_transfer,
+                categorization_rules.set_is_savings,
+                categorization_rules.set_is_fixed_cost,
+                categorization_rules.set_is_excluded_from_budget
             FROM categorization_rules
             JOIN categories ON categories.id = categorization_rules.category_id
             LEFT JOIN merchants ON merchants.id = categorization_rules.merchant_id
@@ -280,8 +288,10 @@ def test_rules_route_can_create_edit_and_disable_rule(sample_app: Flask) -> None
 
     assert create_response.status_code == 200
     assert b"Classify grocery text" in create_response.data
+    assert b"excluded" in create_response.data
     assert edit_response.status_code == 200
     assert b"Classify edited grocery text" in edit_response.data
+    assert b"transfer" in edit_response.data
     assert disable_response.status_code == 200
     assert b"inactive" in disable_response.data
     assert row == (
@@ -292,6 +302,11 @@ def test_rules_route_can_create_edit_and_disable_rule(sample_app: Flask) -> None
         "contains",
         "Sample Supermarket",
         "Eating out",
+        None,
+        None,
+        True,
+        None,
+        None,
         None,
     )
 
@@ -317,6 +332,7 @@ def test_rules_route_can_create_amount_between_rule(sample_app: Flask) -> None:
             "pattern": "-100.00..-50.00",
             "category": "Groceries",
             "merchant": "",
+            "set_is_fixed_cost": "1",
         },
         follow_redirects=True,
     )
@@ -325,10 +341,12 @@ def test_rules_route_can_create_amount_between_rule(sample_app: Flask) -> None:
         row = connection.execute(
             """
             SELECT
+                categorization_rules.id,
                 categorization_rules.field,
                 categorization_rules.operator,
                 categorization_rules.pattern,
-                categories.name
+                categories.name,
+                categorization_rules.set_is_fixed_cost
             FROM categorization_rules
             JOIN categories ON categories.id = categorization_rules.category_id
             WHERE categorization_rules.name = 'Classify mid-size variable spend'
@@ -337,9 +355,29 @@ def test_rules_route_can_create_amount_between_rule(sample_app: Flask) -> None:
 
     body = create_response.get_data(as_text=True)
     assert create_response.status_code == 200
-    assert row == ("amount", "amount_between", "-100.00..-50.00", "Groceries")
+    assert row is not None
+    assert row[1:] == ("amount", "amount_between", "-100.00..-50.00", "Groceries", True)
     assert "amount amount_between" in body
+    assert "fixed" in body
     assert "Matches</dt>\n                <dd>2</dd>" in body
+
+    result = backfill_rule(sample_app.config["DATABASE_URL"], int(row[0]))
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        fixed_count = connection.execute(
+            """
+            SELECT count(*)
+            FROM enriched_transactions
+            JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+            WHERE enriched_transactions.rule_id = %s
+                AND enriched_transactions.is_fixed_cost = true
+                AND abs(raw_transactions.amount) BETWEEN 50 AND 100
+            """,
+            (int(row[0]),),
+        ).fetchone()
+
+    assert result.updated_count == 2
+    assert fixed_count == (2,)
 
 
 def test_rules_route_rejects_invalid_amount_between_rule(sample_app: Flask) -> None:

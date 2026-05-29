@@ -44,7 +44,8 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Transaction rows previously had no source-level troubleshooting action. Added raw transaction detail pages and row links with route and E2E coverage.
 - Transaction corrections previously edited only category and merchant. Added transfer, savings, one-off, and budget-exclusion flag editing with route and E2E coverage.
 - Review corrections previously handled only one transaction or rule preview. Added apply-to-similar review corrections that skip existing manual overrides.
-- The rules screen previously lacked direct create/edit forms. Added rule editor coverage while keeping preview before historical backfill.
+- The rules screen previously lacked direct create/edit forms and flag controls. Added rule editor coverage for category,
+  merchant, and rule-set flags while keeping preview before historical backfill.
 - The dashboard previously omitted top category variances. Added dashboard variance visibility with sample-data and E2E assertions.
 - Forecast settings previously exposed only money assumptions. Added salary-day, baseline-month, and sync-lookback controls with route and E2E coverage.
 - Settings previously hid operational context. Added account, category taxonomy, and sync schedule readouts with route and E2E coverage.
