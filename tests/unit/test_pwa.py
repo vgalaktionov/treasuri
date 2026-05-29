@@ -7,6 +7,7 @@ def test_manifest_is_public_static_asset(client) -> None:
     assert response.status_code == 200
     assert response.json["name"] == "Treasuri"
     assert response.json["display"] == "standalone"
+    assert response.json["icons"][0]["src"] == "/static/icons/icon.svg"
 
 
 def test_service_worker_avoids_precaching_financial_pages(client) -> None:
@@ -37,5 +38,17 @@ def test_base_template_registers_pwa_assets(client) -> None:
     assert response.status_code == 200
     assert b"site.webmanifest" in response.data
     assert b"service-worker.js" in response.data
+    assert "💸 Treasuri".encode() in response.data
+    assert '<span class="brand-mark" aria-hidden="true">💸</span>'.encode() in response.data
     assert b"treasuri-offline-summary" in response.data
     assert b"offline-summary.js" in response.data
+
+
+def test_favicon_uses_native_flying_money_emoji(client) -> None:
+    response = client.get("/static/icons/icon.svg")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'aria-label="💸"' in body
+    assert "<title>💸</title>" in body
+    assert ">💸</text>" in body
