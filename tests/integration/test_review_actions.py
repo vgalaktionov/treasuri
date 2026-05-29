@@ -144,6 +144,37 @@ def test_review_category_update_can_skip_merchant_alias(sample_app: Flask) -> No
     assert alias_count[0] == 0
 
 
+def test_review_category_update_refreshes_current_month_forecast(sample_app: Flask) -> None:
+    client = sample_app.test_client()
+    _set_forecast_updated_at(sample_app, "2026-05-01 00:00:00+00")
+    review_response = client.get("/review")
+    csrf_token = _extract_csrf(review_response.get_data(as_text=True))
+
+    response = client.post(
+        _review_action(sample_app),
+        data={
+            "csrf_token": csrf_token,
+            "category": "Dog",
+            "merchant": "Sample Pet Care",
+        },
+        follow_redirects=True,
+    )
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        row = connection.execute(
+            """
+            SELECT updated_at, explanation_json
+            FROM monthly_forecasts
+            WHERE year_month = '2026-05'
+            """
+        ).fetchone()
+
+    assert response.status_code == 200
+    assert row is not None
+    assert str(row[0]) > "2026-05-01"
+    assert "review_burden" not in row[1]["confidence_reasons"]
+
+
 def test_review_category_update_can_apply_to_similar_transactions(sample_app: Flask) -> None:
     similar_id = _insert_similar_review_transaction(sample_app)
     client = sample_app.test_client()
@@ -272,6 +303,15 @@ def _insert_similar_review_transaction(app: Flask) -> int:
             if enriched_row is None:
                 raise AssertionError("similar enriched transaction was not inserted")
             return int(enriched_row[0])
+
+
+def _set_forecast_updated_at(app: Flask, updated_at: str) -> None:
+    with psycopg.connect(app.config["DATABASE_URL"]) as connection:
+        with connection.transaction():
+            connection.execute(
+                "UPDATE monthly_forecasts SET updated_at = %s WHERE year_month = '2026-05'",
+                (updated_at,),
+            )
 
 
 def _extract_csrf(html: str) -> str:

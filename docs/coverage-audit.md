@@ -8,6 +8,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 | --- | --- |
 | Forecast formula and safe-to-spend math | `tests/unit/forecast/test_calculator.py`, `tests/integration/test_forecast_service.py`, `tests/integration/test_month_routes.py`, `e2e/tests/dashboard-review.spec.mjs` dashboard and month tests |
 | Forecast confidence from review and sync freshness | `tests/integration/test_forecast_service.py`, `tests/integration/test_sample_data.py`, dashboard E2E in `e2e/tests/dashboard-review.spec.mjs` |
+| Forecast refresh after user corrections | `tests/integration/test_review_actions.py`, `tests/integration/test_transaction_routes.py` |
 | Classification priority order | `tests/unit/classify/test_pipeline.py`, `tests/integration/test_classify_service.py` |
 | Manual overrides and review correction | `tests/integration/test_review_actions.py`, `tests/integration/test_rule_routes.py`, `tests/integration/test_transaction_routes.py`, review and transaction E2E in `e2e/tests/dashboard-review.spec.mjs` |
 | Merchant aliases from review | `tests/integration/test_review_actions.py`, alias classifier coverage in `tests/unit/classify/test_pipeline.py` |
@@ -64,6 +65,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Status previously showed sync completion without transaction classification health. Added transaction totals, classified count, review count, and classification-method counts with Testcontainers and mobile E2E coverage.
 - Runtime secrets previously supported direct environment values only. Added mounted-file support for `SECRET_KEY`, `ABN_CARD_NUMBER`, and `ABN_SOFT_TOKEN` with ambiguity and missing-file coverage.
 - Production startup previously accepted development defaults. Added fail-fast config checks for default secret, missing database URL, and missing allowed-email allowlist outside development/test.
+- Review and transaction correction tests previously asserted the corrected rows but not the PRD forecast-refresh contract. Added regression coverage that manual corrections refresh the current-month forecast.
 
 ## Residual Risk
 

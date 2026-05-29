@@ -122,6 +122,7 @@ def test_transactions_route_filters_by_month(sample_app) -> None:
 def test_transactions_route_can_apply_manual_edit(sample_app) -> None:
     client = sample_app.test_client()
     transaction_id = _transaction_id(sample_app, "Large one-off sample purchase")
+    _set_forecast_updated_at(sample_app, "2026-05-01 00:00:00+00")
     response = client.get("/transactions?q=one-off")
     csrf_token = _extract_csrf(response.get_data(as_text=True))
 
@@ -159,6 +160,13 @@ def test_transactions_route_can_apply_manual_edit(sample_app) -> None:
             """,
             (transaction_id,),
         ).fetchone()
+        forecast_row = connection.execute(
+            """
+            SELECT updated_at
+            FROM monthly_forecasts
+            WHERE year_month = '2026-05'
+            """
+        ).fetchone()
 
     assert edit_response.status_code == 200
     assert b"Sample Edited Shop" in edit_response.data
@@ -178,6 +186,8 @@ def test_transactions_route_can_apply_manual_edit(sample_app) -> None:
         },
         True,
     )
+    assert forecast_row is not None
+    assert str(forecast_row[0]) > "2026-05-01"
 
 
 def test_transaction_raw_route_shows_source_payload(sample_app) -> None:
@@ -214,3 +224,12 @@ def _extract_csrf(html: str) -> str:
     if match is None:
         raise AssertionError("CSRF token was not rendered")
     return match.group(1)
+
+
+def _set_forecast_updated_at(app, updated_at: str) -> None:
+    with psycopg.connect(app.config["DATABASE_URL"]) as connection:
+        with connection.transaction():
+            connection.execute(
+                "UPDATE monthly_forecasts SET updated_at = %s WHERE year_month = '2026-05'",
+                (updated_at,),
+            )
