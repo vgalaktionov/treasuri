@@ -324,6 +324,7 @@ uiTest("status page summarizes setup on mobile without exposing secrets", async 
   assert.match(bodyText, /App version\s+0\.1\.0/);
   assert.match(bodyText, /Migration version\s+0004_classification_runtime/);
   assert.match(bodyText, /Last sync\s+completed/);
+  assert.match(bodyText, /lookback 90 days, 2 skipped old/);
   assert.match(bodyText, /Known transactions\s+7 total/);
   assert.match(bodyText, /Classified transactions\s+6/);
   assert.match(bodyText, /Needs review\s+1/);

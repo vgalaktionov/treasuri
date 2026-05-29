@@ -47,7 +47,7 @@ def test_status_route_shows_runtime_state_without_secrets() -> None:
     assert "0004_classification_runtime" in body
     assert "Last sync" in body
     assert "completed" in body
-    assert "fake, 7 new, 0 updated" in body
+    assert "fake, 7 new, 0 updated, lookback 90 days, 2 skipped old" in body
     assert "Known transactions" in body
     assert "7 total" in body
     assert "Classified transactions" in body

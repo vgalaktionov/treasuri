@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 from urllib.parse import urlsplit, urlunsplit
 
 import psycopg
@@ -79,7 +80,14 @@ def _load_database_sections(database_url: str) -> list[StatusSection]:
         ).fetchone()
         sync_run = connection.execute(
             """
-            SELECT provider, status, finished_at, new_transaction_count, updated_transaction_count, error_message
+            SELECT
+                provider,
+                status,
+                finished_at,
+                new_transaction_count,
+                updated_transaction_count,
+                error_message,
+                metadata_json
             FROM sync_runs
             ORDER BY started_at DESC, id DESC
             LIMIT 1
@@ -154,12 +162,27 @@ def _sync_row(row: tuple[object, ...] | None) -> StatusRow:
     finished = _format_datetime(row[2])
     counts = f"{_read_int(row[3])} new, {_read_int(row[4])} updated"
     error = _optional_text(row, 5)
-    detail = f"{provider}, {counts}"
+    metadata = row[6] if len(row) > 6 else None
+    detail_parts = [provider, counts, *_sync_metadata_parts(metadata)]
     if finished:
-        detail = f"{detail}, finished {finished}"
+        detail_parts.append(f"finished {finished}")
     if error:
-        detail = f"{detail}, error: {error}"
-    return StatusRow("Last sync", status, detail)
+        detail_parts.append(f"error: {error}")
+    return StatusRow("Last sync", status, ", ".join(detail_parts))
+
+
+def _sync_metadata_parts(metadata: object) -> list[str]:
+    if not isinstance(metadata, dict):
+        return []
+    metadata_map = cast("dict[str, object]", metadata)
+    parts: list[str] = []
+    lookback_days = metadata_map.get("lookback_days")
+    skipped_old_count = metadata_map.get("skipped_old_transaction_count")
+    if isinstance(lookback_days, int):
+        parts.append(f"lookback {lookback_days} days")
+    if isinstance(skipped_old_count, int) and skipped_old_count > 0:
+        parts.append(f"{skipped_old_count} skipped old")
+    return parts
 
 
 def _transaction_rows(summary: tuple[object, ...] | None, method_rows: list[tuple[object, ...]]) -> list[StatusRow]:

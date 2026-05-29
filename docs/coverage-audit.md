@@ -67,6 +67,7 @@ This audit maps the PRD critical flows to the current automated coverage. It is 
 - Production startup previously accepted development defaults. Added fail-fast config checks for default secret, missing database URL, and missing allowed-email allowlist outside development/test.
 - Review and transaction correction tests previously asserted the corrected rows but not the PRD forecast-refresh contract. Added regression coverage that manual corrections refresh the current-month forecast.
 - Worker sync previously skipped forecast refresh when bank sync found only already-seen transactions. Added a queued-chain regression that refreshes the forecast after raw updates without new normalized rows.
+- Status previously hid safe sync metadata that explains the import window. Added lookback and skipped-old counts to `/status` with Testcontainers and mobile E2E coverage.
 
 ## Residual Risk
 

@@ -356,7 +356,7 @@ def _upsert_sample_sync_run(connection: Connection[tuple[object, ...]]) -> None:
             'completed',
             %s,
             0,
-            '{"source":"sample"}'::jsonb
+            '{"source":"sample","lookback_days":90,"skipped_old_transaction_count":2}'::jsonb
         )
         """,
         (len(SAMPLE_TRANSACTIONS),),
