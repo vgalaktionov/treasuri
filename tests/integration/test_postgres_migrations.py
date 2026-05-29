@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from time import monotonic, sleep
 
 import psycopg
 import pytest
@@ -11,7 +12,7 @@ from app.categories import DEFAULT_CATEGORIES
 from app.migrate import run_migrations
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def postgres_url() -> Iterator[str]:
     with PostgresContainer(
         image="postgres:16-alpine",
@@ -20,7 +21,9 @@ def postgres_url() -> Iterator[str]:
         dbname="treasuri",
         driver=None,
     ) as postgres:
-        yield postgres.get_connection_url(driver=None)
+        database_url = postgres.get_connection_url(driver=None)
+        _wait_for_postgres(database_url)
+        yield database_url
 
 
 def test_migrations_apply_from_clean_postgres_and_are_idempotent(postgres_url: str) -> None:
@@ -72,6 +75,8 @@ def test_migrations_apply_from_clean_postgres_and_are_idempotent(postgres_url: s
 
 
 def test_seed_categories_admin_command_is_idempotent(postgres_url: str) -> None:
+    run_migrations(postgres_url)
+
     checked_first = seed_categories(postgres_url)
     checked_second = seed_categories(postgres_url)
 
@@ -81,3 +86,15 @@ def test_seed_categories_admin_command_is_idempotent(postgres_url: str) -> None:
     assert checked_first == len(DEFAULT_CATEGORIES)
     assert checked_second == len(DEFAULT_CATEGORIES)
     assert category_count == (len(DEFAULT_CATEGORIES),)
+
+
+def _wait_for_postgres(database_url: str) -> None:
+    deadline = monotonic() + 10
+    while True:
+        try:
+            with psycopg.connect(database_url):
+                return
+        except psycopg.OperationalError:
+            if monotonic() >= deadline:
+                raise
+            sleep(0.1)

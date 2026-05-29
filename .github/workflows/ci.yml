@@ -47,17 +47,8 @@ jobs:
       - name: Install E2E dependencies
         run: npm ci --prefix e2e
 
-      - name: Check formatting
-        run: uv run ruff format --check .
-
-      - name: Lint
-        run: uv run ruff check .
-
-      - name: Type check
-        run: uv run ty check
-
-      - name: Run Python tests
-        run: uv run pytest
+      - name: Run pre-commit gates
+        run: uv run pre-commit run --all-files
 
       - name: Run Docker image smoke test
         run: TREASURI_DOCKER_SMOKE=1 uv run pytest tests/integration/test_docker_image.py

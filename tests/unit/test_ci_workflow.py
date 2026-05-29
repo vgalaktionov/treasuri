@@ -9,10 +9,7 @@ def test_ci_workflow_runs_checks_before_publishing_image() -> None:
     workflow = (PROJECT_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
     assert "uv sync --locked" in workflow
-    assert "uv run ruff format --check ." in workflow
-    assert "uv run ruff check ." in workflow
-    assert "uv run ty check" in workflow
-    assert "uv run pytest" in workflow
+    assert "uv run pre-commit run --all-files" in workflow
     assert "npm test --prefix e2e" in workflow
     assert "needs: checks" in workflow
     assert "ghcr.io/${{ github.repository }}" in workflow
