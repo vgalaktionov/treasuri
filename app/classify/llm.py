@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 from app.classify.pipeline import TransactionForClassification
 
 PROMPT_VERSION = "classification-v1"
+LLM_RUNTIME = "llama.cpp-openai-compatible"
 JsonObject = dict[str, Any]
 JsonTransport = Callable[[str, JsonObject, int], JsonObject]
 
@@ -28,6 +29,7 @@ class LlmClassificationSuggestion:
     confidence: Decimal
     reason: str
     model_ref: str
+    runtime: str = LLM_RUNTIME
     prompt_version: str = PROMPT_VERSION
 
 

@@ -285,6 +285,7 @@ def test_classify_transactions_uses_llm_fallback_without_clearing_review(
                 enriched_transactions.classification_method,
                 enriched_transactions.classification_confidence,
                 enriched_transactions.classification_model,
+                enriched_transactions.classification_runtime,
                 enriched_transactions.classification_prompt_version
             FROM enriched_transactions
             JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
@@ -295,7 +296,16 @@ def test_classify_transactions_uses_llm_fallback_without_clearing_review(
         ).fetchone()
 
     assert result.classified_count == 3
-    assert row == ("Groceries", "Sample Merchant", True, "llm", Decimal("0.6100"), "test-llm", "classification-v1")
+    assert row == (
+        "Groceries",
+        "Sample Merchant",
+        True,
+        "llm",
+        Decimal("0.6100"),
+        "test-llm",
+        "llama.cpp-openai-compatible",
+        "classification-v1",
+    )
 
 
 def test_classify_transactions_obeys_database_llm_disabled_setting(

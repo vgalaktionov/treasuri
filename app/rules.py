@@ -532,6 +532,7 @@ def _apply_rule_to_transaction(
             classification_confidence = 1,
             classification_reason = %s,
             classification_model = NULL,
+            classification_runtime = NULL,
             classification_prompt_version = NULL,
             rule_id = %s,
             updated_at = now()

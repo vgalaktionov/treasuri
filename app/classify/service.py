@@ -120,6 +120,7 @@ def _try_llm_classification(
         needs_review=True,
         reason=f"LLM suggestion: {suggestion.reason}",
         model_ref=suggestion.model_ref,
+        runtime=suggestion.runtime,
         prompt_version=suggestion.prompt_version,
     )
 
@@ -322,6 +323,7 @@ def _update_enriched_transaction(
             classification_confidence = %s,
             classification_reason = %s,
             classification_model = %s,
+            classification_runtime = %s,
             classification_prompt_version = %s,
             rule_id = %s,
             updated_at = now()
@@ -341,6 +343,7 @@ def _update_enriched_transaction(
             result.confidence,
             result.reason,
             result.model_ref,
+            result.runtime,
             result.prompt_version,
             result.rule_id,
             transaction_id,

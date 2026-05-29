@@ -109,6 +109,7 @@ class ClassificationResult:
     reason: str
     rule_id: int | None = None
     model_ref: str | None = None
+    runtime: str | None = None
     prompt_version: str | None = None
     flags: ClassificationFlags = ClassificationFlags()
 

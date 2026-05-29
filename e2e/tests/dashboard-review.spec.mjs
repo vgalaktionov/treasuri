@@ -301,7 +301,7 @@ uiTest("status page summarizes setup on mobile without exposing secrets", async 
 
   const bodyText = await page.locator("body").map((body) => body.innerText).wait();
   assert.match(bodyText, /Status/);
-  assert.match(bodyText, /Migration version\s+0003_pgqueuer/);
+  assert.match(bodyText, /Migration version\s+0004_classification_runtime/);
   assert.match(bodyText, /Last sync\s+completed/);
   assert.match(bodyText, /LLM model\s+unsloth\/gemma-4-E4B-it-GGUF/);
   assert.doesNotMatch(bodyText, /SECRET_KEY|ABN_SOFT_TOKEN|OIDC_CLIENT_SECRETS/);

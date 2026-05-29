@@ -32,7 +32,7 @@ def test_status_route_shows_runtime_state_without_secrets() -> None:
 
     assert response.status_code == 200
     assert "Migration version" in body
-    assert "0003_pgqueuer" in body
+    assert "0004_classification_runtime" in body
     assert "Last sync" in body
     assert "completed" in body
     assert "fake, 7 new, 0 updated" in body
