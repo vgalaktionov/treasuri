@@ -294,7 +294,7 @@ async def run_worker(
             dequeue_timeout=dequeue_timeout,
             batch_size=1,
             mode=mode,
-            max_concurrent_tasks=2,
+            max_concurrent_tasks=config.worker_concurrency,
             heartbeat_timeout=timedelta(seconds=30),
         )
 

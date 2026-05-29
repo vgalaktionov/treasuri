@@ -112,6 +112,7 @@ class AppConfig:
     )
     oidc_cookie_secure: bool = field(default_factory=lambda: _read_bool("OIDC_ID_TOKEN_COOKIE_SECURE", True))
     session_lifetime_minutes: int = field(default_factory=lambda: _read_int("SESSION_LIFETIME_MINUTES", 480))
+    worker_concurrency: int = field(default_factory=lambda: _read_int("WORKER_CONCURRENCY", 2))
     llm_enabled: bool = field(default_factory=lambda: _read_bool("LLM_ENABLED", True))
     llm_base_url: str = field(default_factory=lambda: os.environ.get("LLM_BASE_URL", "http://llama:8080/v1"))
     llm_model: str = field(
@@ -139,6 +140,8 @@ class AppConfig:
             raise ConfigError("SECRET_KEY is required")
         if self.session_lifetime_minutes < 1:
             raise ConfigError("SESSION_LIFETIME_MINUTES must be at least 1")
+        if self.worker_concurrency < 1:
+            raise ConfigError("WORKER_CONCURRENCY must be at least 1")
         if self.llm_timeout_seconds < 1:
             raise ConfigError("LLM_TIMEOUT_SECONDS must be at least 1")
         if self.llm_temperature < 0:

@@ -12,11 +12,13 @@ def test_load_config_parses_oidc_testing_profile(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("OIDC_TESTING_PROFILE_JSON", '{"email":"dev-user@example.test"}')
     monkeypatch.setenv("ALLOWED_EMAILS", "dev-user@example.test,other@example.test")
     monkeypatch.setenv("OIDC_OPENID_REALM", "test-realm")
+    monkeypatch.setenv("WORKER_CONCURRENCY", "4")
 
     config = load_config()
 
     assert config.oidc_enabled is False
     assert config.oidc_openid_realm == "test-realm"
+    assert config.worker_concurrency == 4
     assert config.oidc_testing_profile["email"] == "dev-user@example.test"
     assert config.allowed_emails == ("dev-user@example.test", "other@example.test")
     assert str(config.llm_confidence_threshold) == "0.60"
@@ -98,6 +100,14 @@ def test_load_config_rejects_non_positive_session_lifetime(monkeypatch: pytest.M
     monkeypatch.setenv("SESSION_LIFETIME_MINUTES", "0")
 
     with pytest.raises(ConfigError, match="SESSION_LIFETIME_MINUTES"):
+        load_config()
+
+
+def test_load_config_rejects_non_positive_worker_concurrency(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OIDC_ENABLED", "false")
+    monkeypatch.setenv("WORKER_CONCURRENCY", "0")
+
+    with pytest.raises(ConfigError, match="WORKER_CONCURRENCY"):
         load_config()
 
 

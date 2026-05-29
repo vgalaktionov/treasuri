@@ -51,3 +51,9 @@ def test_gpu_compose_override_enables_llama_gpu_without_requiring_it_by_default(
     assert re.search(r"^  llama:\n    gpus: all\n", gpu_compose, flags=re.MULTILINE)
     assert "--n-gpu-layers" in gpu_compose
     assert '"999"' in gpu_compose
+
+
+def test_worker_uses_configured_concurrency() -> None:
+    worker = read_project_file("app/jobs/worker.py")
+
+    assert "max_concurrent_tasks=config.worker_concurrency" in worker

@@ -37,6 +37,8 @@ def test_status_route_shows_runtime_state_without_secrets() -> None:
     assert "abcdef123456" in body
     assert "OIDC realm" in body
     assert "treasuri-test" in body
+    assert "Worker concurrency" in body
+    assert "3" in body
     assert "Migration version" in body
     assert "0004_classification_runtime" in body
     assert "Last sync" in body
@@ -108,6 +110,7 @@ def _sample_app() -> Iterator[Flask]:
                 oidc_openid_realm="treasuri-test",
                 oidc_testing_profile={"sub": "dev-user", "email": "dev-user@example.test"},
                 oidc_cookie_secure=False,
+                worker_concurrency=3,
                 llm_enabled=True,
                 llm_base_url="http://llama-secret:password@llama:8080/v1?token=secret",
                 bank_provider="abn",

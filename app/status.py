@@ -36,6 +36,7 @@ def load_status_sections(config: AppConfig) -> list[StatusSection]:
             StatusRow("OIDC realm", config.oidc_openid_realm),
             StatusRow("OIDC client secrets", _configured(config.oidc_client_secrets)),
             StatusRow("Allowed emails", f"{len(config.allowed_emails)} configured"),
+            StatusRow("Worker concurrency", str(config.worker_concurrency)),
             StatusRow("Bank provider", config.bank_provider),
             StatusRow("ABN account", _configured(config.abn_account_iban)),
             StatusRow("ABN card", _configured(config.abn_card_number)),
