@@ -248,6 +248,74 @@ def test_rules_route_can_create_edit_and_disable_rule(sample_app: Flask) -> None
     )
 
 
+def test_rules_route_can_create_amount_between_rule(sample_app: Flask) -> None:
+    client = sample_app.test_client()
+    rules_html = client.get("/rules").get_data(as_text=True)
+    csrf_token = _extract_csrf(rules_html)
+
+    assert "amount_between" in rules_html
+    assert 'value="amount"' in rules_html
+    assert 'value="account_id"' in rules_html
+
+    create_response = client.post(
+        "/rules",
+        data={
+            "csrf_token": csrf_token,
+            "name": "Classify mid-size variable spend",
+            "priority": "30",
+            "is_active": "1",
+            "field": "amount",
+            "operator": "amount_between",
+            "pattern": "-100.00..-50.00",
+            "category": "Groceries",
+            "merchant": "",
+        },
+        follow_redirects=True,
+    )
+
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                categorization_rules.field,
+                categorization_rules.operator,
+                categorization_rules.pattern,
+                categories.name
+            FROM categorization_rules
+            JOIN categories ON categories.id = categorization_rules.category_id
+            WHERE categorization_rules.name = 'Classify mid-size variable spend'
+            """
+        ).fetchone()
+
+    body = create_response.get_data(as_text=True)
+    assert create_response.status_code == 200
+    assert row == ("amount", "amount_between", "-100.00..-50.00", "Groceries")
+    assert "amount amount_between" in body
+    assert "Matches</dt>\n                <dd>2</dd>" in body
+
+
+def test_rules_route_rejects_invalid_amount_between_rule(sample_app: Flask) -> None:
+    client = sample_app.test_client()
+    csrf_token = _extract_csrf(client.get("/rules").get_data(as_text=True))
+
+    response = client.post(
+        "/rules",
+        data={
+            "csrf_token": csrf_token,
+            "name": "Broken amount rule",
+            "priority": "30",
+            "is_active": "1",
+            "field": "description",
+            "operator": "amount_between",
+            "pattern": "-100.00..-50.00",
+            "category": "Groceries",
+            "merchant": "",
+        },
+    )
+
+    assert response.status_code == 400
+
+
 def _review_transaction_id(app: Flask) -> int:
     with psycopg.connect(app.config["DATABASE_URL"]) as connection:
         row = connection.execute(

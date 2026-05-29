@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import psycopg
 from psycopg import Connection
@@ -17,8 +17,8 @@ from app.classify.pipeline import (
     rule_matches,
 )
 
-RULE_FIELDS = ("description", "counterparty_name", "counterparty_iban", "merchant")
-RULE_OPERATORS = ("contains", "exact", "regex", "starts_with", "ends_with")
+RULE_FIELDS = ("description", "counterparty_name", "counterparty_iban", "merchant", "amount", "account_id")
+RULE_OPERATORS = ("contains", "exact", "regex", "starts_with", "ends_with", "amount_between")
 
 
 @dataclass(frozen=True)
@@ -285,6 +285,7 @@ def parse_rule_editor_input(form: dict[str, str]) -> RuleEditorInput:
         raise ValueError(f"unsupported rule operator: {operator}")
     if not pattern:
         raise ValueError("rule pattern is required")
+    _validate_rule_match_input(field, operator, pattern)
     if not category_name:
         raise ValueError("rule category is required")
     return RuleEditorInput(
@@ -297,6 +298,23 @@ def parse_rule_editor_input(form: dict[str, str]) -> RuleEditorInput:
         category_name=category_name,
         merchant_name=merchant_name,
     )
+
+
+def _validate_rule_match_input(field: str, operator: str, pattern: str) -> None:
+    if operator != "amount_between":
+        return
+    if field != "amount":
+        raise ValueError("amount_between rules must use the amount field")
+    lower_raw, separator, upper_raw = pattern.partition("..")
+    if separator == "":
+        raise ValueError("amount_between pattern must use '<lower>..<upper>'")
+    try:
+        lower = Decimal(lower_raw)
+        upper = Decimal(upper_raw)
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError("amount_between bounds must be decimal values") from exc
+    if lower > upper:
+        raise ValueError("amount_between lower bound must be less than or equal to upper bound")
 
 
 def list_rules(database_url: str) -> list[RuleListItem]:
