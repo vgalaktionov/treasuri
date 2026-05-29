@@ -48,6 +48,12 @@ def test_image_runs_migrate_web_and_worker_commands(smoke_image: str) -> None:
         )
         assert "Applied migrations:" in migrate.stdout
 
+        admin = _run(
+            [*base_run, "--rm", smoke_image, "python", "-m", "app.admin", "seed-categories"],
+            timeout=60,
+        )
+        assert "Seeded category taxonomy" in admin.stdout
+
         web_name = f"treasuri-web-smoke-{uuid4().hex}"
         worker_name = f"treasuri-worker-smoke-{uuid4().hex}"
         try:
