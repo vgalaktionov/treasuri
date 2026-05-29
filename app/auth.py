@@ -54,7 +54,7 @@ def _require_allowed_user() -> ResponseReturnValue | None:
 
     allowed_emails: tuple[str, ...] = current_app.config["APP_CONFIG"].allowed_emails
     email = current_user_email()
-    if allowed_emails and email not in allowed_emails:
+    if not allowed_emails or email not in allowed_emails:
         abort(403)
 
     g.user_email = email

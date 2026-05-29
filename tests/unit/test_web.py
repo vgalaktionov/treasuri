@@ -51,6 +51,27 @@ def test_app_route_rejects_disallowed_test_profile(test_config: AppConfig) -> No
     assert response.status_code == 403
 
 
+def test_app_route_rejects_missing_allowed_email_list() -> None:
+    app = create_app(
+        AppConfig(
+            app_env="test",
+            secret_key="test-secret",
+            allowed_emails=(),
+            oidc_enabled=False,
+            oidc_testing_profile={
+                "sub": "dev-user",
+                "email": "dev-user@example.test",
+            },
+            oidc_cookie_secure=False,
+        ),
+        {"TESTING": True},
+    )
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 403
+
+
 def test_status_shows_llm_model(client) -> None:
     response = client.get("/status")
 

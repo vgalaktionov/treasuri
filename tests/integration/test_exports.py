@@ -164,6 +164,38 @@ def test_export_download_returns_404_for_unknown_file(sample_app: Flask) -> None
     assert response.status_code == 404
 
 
+def test_export_download_requires_allowed_user(sample_app: Flask) -> None:
+    run_id = generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
+    with psycopg.connect(sample_app.config["DATABASE_URL"]) as connection:
+        row = connection.execute(
+            "SELECT id FROM export_files WHERE export_run_id = %s",
+            (run_id,),
+        ).fetchone()
+
+    assert row is not None
+
+    app = create_app(
+        AppConfig(
+            app_env="test",
+            secret_key="test-secret",
+            database_url=sample_app.config["DATABASE_URL"],
+            allowed_emails=("allowed@example.test",),
+            oidc_enabled=False,
+            oidc_testing_profile={
+                "sub": "dev-user",
+                "email": "dev-user@example.test",
+            },
+            oidc_cookie_secure=False,
+            llm_enabled=False,
+        ),
+        {"TESTING": True},
+    )
+
+    response = app.test_client().get(f"/export/files/{row[0]}")
+
+    assert response.status_code == 403
+
+
 def test_export_route_shows_previous_exports_and_failed_runs(sample_app: Flask) -> None:
     generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
     generate_budget_export(sample_app.config["DATABASE_URL"], created_by="dev-user@example.test")
