@@ -98,3 +98,68 @@ def test_update_monthly_forecast_includes_confirmed_upcoming_recurring(sample_da
 
     assert result.safe_to_spend == Decimal("545.01")
     assert row == (Decimal("632.99"), Decimal("545.01"), Decimal("90.84"))
+
+
+def test_update_monthly_forecast_uses_medium_confidence_for_recent_clean_sync(
+    sample_database_url: str,
+) -> None:
+    with psycopg.connect(sample_database_url) as connection:
+        with connection.transaction():
+            connection.execute("UPDATE enriched_transactions SET needs_review = false")
+            connection.execute(
+                """
+                UPDATE sync_runs
+                SET started_at = '2026-05-25 08:00:00+00',
+                    finished_at = '2026-05-25 08:00:01+00',
+                    status = 'completed'
+                WHERE metadata_json @> '{"source":"sample"}'::jsonb
+                """
+            )
+
+    result = update_monthly_forecast(sample_database_url, as_of=date(2026, 5, 26))
+
+    with psycopg.connect(sample_database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT confidence, explanation_json->>'confidence_reasons'
+            FROM monthly_forecasts
+            WHERE year_month = '2026-05'
+            """
+        ).fetchone()
+
+    assert result.confidence == "medium"
+    assert result.review_count == 0
+    assert row == ("medium", "[]")
+
+
+def test_update_monthly_forecast_marks_stale_sync_low_confidence(sample_database_url: str) -> None:
+    with psycopg.connect(sample_database_url) as connection:
+        with connection.transaction():
+            connection.execute("UPDATE enriched_transactions SET needs_review = false")
+            connection.execute(
+                """
+                UPDATE sync_runs
+                SET started_at = '2026-05-20 08:00:00+00',
+                    finished_at = '2026-05-20 08:00:01+00',
+                    status = 'completed'
+                WHERE metadata_json @> '{"source":"sample"}'::jsonb
+                """
+            )
+
+    result = update_monthly_forecast(sample_database_url, as_of=date(2026, 5, 26))
+
+    with psycopg.connect(sample_database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                confidence,
+                explanation_json->>'confidence_reasons',
+                explanation_json->>'last_completed_sync_at'
+            FROM monthly_forecasts
+            WHERE year_month = '2026-05'
+            """
+        ).fetchone()
+
+    assert result.confidence == "low"
+    assert result.review_count == 0
+    assert row == ("low", '["sync_stale"]', "2026-05-20T08:00:01+00:00")

@@ -80,4 +80,6 @@ def test_dashboard_renders_database_backed_sample_summary(migrated_postgres_url:
     assert b"EUR 620" in response.data
     assert b"predicted_variable_remaining" in response.data
     assert b"1 transaction needs review" in response.data
+    assert b"Review needed" in response.data
+    assert b"No completed sync" not in response.data
     assert b"fake completed at 2026-05-28 08:00" in response.data

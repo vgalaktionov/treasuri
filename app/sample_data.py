@@ -125,8 +125,8 @@ def load_sample_data(database_url: str) -> None:
                 _upsert_sample_transaction(connection, account_id, transaction)
             _upsert_sample_recurring_series(connection)
             _upsert_sample_settings(connection)
-            update_monthly_forecast_in_connection(connection, as_of=SAMPLE_FORECAST_DATE)
             _upsert_sample_sync_run(connection)
+            update_monthly_forecast_in_connection(connection, as_of=SAMPLE_FORECAST_DATE)
 
 
 def _upsert_sample_account(connection: Connection[tuple[object, ...]]) -> int:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from calendar import monthrange
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import LiteralString
 
@@ -18,6 +18,8 @@ from app.forecast.calculator import (
     calculate_safe_to_spend,
     predict_variable_spend,
 )
+
+STALE_SYNC_AFTER_DAYS = 2
 
 
 @dataclass(frozen=True)
@@ -83,7 +85,12 @@ def update_monthly_forecast_in_connection(
         )
     )
     review_count = _review_count(connection)
-    confidence = "low" if review_count > 0 else "medium"
+    last_completed_sync_at = _last_completed_sync_finished_at(connection)
+    confidence, confidence_reasons = _forecast_confidence(
+        review_count,
+        last_completed_sync_at,
+        as_of=as_of,
+    )
     projected_savings = forecast.safe_to_spend + target_savings
     explanation = {
         **forecast.explanation,
@@ -92,6 +99,9 @@ def update_monthly_forecast_in_connection(
         "variable_spent": str(variable_spent),
         "pace_projection": str(variable_prediction.pace_projection),
         "predicted_month_end": str(variable_prediction.predicted_month_end),
+        "confidence_reasons": list(confidence_reasons),
+        "last_completed_sync_at": last_completed_sync_at.isoformat() if last_completed_sync_at else None,
+        "stale_sync_after_days": STALE_SYNC_AFTER_DAYS,
         "variable_prediction_inputs": {
             "baseline_3m": str(inputs.baseline_3m),
             "baseline_6m": str(inputs.baseline_6m),
@@ -239,6 +249,50 @@ def _review_count(connection: Connection[tuple[object, ...]]) -> int:
     if row is None:
         return 0
     return _read_int(row[0])
+
+
+def _last_completed_sync_finished_at(connection: Connection[tuple[object, ...]]) -> datetime | None:
+    row = connection.execute(
+        """
+        SELECT finished_at
+        FROM sync_runs
+        WHERE status = 'completed'
+            AND finished_at IS NOT NULL
+        ORDER BY finished_at DESC, id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    if row is None or row[0] is None:
+        return None
+    if not isinstance(row[0], datetime):
+        raise RuntimeError(f"expected datetime, got {type(row[0]).__name__}")
+    return row[0]
+
+
+def _forecast_confidence(
+    review_count: int,
+    last_completed_sync_at: datetime | None,
+    *,
+    as_of: date,
+) -> tuple[str, tuple[str, ...]]:
+    reasons: list[str] = []
+    if review_count > 0:
+        reasons.append("review_burden")
+    if last_completed_sync_at is None:
+        reasons.append("no_completed_sync")
+    elif _sync_age_days(last_completed_sync_at, as_of=as_of) > STALE_SYNC_AFTER_DAYS:
+        reasons.append("sync_stale")
+    if reasons:
+        return "low", tuple(reasons)
+    return "medium", ()
+
+
+def _sync_age_days(finished_at: datetime, *, as_of: date) -> int:
+    if finished_at.tzinfo is None:
+        sync_date = finished_at.date()
+    else:
+        sync_date = finished_at.astimezone(UTC).date()
+    return max(0, (as_of - sync_date).days)
 
 
 def _confirmed_recurring_upcoming(connection: Connection[tuple[object, ...]], as_of: date) -> Decimal:

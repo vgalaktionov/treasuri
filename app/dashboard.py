@@ -24,6 +24,7 @@ class DashboardSummary:
     projected_savings: str
     target_savings: str
     confidence: str
+    confidence_note: str
     pace: str
     review_count: int
     last_sync: str
@@ -38,6 +39,7 @@ class DashboardSummary:
             "projected_savings": self.projected_savings,
             "target_savings": self.target_savings,
             "confidence": self.confidence,
+            "confidence_note": self.confidence_note,
             "pace": self.pace,
             "review_count": self.review_count,
             "last_sync": self.last_sync,
@@ -53,6 +55,7 @@ FALLBACK_DASHBOARD_SUMMARY = DashboardSummary(
     projected_savings="EUR 1,087",
     target_savings="EUR 1,000",
     confidence="Medium",
+    confidence_note="Sample confidence",
     pace="EUR 142 ahead of normal pace",
     review_count=7,
     last_sync="Sample data only",
@@ -112,6 +115,7 @@ def load_dashboard_summary(database_url: str) -> DashboardSummary:
         ).fetchone()
 
     review_count = int(review_count_row[0]) if review_count_row is not None else 0
+    explanation = _read_json_object(forecast[13])
     return DashboardSummary(
         month=_format_year_month(str(forecast[0])),
         safe_to_spend=_format_money(forecast[1]),
@@ -119,7 +123,8 @@ def load_dashboard_summary(database_url: str) -> DashboardSummary:
         projected_savings=_format_money(forecast[3]),
         target_savings=_format_money(forecast[4]),
         confidence=str(forecast[5]).title(),
-        pace=_format_pace(_read_json_object(forecast[13])),
+        confidence_note=_format_confidence_note(explanation, review_count),
+        pace=_format_pace(explanation),
         review_count=review_count,
         last_sync=_format_sync(last_sync_row),
         breakdown=(
@@ -131,7 +136,7 @@ def load_dashboard_summary(database_url: str) -> DashboardSummary:
             DashboardMetric("Predicted variable", _format_money(forecast[11])),
             DashboardMetric("Safety buffer", _format_money(forecast[12])),
         ),
-        formula=str(_read_json_object(forecast[13]).get("formula", FALLBACK_DASHBOARD_SUMMARY.formula)),
+        formula=str(explanation.get("formula", FALLBACK_DASHBOARD_SUMMARY.formula)),
     )
 
 
@@ -185,3 +190,18 @@ def _format_pace(explanation: dict[str, Any]) -> str:
     if pace_projection is None:
         return FALLBACK_DASHBOARD_SUMMARY.pace
     return f"Variable pace projects {_format_money(pace_projection)} this month"
+
+
+def _format_confidence_note(explanation: dict[str, Any], review_count: int) -> str:
+    raw_reasons = explanation.get("confidence_reasons", ())
+    reasons = raw_reasons if isinstance(raw_reasons, list) else ()
+    labels: list[str] = []
+    if "review_burden" in reasons or review_count > 0:
+        labels.append("Review needed")
+    if "sync_stale" in reasons:
+        labels.append("Sync is stale")
+    if "no_completed_sync" in reasons:
+        labels.append("No completed sync")
+    if labels:
+        return "; ".join(labels)
+    return "Recent sync and no review blockers"
