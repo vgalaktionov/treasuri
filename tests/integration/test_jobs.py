@@ -10,10 +10,12 @@ from testcontainers.postgres import PostgresContainer
 from app.config import AppConfig
 from app.jobs.enqueue import (
     BACKFILL_RULE_ENTRYPOINT,
+    CLASSIFY_TRANSACTIONS_ENTRYPOINT,
     GENERATE_XLSX_EXPORT_ENTRYPOINT,
     REQUIRED_JOB_ENTRYPOINTS,
     SYNC_ABN_TRANSACTIONS_ENTRYPOINT,
     SYNC_NOW_ENTRYPOINT,
+    UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
     enqueue_backfill_rule,
     enqueue_generate_xlsx_export,
     enqueue_sync_abn_transactions,
@@ -83,7 +85,9 @@ def test_enqueue_payload_jobs_write_json_payloads(migrated_postgres_url: str) ->
     ]
 
 
-def test_worker_drains_sync_abn_transaction_chain(migrated_postgres_url: str) -> None:
+def test_worker_drains_sync_abn_transaction_chain(
+    migrated_postgres_url: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     job_id = enqueue_sync_abn_transactions(migrated_postgres_url)
     config = AppConfig(
         app_env="test",
@@ -95,6 +99,7 @@ def test_worker_drains_sync_abn_transaction_chain(migrated_postgres_url: str) ->
     )
 
     run_until_drained(config)
+    logs = _json_logs(capsys.readouterr().out)
 
     with psycopg.connect(migrated_postgres_url) as connection:
         job_status = connection.execute("SELECT status FROM pgqueuer WHERE id = %s", (job_id,)).fetchone()
@@ -124,9 +129,20 @@ def test_worker_drains_sync_abn_transaction_chain(migrated_postgres_url: str) ->
     ]
     assert raw_count == (3,)
     assert forecast_count == (1,)
+    assert _find_log(logs, "job_started", SYNC_ABN_TRANSACTIONS_ENTRYPOINT) is not None
+    sync_log = _find_log(logs, "job_completed", SYNC_ABN_TRANSACTIONS_ENTRYPOINT)
+    assert sync_log is not None
+    assert sync_log["new_transaction_count"] == 3
+    classify_log = _find_log(logs, "job_completed", CLASSIFY_TRANSACTIONS_ENTRYPOINT)
+    assert classify_log is not None
+    assert classify_log["classified_count"] == 3
+    assert isinstance(classify_log["method_counts"], dict)
+    forecast_log = _find_log(logs, "forecast_recalculated", UPDATE_MONTHLY_FORECAST_ENTRYPOINT)
+    assert forecast_log is not None
+    assert forecast_log["year_month"] == "2026-05"
 
 
-def test_worker_drains_generate_xlsx_export_job(migrated_postgres_url: str) -> None:
+def test_worker_drains_generate_xlsx_export_job(migrated_postgres_url: str, capsys: pytest.CaptureFixture[str]) -> None:
     load_sample_data(migrated_postgres_url)
     job_id = enqueue_generate_xlsx_export(migrated_postgres_url, created_by="dev-user@example.test")
     config = AppConfig(
@@ -139,6 +155,7 @@ def test_worker_drains_generate_xlsx_export_job(migrated_postgres_url: str) -> N
     )
 
     run_until_drained(config)
+    logs = _json_logs(capsys.readouterr().out)
 
     with psycopg.connect(migrated_postgres_url) as connection:
         job_status = connection.execute("SELECT status FROM pgqueuer WHERE id = %s", (job_id,)).fetchone()
@@ -149,6 +166,7 @@ def test_worker_drains_generate_xlsx_export_job(migrated_postgres_url: str) -> N
         row = connection.execute(
             """
             SELECT
+                export_runs.id,
                 export_runs.status,
                 export_runs.created_by,
                 export_files.filename,
@@ -162,6 +180,24 @@ def test_worker_drains_generate_xlsx_export_job(migrated_postgres_url: str) -> N
     assert job_status is None
     assert job_log_status == ("successful",)
     assert row is not None
-    assert row[:3] == ("completed", "dev-user@example.test", "budget-averages-2026-05.xlsx")
-    assert row[3] > 0
-    assert row[4] is True
+    assert row[1:4] == ("completed", "dev-user@example.test", "budget-averages-2026-05.xlsx")
+    assert row[4] > 0
+    assert row[5] is True
+    assert _find_log(logs, "job_started", GENERATE_XLSX_EXPORT_ENTRYPOINT) is not None
+    completed_log = _find_log(logs, "job_completed", GENERATE_XLSX_EXPORT_ENTRYPOINT)
+    assert completed_log is not None
+    assert completed_log["export_run_id"] == row[0]
+    export_log = _find_log(logs, "export_generated", GENERATE_XLSX_EXPORT_ENTRYPOINT)
+    assert export_log is not None
+    assert export_log["export_run_id"] == completed_log["export_run_id"]
+
+
+def _json_logs(output: str) -> list[dict[str, object]]:
+    return [json.loads(line) for line in output.splitlines() if line.strip()]
+
+
+def _find_log(logs: list[dict[str, object]], event: str, entrypoint: str) -> dict[str, object] | None:
+    for log in logs:
+        if log.get("event") == event and log.get("entrypoint") == entrypoint:
+            return log
+    return None

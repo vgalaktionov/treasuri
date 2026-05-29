@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import cast
@@ -31,6 +32,7 @@ from app.settings import load_classification_settings
 class ClassifyResult:
     classified_count: int
     review_count: int
+    method_counts: dict[str, int]
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,7 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
             llm_classifier = _create_llm_classifier(config, enabled=runtime_settings.llm_enabled)
             classified_count = 0
             review_count = 0
+            method_counts: Counter[str] = Counter()
             for transaction_id, transaction in _load_transactions(connection):
                 result = classify_transaction(
                     transaction,
@@ -69,10 +72,15 @@ def classify_transactions(database_url: str, config: AppConfig | None = None) ->
                     )
                 _update_enriched_transaction(connection, transaction_id, result)
                 classified_count += 1
+                method_counts[result.method.value] += 1
                 if result.needs_review:
                     review_count += 1
 
-    return ClassifyResult(classified_count=classified_count, review_count=review_count)
+    return ClassifyResult(
+        classified_count=classified_count,
+        review_count=review_count,
+        method_counts=dict(method_counts),
+    )
 
 
 def _load_runtime_settings(database_url: str, config: AppConfig | None) -> _ClassificationRuntimeSettings:

@@ -40,82 +40,158 @@ type JobPayload = dict[str, object]
 def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
     @pgq.entrypoint(SYNC_NOW_ENTRYPOINT)
     async def sync_now(job: Job) -> None:
-        _ = job
-        result = await asyncio.to_thread(run_sync_now, config)
-        print(result.as_summary(), flush=True)
+        _log_job_started(SYNC_NOW_ENTRYPOINT, job)
+        try:
+            result = await asyncio.to_thread(run_sync_now, config)
+        except Exception as exc:
+            _log_job_failed(SYNC_NOW_ENTRYPOINT, job, exc)
+            raise
+        _log_job_completed(
+            SYNC_NOW_ENTRYPOINT,
+            job,
+            provider=result.provider,
+            new_transaction_count=result.new_transaction_count,
+            updated_transaction_count=result.updated_transaction_count,
+            normalized_count=result.normalized_count,
+            review_count=result.review_count,
+            recurring_detected_count=result.recurring_detected_count,
+            forecast_year_month=result.forecast_year_month,
+        )
 
     @pgq.entrypoint(SYNC_ABN_TRANSACTIONS_ENTRYPOINT)
     async def sync_abn_transactions(job: Job) -> None:
-        _ = job
-        sync_result = await asyncio.to_thread(_sync_bank_transactions, config)
+        _log_job_started(SYNC_ABN_TRANSACTIONS_ENTRYPOINT, job)
+        try:
+            sync_result = await asyncio.to_thread(_sync_bank_transactions, config)
+        except Exception as exc:
+            _log_job_failed(SYNC_ABN_TRANSACTIONS_ENTRYPOINT, job, exc)
+            raise
         if sync_result.new_transaction_count > 0 or sync_result.updated_transaction_count > 0:
             await enqueue_job_async(config.database_url, NORMALIZE_TRANSACTIONS_ENTRYPOINT)
-        print(
-            f"{SYNC_ABN_TRANSACTIONS_ENTRYPOINT}: {sync_result.new_transaction_count} new, "
-            f"{sync_result.updated_transaction_count} updated",
-            flush=True,
+        _log_job_completed(
+            SYNC_ABN_TRANSACTIONS_ENTRYPOINT,
+            job,
+            provider=sync_result.provider,
+            new_transaction_count=sync_result.new_transaction_count,
+            updated_transaction_count=sync_result.updated_transaction_count,
         )
 
     @pgq.entrypoint(NORMALIZE_TRANSACTIONS_ENTRYPOINT)
     async def normalize_transactions(job: Job) -> None:
-        _ = job
-        normalize_result = await asyncio.to_thread(normalize_raw_transactions, config.database_url)
+        _log_job_started(NORMALIZE_TRANSACTIONS_ENTRYPOINT, job)
+        try:
+            normalize_result = await asyncio.to_thread(normalize_raw_transactions, config.database_url)
+        except Exception as exc:
+            _log_job_failed(NORMALIZE_TRANSACTIONS_ENTRYPOINT, job, exc)
+            raise
         if normalize_result.created_count > 0:
             await enqueue_job_async(config.database_url, CLASSIFY_TRANSACTIONS_ENTRYPOINT)
-        print(f"{NORMALIZE_TRANSACTIONS_ENTRYPOINT}: {normalize_result.created_count} created", flush=True)
+        _log_job_completed(NORMALIZE_TRANSACTIONS_ENTRYPOINT, job, created_count=normalize_result.created_count)
 
     @pgq.entrypoint(CLASSIFY_TRANSACTIONS_ENTRYPOINT)
     async def classify_transactions_job(job: Job) -> None:
-        _ = job
-        classify_result = await asyncio.to_thread(classify_transactions, config.database_url, config)
+        _log_job_started(CLASSIFY_TRANSACTIONS_ENTRYPOINT, job)
+        try:
+            classify_result = await asyncio.to_thread(classify_transactions, config.database_url, config)
+        except Exception as exc:
+            _log_job_failed(CLASSIFY_TRANSACTIONS_ENTRYPOINT, job, exc)
+            raise
         await enqueue_job_async(config.database_url, DETECT_RECURRING_ENTRYPOINT)
-        print(
-            f"{CLASSIFY_TRANSACTIONS_ENTRYPOINT}: {classify_result.classified_count} classified, "
-            f"{classify_result.review_count} review",
-            flush=True,
+        _log_job_completed(
+            CLASSIFY_TRANSACTIONS_ENTRYPOINT,
+            job,
+            classified_count=classify_result.classified_count,
+            review_count=classify_result.review_count,
+            method_counts=classify_result.method_counts,
         )
 
     @pgq.entrypoint(DETECT_RECURRING_ENTRYPOINT)
     async def detect_recurring_job(job: Job) -> None:
-        _ = job
-        recurring_result = await asyncio.to_thread(detect_recurring, config.database_url)
+        _log_job_started(DETECT_RECURRING_ENTRYPOINT, job)
+        try:
+            recurring_result = await asyncio.to_thread(detect_recurring, config.database_url)
+        except Exception as exc:
+            _log_job_failed(DETECT_RECURRING_ENTRYPOINT, job, exc)
+            raise
         await enqueue_job_async(
             config.database_url,
             UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
             dedupe_key=UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
         )
-        print(f"{DETECT_RECURRING_ENTRYPOINT}: {recurring_result.detected_count} detected", flush=True)
+        _log_job_completed(
+            DETECT_RECURRING_ENTRYPOINT,
+            job,
+            detected_count=recurring_result.detected_count,
+            linked_transaction_count=recurring_result.linked_transaction_count,
+        )
 
     @pgq.entrypoint(UPDATE_MONTHLY_FORECAST_ENTRYPOINT)
     async def update_monthly_forecast_job(job: Job) -> None:
-        _ = job
-        forecast_result = await asyncio.to_thread(update_monthly_forecast, config.database_url)
-        print(f"{UPDATE_MONTHLY_FORECAST_ENTRYPOINT}: {forecast_result.year_month}", flush=True)
+        _log_job_started(UPDATE_MONTHLY_FORECAST_ENTRYPOINT, job)
+        try:
+            forecast_result = await asyncio.to_thread(update_monthly_forecast, config.database_url)
+        except Exception as exc:
+            _log_job_failed(UPDATE_MONTHLY_FORECAST_ENTRYPOINT, job, exc)
+            raise
+        _log_job_completed(
+            UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+            job,
+            year_month=forecast_result.year_month,
+            safe_to_spend=str(forecast_result.safe_to_spend),
+            safe_per_day=str(forecast_result.safe_per_day),
+            confidence=forecast_result.confidence,
+            review_count=forecast_result.review_count,
+        )
+        _log_event(
+            "forecast_recalculated",
+            entrypoint=UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
+            job_id=str(job.id),
+            year_month=forecast_result.year_month,
+        )
 
     @pgq.entrypoint(GENERATE_XLSX_EXPORT_ENTRYPOINT)
     async def generate_xlsx_export_job(job: Job) -> None:
-        created_by = _optional_str_payload(job, "created_by")
-        run_id = _optional_int_payload(job, "run_id")
-        run_id = await asyncio.to_thread(
-            generate_budget_export,
-            config.database_url,
-            created_by=created_by,
-            run_id=run_id,
+        _log_job_started(GENERATE_XLSX_EXPORT_ENTRYPOINT, job)
+        try:
+            created_by = _optional_str_payload(job, "created_by")
+            run_id = _optional_int_payload(job, "run_id")
+            run_id = await asyncio.to_thread(
+                generate_budget_export,
+                config.database_url,
+                created_by=created_by,
+                run_id=run_id,
+            )
+        except Exception as exc:
+            _log_job_failed(GENERATE_XLSX_EXPORT_ENTRYPOINT, job, exc)
+            raise
+        _log_job_completed(GENERATE_XLSX_EXPORT_ENTRYPOINT, job, export_run_id=run_id)
+        _log_event(
+            "export_generated",
+            entrypoint=GENERATE_XLSX_EXPORT_ENTRYPOINT,
+            job_id=str(job.id),
+            export_run_id=run_id,
         )
-        print(f"{GENERATE_XLSX_EXPORT_ENTRYPOINT}: run {run_id}", flush=True)
 
     @pgq.entrypoint(BACKFILL_RULE_ENTRYPOINT)
     async def backfill_rule_job(job: Job) -> None:
-        rule_id = _required_int_payload(job, "rule_id")
-        result = await asyncio.to_thread(backfill_rule_for_job, config.database_url, rule_id)
+        _log_job_started(BACKFILL_RULE_ENTRYPOINT, job)
+        try:
+            rule_id = _required_int_payload(job, "rule_id")
+            result = await asyncio.to_thread(backfill_rule_for_job, config.database_url, rule_id)
+        except Exception as exc:
+            _log_job_failed(BACKFILL_RULE_ENTRYPOINT, job, exc)
+            raise
         await enqueue_job_async(
             config.database_url,
             UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
             dedupe_key=UPDATE_MONTHLY_FORECAST_ENTRYPOINT,
         )
-        print(
-            f"{BACKFILL_RULE_ENTRYPOINT}: {result.updated_count} updated, {result.skipped_manual_count} skipped",
-            flush=True,
+        _log_job_completed(
+            BACKFILL_RULE_ENTRYPOINT,
+            job,
+            rule_id=rule_id,
+            updated_count=result.updated_count,
+            skipped_manual_count=result.skipped_manual_count,
         )
 
 
@@ -156,6 +232,31 @@ def _optional_int_payload(job: Job, key: str) -> int | None:
     if not isinstance(value, int):
         raise ValueError(f"job payload {key} must be an integer")
     return value
+
+
+def _log_job_started(entrypoint: str, job: Job) -> None:
+    _log_event("job_started", entrypoint=entrypoint, job_id=str(job.id), attempts=job.attempts)
+
+
+def _log_job_completed(entrypoint: str, job: Job, **fields: object) -> None:
+    _log_event("job_completed", entrypoint=entrypoint, job_id=str(job.id), **fields)
+
+
+def _log_job_failed(entrypoint: str, job: Job, error: Exception) -> None:
+    _log_event(
+        "job_failed",
+        entrypoint=entrypoint,
+        job_id=str(job.id),
+        error=_safe_log_error(error),
+    )
+
+
+def _log_event(event: str, **fields: object) -> None:
+    print(json.dumps({"event": event, **fields}, sort_keys=True), flush=True)
+
+
+def _safe_log_error(error: Exception) -> str:
+    return str(error).splitlines()[0][:500] or type(error).__name__
 
 
 def _install_signal_handlers(pgq: PgQueuer) -> None:

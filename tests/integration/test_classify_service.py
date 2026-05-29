@@ -100,6 +100,7 @@ def test_classify_transactions_applies_rules_before_aliases(normalized_postgres_
 
     assert result.classified_count == 3
     assert result.review_count == 1
+    assert result.method_counts == {"merchant_alias": 1, "rule": 1, "uncategorized": 1}
     assert rows == [
         ("Groceries sample", "Groceries", "Sample Supermarket", False, "merchant_alias"),
         ("Monthly salary sample", "Income", None, False, "rule"),
