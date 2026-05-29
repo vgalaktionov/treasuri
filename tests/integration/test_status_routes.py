@@ -48,6 +48,14 @@ def test_status_route_shows_runtime_state_without_secrets() -> None:
     assert "Last sync" in body
     assert "completed" in body
     assert "fake, 7 new, 0 updated" in body
+    assert "Known transactions" in body
+    assert "7 total" in body
+    assert "Classified transactions" in body
+    assert "6" in body
+    assert "Needs review" in body
+    assert "1" in body
+    assert "Classification methods" in body
+    assert "sample 6, uncategorized 1" in body
     assert "Last forecast update" in body
     assert "safe to spend 558.00" in body
     assert "Queued jobs" in body

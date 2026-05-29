@@ -118,10 +118,28 @@ def _load_database_sections(database_url: str) -> list[StatusSection]:
             LIMIT 1
             """
         ).fetchone()
+        transaction_summary = connection.execute(
+            """
+            SELECT
+                count(*)::int,
+                count(*) FILTER (WHERE needs_review = false)::int,
+                count(*) FILTER (WHERE needs_review = true)::int
+            FROM enriched_transactions
+            """
+        ).fetchone()
+        classification_counts = connection.execute(
+            """
+            SELECT COALESCE(NULLIF(classification_method, ''), 'none'), count(*)::int
+            FROM enriched_transactions
+            GROUP BY 1
+            ORDER BY 1
+            """
+        ).fetchall()
 
     return [
         StatusSection("Database", [StatusRow("Migration version", _optional_text(migration_version, 0, "none"))]),
         StatusSection("Sync", [_sync_row(sync_run)]),
+        StatusSection("Transactions", _transaction_rows(transaction_summary, classification_counts)),
         StatusSection("Forecast", [_forecast_row(forecast)]),
         StatusSection("Worker", [_job_count_row(job_counts), _job_log_row(job_log)]),
         StatusSection("Exports", [_export_row(export_run)]),
@@ -142,6 +160,29 @@ def _sync_row(row: tuple[object, ...] | None) -> StatusRow:
     if error:
         detail = f"{detail}, error: {error}"
     return StatusRow("Last sync", status, detail)
+
+
+def _transaction_rows(summary: tuple[object, ...] | None, method_rows: list[tuple[object, ...]]) -> list[StatusRow]:
+    if summary is None:
+        return [
+            StatusRow("Known transactions", "0 total"),
+            StatusRow("Classified transactions", "0"),
+            StatusRow("Needs review", "0"),
+            StatusRow("Classification methods", "none"),
+        ]
+
+    return [
+        StatusRow("Known transactions", f"{_read_int(summary[0])} total"),
+        StatusRow("Classified transactions", str(_read_int(summary[1]))),
+        StatusRow("Needs review", str(_read_int(summary[2]))),
+        StatusRow("Classification methods", _format_classification_counts(method_rows)),
+    ]
+
+
+def _format_classification_counts(rows: list[tuple[object, ...]]) -> str:
+    if not rows:
+        return "none"
+    return ", ".join(f"{row[0]} {_read_int(row[1])}" for row in rows)
 
 
 def _job_count_row(rows: list[tuple[object, ...]]) -> StatusRow:
