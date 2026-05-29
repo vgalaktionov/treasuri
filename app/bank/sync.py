@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 import psycopg
 from psycopg import Connection
@@ -17,22 +18,40 @@ class SyncResult:
     provider: str
     new_transaction_count: int
     updated_transaction_count: int
+    skipped_old_transaction_count: int
 
 
-def sync_bank_transactions(database_url: str, adapter: BankAdapter, *, account_iban: str) -> SyncResult:
+def sync_bank_transactions(
+    database_url: str,
+    adapter: BankAdapter,
+    *,
+    account_iban: str,
+    lookback_days: int | None = None,
+    as_of: date | None = None,
+) -> SyncResult:
     try:
         with psycopg.connect(database_url) as connection:
             with connection.transaction():
                 account_id = _upsert_account(connection, adapter.provider, account_iban)
                 new_count = 0
                 updated_count = 0
-                for mutation in adapter.fetch_recent_mutations():
+                mutations = adapter.fetch_recent_mutations()
+                mutations_to_insert = _filter_by_lookback(mutations, lookback_days=lookback_days, as_of=as_of)
+                skipped_old_count = len(mutations) - len(mutations_to_insert)
+                for mutation in mutations_to_insert:
                     inserted = _upsert_raw_transaction(connection, account_id, adapter.provider, mutation)
                     if inserted:
                         new_count += 1
                     else:
                         updated_count += 1
-                _insert_completed_sync_run(connection, adapter.provider, new_count, updated_count)
+                _insert_completed_sync_run(
+                    connection,
+                    adapter.provider,
+                    new_count,
+                    updated_count,
+                    lookback_days=lookback_days,
+                    skipped_old_transaction_count=skipped_old_count,
+                )
     except Exception as exc:
         try:
             _insert_failed_sync_run(database_url, adapter.provider, exc)
@@ -44,7 +63,22 @@ def sync_bank_transactions(database_url: str, adapter: BankAdapter, *, account_i
         provider=adapter.provider,
         new_transaction_count=new_count,
         updated_transaction_count=updated_count,
+        skipped_old_transaction_count=skipped_old_count,
     )
+
+
+def _filter_by_lookback(
+    mutations: list[BankMutation],
+    *,
+    lookback_days: int | None,
+    as_of: date | None,
+) -> list[BankMutation]:
+    if lookback_days is None:
+        return mutations
+    if lookback_days < 1:
+        raise ValueError("lookback_days must be at least 1")
+    cutoff = (as_of or date.today()) - timedelta(days=lookback_days)
+    return [mutation for mutation in mutations if mutation.booking_date >= cutoff]
 
 
 def _upsert_account(connection: Connection[tuple[object, ...]], provider: str, iban: str) -> int:
@@ -137,6 +171,9 @@ def _insert_completed_sync_run(
     provider: str,
     new_transaction_count: int,
     updated_transaction_count: int,
+    *,
+    lookback_days: int | None,
+    skipped_old_transaction_count: int,
 ) -> None:
     connection.execute(
         """
@@ -154,7 +191,14 @@ def _insert_completed_sync_run(
             provider,
             new_transaction_count,
             updated_transaction_count,
-            json.dumps({"source": "bank-sync"}, sort_keys=True),
+            json.dumps(
+                {
+                    "source": "bank-sync",
+                    "lookback_days": lookback_days,
+                    "skipped_old_transaction_count": skipped_old_transaction_count,
+                },
+                sort_keys=True,
+            ),
         ),
     )
 

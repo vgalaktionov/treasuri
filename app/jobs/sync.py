@@ -11,6 +11,7 @@ from app.config import AppConfig
 from app.forecast.service import update_monthly_forecast
 from app.normalize import normalize_raw_transactions
 from app.recurring import detect_recurring
+from app.settings import load_forecast_settings
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,7 @@ class SyncNowResult:
     provider: str
     new_transaction_count: int
     updated_transaction_count: int
+    skipped_old_transaction_count: int
     normalized_count: int
     review_count: int
     recurring_detected_count: int
@@ -27,6 +29,7 @@ class SyncNowResult:
         return (
             f"Synced {self.provider}: {self.new_transaction_count} new, "
             f"{self.updated_transaction_count} updated, "
+            f"{self.skipped_old_transaction_count} outside lookback, "
             f"{self.normalized_count} normalized, "
             f"{self.review_count} still need review, "
             f"{self.recurring_detected_count} recurring detected, "
@@ -36,7 +39,13 @@ class SyncNowResult:
 
 def run_sync_now(config: AppConfig) -> SyncNowResult:
     adapter, account_iban = build_bank_adapter(config)
-    sync_result = sync_bank_transactions(config.database_url, adapter, account_iban=account_iban)
+    sync_settings = load_forecast_settings(config.database_url)
+    sync_result = sync_bank_transactions(
+        config.database_url,
+        adapter,
+        account_iban=account_iban,
+        lookback_days=sync_settings.sync_lookback_days,
+    )
     normalize_result = normalize_raw_transactions(config.database_url)
     classify_result = classify_transactions(config.database_url, config)
     recurring_result = detect_recurring(config.database_url)
@@ -45,6 +54,7 @@ def run_sync_now(config: AppConfig) -> SyncNowResult:
         provider=sync_result.provider,
         new_transaction_count=sync_result.new_transaction_count,
         updated_transaction_count=sync_result.updated_transaction_count,
+        skipped_old_transaction_count=sync_result.skipped_old_transaction_count,
         normalized_count=normalize_result.created_count,
         review_count=classify_result.review_count,
         recurring_detected_count=recurring_result.detected_count,

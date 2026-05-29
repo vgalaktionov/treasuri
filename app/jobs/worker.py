@@ -33,6 +33,7 @@ from app.jobs.sync import run_sync_now
 from app.normalize import normalize_raw_transactions
 from app.recurring import detect_recurring
 from app.rules import backfill_rule as backfill_rule_for_job
+from app.settings import load_forecast_settings
 
 type JobPayload = dict[str, object]
 
@@ -52,6 +53,7 @@ def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
             provider=result.provider,
             new_transaction_count=result.new_transaction_count,
             updated_transaction_count=result.updated_transaction_count,
+            skipped_old_transaction_count=result.skipped_old_transaction_count,
             normalized_count=result.normalized_count,
             review_count=result.review_count,
             recurring_detected_count=result.recurring_detected_count,
@@ -74,6 +76,7 @@ def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
             provider=sync_result.provider,
             new_transaction_count=sync_result.new_transaction_count,
             updated_transaction_count=sync_result.updated_transaction_count,
+            skipped_old_transaction_count=sync_result.skipped_old_transaction_count,
         )
 
     @pgq.entrypoint(NORMALIZE_TRANSACTIONS_ENTRYPOINT)
@@ -197,7 +200,13 @@ def register_entrypoints(pgq: PgQueuer, config: AppConfig) -> None:
 
 def _sync_bank_transactions(config: AppConfig) -> SyncResult:
     adapter, account_iban = build_bank_adapter(config)
-    return sync_bank_transactions(config.database_url, adapter, account_iban=account_iban)
+    sync_settings = load_forecast_settings(config.database_url)
+    return sync_bank_transactions(
+        config.database_url,
+        adapter,
+        account_iban=account_iban,
+        lookback_days=sync_settings.sync_lookback_days,
+    )
 
 
 def _job_payload(job: Job) -> JobPayload:

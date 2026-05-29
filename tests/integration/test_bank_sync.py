@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import date
 from decimal import Decimal
 
 import psycopg
@@ -105,6 +106,42 @@ def test_abn_adapter_imports_raw_transactions_idempotently(migrated_postgres_url
     )
 
 
+def test_bank_sync_applies_configured_lookback_window(migrated_postgres_url: str) -> None:
+    result = sync_bank_transactions(
+        migrated_postgres_url,
+        LookbackBankAdapter(),
+        account_iban="NL00LOOKBACK123456789",
+        lookback_days=7,
+        as_of=date(2026, 5, 29),
+    )
+
+    with psycopg.connect(migrated_postgres_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT provider_transaction_id, booking_date
+            FROM raw_transactions
+            WHERE provider = 'lookback'
+            ORDER BY provider_transaction_id
+            """
+        ).fetchall()
+        sync_row = connection.execute(
+            """
+            SELECT new_transaction_count, updated_transaction_count, metadata_json
+            FROM sync_runs
+            WHERE provider = 'lookback'
+            """
+        ).fetchone()
+
+    assert result.new_transaction_count == 1
+    assert result.updated_transaction_count == 0
+    assert result.skipped_old_transaction_count == 1
+    assert rows == [("recent-lookback", date(2026, 5, 26))]
+    assert sync_row is not None
+    assert sync_row[0:2] == (1, 0)
+    assert sync_row[2]["lookback_days"] == 7
+    assert sync_row[2]["skipped_old_transaction_count"] == 1
+
+
 def test_bank_sync_records_failed_sync_run(migrated_postgres_url: str) -> None:
     with pytest.raises(RuntimeError, match="sample adapter failure"):
         sync_bank_transactions(
@@ -164,3 +201,33 @@ class FailingBankAdapter:
 
     def fetch_recent_mutations(self) -> list[BankMutation]:
         raise RuntimeError("sample adapter failure")
+
+
+class LookbackBankAdapter:
+    provider = "lookback"
+
+    def fetch_recent_mutations(self) -> list[BankMutation]:
+        return [
+            BankMutation(
+                provider_transaction_id="old-lookback",
+                booking_date=date(2026, 5, 1),
+                value_date=date(2026, 5, 1),
+                amount=Decimal("-10.00"),
+                currency="EUR",
+                counterparty_name="Old Sample",
+                counterparty_iban=None,
+                description="Old sample",
+                raw_payload={"source": "lookback"},
+            ),
+            BankMutation(
+                provider_transaction_id="recent-lookback",
+                booking_date=date(2026, 5, 26),
+                value_date=date(2026, 5, 26),
+                amount=Decimal("-20.00"),
+                currency="EUR",
+                counterparty_name="Recent Sample",
+                counterparty_iban=None,
+                description="Recent sample",
+                raw_payload={"source": "lookback"},
+            ),
+        ]
