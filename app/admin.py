@@ -10,7 +10,7 @@ import psycopg
 from app.categories import DEFAULT_CATEGORIES
 from app.config import AppConfig, load_config
 from app.forecast.service import update_monthly_forecast
-from app.jobs.enqueue import enqueue_sync_now
+from app.jobs.enqueue import enqueue_sync_abn_transactions
 from app.jobs.sync import run_sync_now
 from app.recurring import detect_recurring
 from app.sample_data import load_sample_data
@@ -97,8 +97,8 @@ def main() -> None:
         return
 
     if args.command == "enqueue-sync":
-        job_id = enqueue_sync_now(database_url)
-        print(f"Enqueued sync-now job {job_id}")
+        job_id = enqueue_sync_abn_transactions(database_url)
+        print(f"Enqueued sync_abn_transactions job {job_id}")
         return
 
     sync_now(config)

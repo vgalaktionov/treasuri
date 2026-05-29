@@ -80,6 +80,8 @@ If a Puppeteer assertion fails, the harness writes screenshots and the thrown st
 
 `uv run python -m app.admin load-sample-data` loads deterministic fake financial data into Postgres. It is safe to rerun and is intended for local UI development and automated tests only.
 
+`uv run python -m app.admin enqueue-sync` enqueues the `sync_abn_transactions` worker chain. `sync-now` remains a foreground one-shot command for local debugging.
+
 The Docker image is intentionally one artifact. Override the Compose command to run the same image as `python -m app.web`, `python -m app.worker`, `python -m app.migrate`, or `python -m app.admin <command>`.
 
 Bank sync defaults to the deterministic fake provider. To use ABN AMRO, set `BANK_PROVIDER=abn`, `ABN_ACCOUNT_IBAN`, `ABN_CARD_NUMBER`, and `ABN_SOFT_TOKEN`; the app keeps `abna` usage inside the bank adapter boundary.
