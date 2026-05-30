@@ -314,6 +314,72 @@ uiTest("settings expose forecast and llm controls on mobile", async () => {
   assert.equal(bottomMetrics.buttonBottom < bottomMetrics.tabbarTop, true);
 });
 
+uiTest("dark mode keeps mobile screens readable", async () => {
+  const paths = ["/", "/transactions", "/settings", "/status"];
+
+  for (const path of paths) {
+    const page = await browser.newPage();
+    await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "dark" }]);
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
+    await page.goto(`${baseUrl}${path}`, { waitUntil: "networkidle0" });
+
+    const metrics = await page.evaluate(() => {
+      function parseRgb(value) {
+        const parts = value.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+        if (parts.length >= 4 && parts[3] === 0) {
+          return [19, 23, 31];
+        }
+        return parts.slice(0, 3);
+      }
+
+      function relativeLuminance(value) {
+        return parseRgb(value)
+          .map((part) => {
+            const channel = part / 255;
+            return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+          })
+          .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+      }
+
+      function contrast(foreground, background) {
+        const first = relativeLuminance(foreground);
+        const second = relativeLuminance(background);
+        return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+      }
+
+      const bodyStyle = getComputedStyle(document.body);
+      const pageBackground =
+        bodyStyle.backgroundColor === "rgba(0, 0, 0, 0)"
+          ? getComputedStyle(document.documentElement).backgroundColor
+          : bodyStyle.backgroundColor;
+      const mutedElement = document.querySelector(".muted, .transaction-main p, .status-list dt");
+      const mutedStyle = mutedElement ? getComputedStyle(mutedElement) : null;
+      const currentTab = document.querySelector(".mobile-tabbar a[aria-current='page']");
+      const currentTabStyle = currentTab ? getComputedStyle(currentTab) : null;
+      const softSurface = document.querySelector(".money-answer, .transaction-meta span, .mobile-tabbar a[aria-current='page']");
+      const softSurfaceStyle = softSurface ? getComputedStyle(softSurface) : null;
+
+      return {
+        bodyContrast: contrast(bodyStyle.color, pageBackground),
+        mutedContrast: mutedStyle ? contrast(mutedStyle.color, pageBackground) : 21,
+        currentTabContrast: currentTabStyle ? contrast(currentTabStyle.color, currentTabStyle.backgroundColor) : 21,
+        softSurfaceBackground: softSurfaceStyle?.backgroundColor ?? "",
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+
+    assert.equal(metrics.bodyContrast >= 7, true, `${path} body contrast is ${metrics.bodyContrast}`);
+    assert.equal(metrics.mutedContrast >= 4.5, true, `${path} muted contrast is ${metrics.mutedContrast}`);
+    assert.equal(
+      metrics.currentTabContrast >= 4.5,
+      true,
+      `${path} active tab contrast is ${metrics.currentTabContrast}`,
+    );
+    assert.notEqual(metrics.softSurfaceBackground, "rgb(238, 247, 244)", `${path} uses light soft surface`);
+    assert.equal(metrics.overflow <= 1, true, `${path} dark mode overflows horizontally by ${metrics.overflow}px`);
+  }
+});
+
 uiTest("status page summarizes setup on mobile without exposing secrets", async () => {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });

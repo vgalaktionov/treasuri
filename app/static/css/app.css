@@ -1,12 +1,38 @@
 :root {
+  color-scheme: light dark;
   --treasuri-ink: #17201c;
   --treasuri-muted: #63706b;
   --treasuri-accent: #0f766e;
   --treasuri-soft: #eef7f4;
   --treasuri-line: #dce6e2;
+  --treasuri-surface-muted: #f8fafc;
+  --treasuri-chip-bg: #f1f5f9;
+  --treasuri-warning: #9a3412;
+  --treasuri-warning-strong: #b45309;
+  --treasuri-warning-line: #fed7aa;
+  --treasuri-warning-surface: #fff7ed;
+  --treasuri-shadow: rgb(15 23 42 / 8%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --treasuri-ink: #e6f1ec;
+    --treasuri-muted: #b4c5be;
+    --treasuri-accent: #5eead4;
+    --treasuri-soft: #12342f;
+    --treasuri-line: #33443e;
+    --treasuri-surface-muted: #171f27;
+    --treasuri-chip-bg: #18232d;
+    --treasuri-warning: #fdba74;
+    --treasuri-warning-strong: #f59e0b;
+    --treasuri-warning-line: #8a5a18;
+    --treasuri-warning-surface: #2d2112;
+    --treasuri-shadow: rgb(0 0 0 / 35%);
+  }
 }
 
 body {
+  background: var(--pico-background-color);
   color: var(--treasuri-ink);
 }
 
@@ -249,11 +275,11 @@ header nav a {
 }
 
 .month-pace-card.over {
-  border-color: #b45309;
+  border-color: var(--treasuri-warning-strong);
 }
 
 .month-pace-card.watch {
-  border-color: #0f766e;
+  border-color: var(--treasuri-accent);
 }
 
 .month-pace-card h3 {
@@ -293,7 +319,7 @@ header nav a {
 }
 
 .category-card.excluded {
-  background: #f8fafc;
+  background: var(--treasuri-surface-muted);
 }
 
 .category-card-header {
@@ -405,7 +431,7 @@ header nav a {
 }
 
 .transaction-card.needs-review {
-  border-color: #b45309;
+  border-color: var(--treasuri-warning-strong);
 }
 
 .transaction-main {
@@ -442,7 +468,7 @@ header nav a {
 }
 
 .transaction-meta span {
-  background: #f1f5f9;
+  background: var(--treasuri-chip-bg);
   border: 1px solid var(--treasuri-line);
   border-radius: 999px;
   color: var(--treasuri-muted);
@@ -452,9 +478,9 @@ header nav a {
 }
 
 .transaction-meta span.warning {
-  background: #fff7ed;
-  border-color: #fed7aa;
-  color: #9a3412;
+  background: var(--treasuri-warning-surface);
+  border-color: var(--treasuri-warning-line);
+  color: var(--treasuri-warning);
 }
 
 .transaction-actions {
@@ -849,7 +875,7 @@ header nav a {
 
   .transaction-card.needs-review {
     border-block-end-color: var(--treasuri-line);
-    border-inline-start: 3px solid #b45309;
+    border-inline-start: 3px solid var(--treasuri-warning-strong);
     padding-inline-start: 0.75rem;
   }
 
@@ -1118,7 +1144,7 @@ header nav a {
     background: var(--pico-background-color);
     border-block-start: 1px solid var(--treasuri-line);
     bottom: 0;
-    box-shadow: 0 -0.5rem 1.5rem rgb(15 23 42 / 8%);
+    box-shadow: 0 -0.5rem 1.5rem var(--treasuri-shadow);
     display: grid;
     gap: 0;
     grid-template-columns: repeat(5, minmax(0, 1fr));
