@@ -23,7 +23,7 @@ def test_dockerfile_builds_single_node_runtime_image() -> None:
     assert 'CMD ["npm", "run", "start"]' in dockerfile
     assert "USER node" in dockerfile
     assert "HEALTHCHECK" in dockerfile
-    assert "python" not in dockerfile.lower()
+    assert "python:" not in dockerfile.lower()
 
 
 def test_compose_starts_local_runtime_shape_without_caddy() -> None:

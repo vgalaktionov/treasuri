@@ -17,6 +17,7 @@ describe("runMigrations", () => {
         "0002_seed_categories",
         "0003_pgqueuer",
         "0004_classification_runtime",
+        "0005_account_balance_snapshots",
       ]);
       expect(first.skipped).toEqual([]);
       expect(second.applied).toEqual([]);

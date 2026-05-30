@@ -42,10 +42,17 @@ def test_migrations_apply_from_clean_postgres_and_are_idempotent(postgres_url: s
             row[0] for row in connection.execute("SELECT version FROM schema_migrations ORDER BY version")
         ]
 
-    assert first_run == ["0001_initial", "0002_seed_categories", "0003_pgqueuer", "0004_classification_runtime"]
+    assert first_run == [
+        "0001_initial",
+        "0002_seed_categories",
+        "0003_pgqueuer",
+        "0004_classification_runtime",
+        "0005_account_balance_snapshots",
+    ]
     assert second_run == []
     assert {
         "accounts",
+        "account_balance_snapshots",
         "app_settings",
         "categories",
         "categorization_rules",
@@ -71,6 +78,7 @@ def test_migrations_apply_from_clean_postgres_and_are_idempotent(postgres_url: s
         "0002_seed_categories",
         "0003_pgqueuer",
         "0004_classification_runtime",
+        "0005_account_balance_snapshots",
     ]
 
 
