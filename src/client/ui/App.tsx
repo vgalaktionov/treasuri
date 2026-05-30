@@ -3,6 +3,7 @@ import type { MobileNavItem } from "../../shared/navigation.ts";
 import { navGroups, primaryMobileNav } from "../../shared/navigation.ts";
 import { DashboardPage } from "../dashboard/DashboardPage.tsx";
 import { ManagementPage } from "../management/ManagementPage.tsx";
+import { OperationsPage } from "../operations/OperationsPage.tsx";
 import { ReviewPage } from "../review/ReviewPage.tsx";
 
 export function App() {
@@ -83,6 +84,15 @@ function renderPage(currentPath: string) {
   }
   if (currentPath === "/recurring") {
     return <ManagementPage section="recurring" />;
+  }
+  if (currentPath === "/export") {
+    return <OperationsPage section="export" />;
+  }
+  if (currentPath === "/settings") {
+    return <OperationsPage section="settings" />;
+  }
+  if (currentPath === "/status") {
+    return <OperationsPage section="status" />;
   }
   return <DashboardPage />;
 }

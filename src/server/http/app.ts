@@ -8,6 +8,7 @@ import type { AppConfig } from "../config/env.ts";
 import { loadConfig } from "../config/env.ts";
 import { registerDashboardRoutes } from "../dashboard/routes.ts";
 import { registerManagementRoutes } from "../management/routes.ts";
+import { registerOperationsRoutes } from "../operations/routes.ts";
 import { registerReviewRoutes } from "../review/routes.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -31,6 +32,7 @@ export function createApp(config: AppConfig = loadConfig()) {
 
   registerDashboardRoutes(app, process.env.DATABASE_URL);
   registerManagementRoutes(app, process.env.DATABASE_URL);
+  registerOperationsRoutes(app, process.env.DATABASE_URL);
   registerReviewRoutes(app, process.env.DATABASE_URL);
 
   app.get(/.*/, (_request, response) => {

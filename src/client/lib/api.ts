@@ -11,6 +11,17 @@ import {
   transactionsResponseSchema,
 } from "../../shared/management.ts";
 import {
+  type ExportCreateResponse,
+  type ExportsResponse,
+  exportCreateResponseSchema,
+  exportsResponseSchema,
+  type SettingsResponse,
+  type StatusResponse,
+  settingsResponseSchema,
+  settingsUpdateSchema,
+  statusResponseSchema,
+} from "../../shared/operations.ts";
+import {
   type ReviewActionRequest,
   type ReviewActionResponse,
   type ReviewInboxResponse,
@@ -122,4 +133,48 @@ export async function applyReviewAction(
     throw new Error("Failed to apply review action");
   }
   return reviewActionResponseSchema.parse(await response.json());
+}
+
+export async function fetchSettings(): Promise<SettingsResponse> {
+  const response = await fetch("/api/settings");
+  if (!response.ok) {
+    throw new Error("Failed to load settings");
+  }
+  return settingsResponseSchema.parse(await response.json());
+}
+
+export async function saveSettings(input: SettingsResponse): Promise<SettingsResponse> {
+  const response = await fetch("/api/settings", {
+    body: JSON.stringify(settingsUpdateSchema.parse(input)),
+    headers: { "content-type": "application/json" },
+    method: "PUT",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to save settings");
+  }
+  return settingsResponseSchema.parse(await response.json());
+}
+
+export async function fetchStatus(): Promise<StatusResponse> {
+  const response = await fetch("/api/status");
+  if (!response.ok) {
+    throw new Error("Failed to load status");
+  }
+  return statusResponseSchema.parse(await response.json());
+}
+
+export async function fetchExports(): Promise<ExportsResponse> {
+  const response = await fetch("/api/exports");
+  if (!response.ok) {
+    throw new Error("Failed to load exports");
+  }
+  return exportsResponseSchema.parse(await response.json());
+}
+
+export async function createExport(): Promise<ExportCreateResponse> {
+  const response = await fetch("/api/exports", { method: "POST" });
+  if (!response.ok) {
+    throw new Error("Failed to create export");
+  }
+  return exportCreateResponseSchema.parse(await response.json());
 }

@@ -51,11 +51,13 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.14",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "lucide-react": "^1.17.0",
     "openid-client": "^6.8.4",
     "pg": "^8.21.0",
+    "pg-boss": "^12.18.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "sql-template-tag": "^5.2.1",
