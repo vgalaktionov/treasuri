@@ -45,7 +45,13 @@ export async function syncBankTransactions(
     }
 
     await normalizePendingTransactions(client);
-    await finishSyncRun(client, syncRunId, newTransactionCount, updatedTransactionCount);
+    await finishSyncRun(
+      client,
+      syncRunId,
+      newTransactionCount,
+      updatedTransactionCount,
+      provider.getSyncMetadata?.() ?? {},
+    );
     await client.query("COMMIT");
     transactionStarted = false;
 
@@ -80,6 +86,7 @@ async function finishSyncRun(
   syncRunId: number,
   newTransactionCount: number,
   updatedTransactionCount: number,
+  metadata: Record<string, unknown>,
 ): Promise<void> {
   await client.query(
     toQuery(sql`
@@ -88,7 +95,8 @@ async function finishSyncRun(
         finished_at = now(),
         status = 'completed',
         new_transaction_count = ${newTransactionCount},
-        updated_transaction_count = ${updatedTransactionCount}
+        updated_transaction_count = ${updatedTransactionCount},
+        metadata_json = metadata_json || ${JSON.stringify(metadata)}::jsonb
       WHERE id = ${syncRunId}
     `),
   );

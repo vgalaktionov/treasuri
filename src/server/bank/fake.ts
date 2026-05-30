@@ -1,4 +1,6 @@
+import fs from "node:fs";
 import { sampleAccountIban, sampleTransactions } from "../sample/data.ts";
+import { createAbnBankProvider } from "./abn/index.ts";
 import type { BankMutation, BankProvider } from "./types.ts";
 
 export type FakeBankProvider = BankProvider & {
@@ -26,12 +28,57 @@ export function createFakeBankProvider(): FakeBankProvider {
   };
 }
 
-export function createDefaultBankProvider(env: NodeJS.ProcessEnv = process.env): FakeBankProvider {
+export function createDefaultBankProvider(env: NodeJS.ProcessEnv = process.env): BankProvider {
   const provider = env.BANK_PROVIDER ?? "fake";
 
-  if (provider !== "fake") {
-    throw new Error(`Unsupported bank provider for this slice: ${provider}`);
+  if (provider === "fake") {
+    return createFakeBankProvider();
   }
 
-  return createFakeBankProvider();
+  if (provider === "abn" || provider === "abn_amro") {
+    return createAbnBankProvider(
+      {
+        accountIban: requiredEnv(env, "ABN_ACCOUNT_IBAN"),
+        cardNumber: readSecret(env, "ABN_CARD_NUMBER"),
+        softToken: readSecret(env, "ABN_SOFT_TOKEN"),
+      },
+      {
+        maxPages: readPositiveInteger(env.ABN_SYNC_PAGES ?? "1", "ABN_SYNC_PAGES"),
+      },
+    );
+  }
+
+  throw new Error(`Unsupported bank provider: ${provider}`);
+}
+
+function readSecret(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name];
+  const file = env[`${name}_FILE`];
+
+  if (value && file) {
+    throw new Error(`${name} and ${name}_FILE cannot both be set`);
+  }
+  if (value) {
+    return value;
+  }
+  if (file) {
+    return fs.readFileSync(file, "utf8").trim();
+  }
+  throw new Error(`${name} is required when BANK_PROVIDER=abn`);
+}
+
+function requiredEnv(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required when BANK_PROVIDER=abn`);
+  }
+  return value;
+}
+
+function readPositiveInteger(value: string, name: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
 }

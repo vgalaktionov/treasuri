@@ -2,6 +2,7 @@ import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { describe, expect, it } from "vitest";
 
 import { getCurrentBalance } from "../../../src/server/balance/snapshots.ts";
+import { AbnBankProvider, parseMutationsListResponse } from "../../../src/server/bank/abn/index.ts";
 import { createFakeBankProvider } from "../../../src/server/bank/fake.ts";
 import { syncBankTransactions } from "../../../src/server/bank/sync.ts";
 import type { BankProvider } from "../../../src/server/bank/types.ts";
@@ -97,4 +98,128 @@ describe("syncBankTransactions", () => {
       await container.stop();
     }
   }, 60_000);
+
+  it("imports ABN mutations through the in-repo provider idempotently", async () => {
+    const container = await new PostgreSqlContainer("postgres:16-alpine").start();
+    const provider = new AbnBankProvider(
+      {
+        accountIban: "NL25ABNA0123456789",
+        cardNumber: "123",
+        softToken: "12345",
+      },
+      {
+        client: {
+          async fetchMutations() {
+            return parseMutationsListResponse(abnMutationsPayload(), "NL25ABNA0123456789");
+          },
+        },
+      },
+    );
+
+    try {
+      await withPool(container.getConnectionUri(), async (pool) => {
+        await runMigrations(pool);
+
+        const firstSync = await syncBankTransactions(pool, provider);
+        const secondSync = await syncBankTransactions(pool, provider);
+
+        const rows = await pool.query<{
+          balance: string;
+          counterparty_iban: string | null;
+          provider_transaction_id: string | null;
+          source_hash: string;
+          source_inquiry_number: string | null;
+        }>(`
+          SELECT
+            raw_transactions.provider_transaction_id,
+            raw_transactions.source_hash,
+            raw_transactions.counterparty_iban,
+            raw_transactions.raw_payload_json->>'sourceInquiryNumber' AS source_inquiry_number,
+            account_balance_snapshots.balance::text AS balance
+          FROM raw_transactions
+          JOIN account_balance_snapshots
+            ON account_balance_snapshots.account_id = raw_transactions.account_id
+           AND account_balance_snapshots.as_of::date = raw_transactions.booking_date
+          WHERE raw_transactions.provider = 'abn_amro'
+          ORDER BY raw_transactions.provider_transaction_id NULLS LAST
+        `);
+        const syncRows = await pool.query<{ metadata_json: Record<string, unknown> }>(`
+          SELECT metadata_json
+          FROM sync_runs
+          WHERE provider = 'abn_amro'
+          ORDER BY id DESC
+          LIMIT 1
+        `);
+
+        expect(firstSync).toMatchObject({
+          newTransactionCount: 2,
+          provider: "abn_amro",
+          updatedTransactionCount: 0,
+        });
+        expect(secondSync).toMatchObject({
+          newTransactionCount: 0,
+          provider: "abn_amro",
+          updatedTransactionCount: 2,
+        });
+        expect(rows.rows).toHaveLength(2);
+        expect(rows.rows[0]).toMatchObject({
+          balance: "3.50",
+          counterparty_iban: null,
+          provider_transaction_id: "NL25ABNA0123456789:0530135401918619",
+          source_inquiry_number: "0530135401918619",
+        });
+        expect(rows.rows[1]?.provider_transaction_id).toBeNull();
+        expect(rows.rows[1]?.source_hash).toMatch(/^[a-f0-9]{64}$/);
+        expect(syncRows.rows[0]?.metadata_json).toMatchObject({
+          clear_cache_indicator: false,
+          cursor_reset: false,
+          last_mutation_key: "cursor-abn",
+          source: "bank-sync",
+        });
+      });
+    } finally {
+      await container.stop();
+    }
+  }, 60_000);
 });
+
+function abnMutationsPayload() {
+  return {
+    mutationsList: {
+      clearCacheIndicator: false,
+      lastMutationKey: "cursor-abn",
+      mutations: [
+        {
+          mutation: {
+            accountNumber: "NL25ABNA0123456789",
+            accountNumberType: "IBAN",
+            amount: -2000.99,
+            balanceAfterMutation: 3.5,
+            bookDate: "2026-05-30",
+            counterAccountName: "Jumbo Amsterdam,PAS123",
+            counterAccountNumber: "",
+            currencyIsoCode: "EUR",
+            descriptionLines: ["BEA, Apple Pay", "Jumbo Amsterdam"],
+            sourceInquiryNumber: "0530135401918619",
+            transactionTimestamp: "20260530135401600",
+            valueDate: "2026-05-30",
+          },
+        },
+        {
+          mutation: {
+            accountNumber: "NL25ABNA0123456789",
+            accountNumberType: "IBAN",
+            amount: "-42.10",
+            balanceAfterMutation: "1960.40",
+            bookDate: "2026-05-31",
+            counterAccountName: "Unknown Counterparty",
+            counterAccountNumber: "",
+            currencyIsoCode: "EUR",
+            descriptionLines: ["No source inquiry"],
+            transactionTimestamp: "20260531120000000",
+          },
+        },
+      ],
+    },
+  };
+}

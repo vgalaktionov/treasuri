@@ -15,6 +15,7 @@ export type BankMutation = {
 
 export type BankProvider = {
   fetchMutations: () => Promise<readonly BankMutation[]>;
+  getSyncMetadata?: () => Record<string, unknown>;
   provider: string;
 };
 
