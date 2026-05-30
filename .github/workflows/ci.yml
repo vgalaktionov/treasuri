@@ -35,7 +35,9 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: e2e/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            e2e/package-lock.json
 
       - name: Set up Chrome
         id: chrome
@@ -44,8 +46,14 @@ jobs:
       - name: Install Python dependencies
         run: uv sync --locked
 
+      - name: Install v2 Node dependencies
+        run: npm ci
+
       - name: Install E2E dependencies
         run: npm ci --prefix e2e
+
+      - name: Run v2 TypeScript checks
+        run: npm run check
 
       - name: Run pre-commit gates
         run: uv run pre-commit run --all-files
