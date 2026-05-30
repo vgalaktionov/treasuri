@@ -2,9 +2,10 @@ services:
   app:
     build: .
     image: treasuri:local
-    command: ["python", "-m", "app.web"]
+    command: ["npm", "run", "start"]
     environment:
       APP_ENV: development
+      NODE_ENV: development
       SECRET_KEY: dev-secret-change-me
       DATABASE_URL: postgresql://treasuri:treasuri@db:5432/treasuri
       HTTP_HOST: 0.0.0.0
@@ -28,9 +29,10 @@ services:
 
   worker:
     image: treasuri:local
-    command: ["python", "-m", "app.worker"]
+    command: ["npm", "run", "worker"]
     environment:
       APP_ENV: development
+      NODE_ENV: development
       SECRET_KEY: dev-secret-change-me
       DATABASE_URL: postgresql://treasuri:treasuri@db:5432/treasuri
       OIDC_ENABLED: "false"
@@ -48,9 +50,10 @@ services:
 
   migrate:
     image: treasuri:local
-    command: ["python", "-m", "app.migrate"]
+    command: ["npm", "run", "migrate"]
     environment:
       APP_ENV: development
+      NODE_ENV: development
       SECRET_KEY: dev-secret-change-me
       DATABASE_URL: postgresql://treasuri:treasuri@db:5432/treasuri
       OIDC_ENABLED: "false"

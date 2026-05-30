@@ -22,52 +22,27 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.12
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            e2e/package-lock.json
-
-      - name: Set up Chrome
-        id: chrome
-        uses: browser-actions/setup-chrome@v1
-
-      - name: Install Python dependencies
-        run: uv sync --locked
+          cache-dependency-path: package-lock.json
 
       - name: Install v2 Node dependencies
         run: npm ci
 
-      - name: Install E2E dependencies
-        run: npm ci --prefix e2e
-
       - name: Run v2 TypeScript checks
         run: npm run check
+
+      - name: Build v2 app
+        run: npm run build
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run pre-commit gates
-        run: uv run pre-commit run --all-files
-
-      - name: Run Docker image smoke test
-        run: TREASURI_DOCKER_SMOKE=1 uv run pytest tests/integration/test_docker_image.py
-
-      - name: Run Puppeteer E2E
-        run: npm test --prefix e2e
-        env:
-          PUPPETEER_EXECUTABLE_PATH: ${{ steps.chrome.outputs.chrome-path }}
+      - name: Run Playwright E2E
+        run: npm run test:e2e
 
   image:
     runs-on: ubuntu-latest

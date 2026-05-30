@@ -8,6 +8,7 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "admin": "tsx src/server/admin.ts",
     "build": "npm run typecheck && npm run build:client",
     "build:client": "vite build",
     "check": "npm run typecheck && biome check . && vitest run",
@@ -15,12 +16,15 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
+    "migrate": "tsx src/server/migrate.ts",
     "prepare": "husky",
+    "start": "tsx src/server/index.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:integration": "vitest run --project integration",
     "test:unit": "vitest run --project unit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "worker": "tsx src/server/worker.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
@@ -53,6 +57,7 @@
     "pg": "^8.21.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "sql-template-tag": "^5.2.1",
     "zod": "^4.4.3"
   }
 }
