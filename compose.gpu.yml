@@ -1,11 +1,10 @@
 services:
   llama:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
     gpus: all
     command:
       - -hf
       - unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL
-      - --host
-      - 0.0.0.0
       - --port
       - "8080"
       - --temp

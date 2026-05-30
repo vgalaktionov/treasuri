@@ -65,7 +65,7 @@ services:
       POSTGRES_USER: treasuri
       POSTGRES_PASSWORD: treasuri
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -79,8 +79,6 @@ services:
     command:
       - -hf
       - unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL
-      - --host
-      - 0.0.0.0
       - --port
       - "8080"
       - --temp

@@ -36,6 +36,8 @@ def test_compose_starts_local_runtime_shape_without_caddy_or_frontend_build() ->
     assert "ghcr.io/ggml-org/llama.cpp:server" in compose
     assert "unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL" in compose
     assert "postgresql://treasuri:treasuri@db:5432/treasuri" in compose
+    assert '"15432:5432"' in compose
+    assert '"5432:5432"' not in compose
     assert 'command: ["python", "-m", "app.web"]' in compose
     assert 'command: ["python", "-m", "app.worker"]' in compose
     assert 'command: ["python", "-m", "app.migrate"]' in compose
@@ -48,7 +50,8 @@ def test_gpu_compose_override_enables_llama_gpu_without_requiring_it_by_default(
     gpu_compose = read_project_file("compose.gpu.yml")
 
     assert "gpus:" not in compose
-    assert re.search(r"^  llama:\n    gpus: all\n", gpu_compose, flags=re.MULTILINE)
+    assert "ghcr.io/ggml-org/llama.cpp:server-cuda" in gpu_compose
+    assert re.search(r"^  llama:\n(?:    .+\n)*    gpus: all\n", gpu_compose, flags=re.MULTILINE)
     assert "--n-gpu-layers" in gpu_compose
     assert '"999"' in gpu_compose
 

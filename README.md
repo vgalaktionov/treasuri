@@ -27,6 +27,7 @@ docker compose -f compose.yml -f compose.gpu.yml up --build
 ```
 
 The GPU override grants the llama container GPU access and passes `--n-gpu-layers 999`, which asks llama.cpp to offload as many layers as fit in VRAM. The llama logs should mention layers being offloaded to confirm the GPU path is active.
+It also switches the llama service to `ghcr.io/ggml-org/llama.cpp:server-cuda`; the default `:server` image is CPU-only and will ignore GPU layer flags.
 
 Run the web process with the development OIDC test profile:
 
@@ -43,12 +44,12 @@ Then open `http://127.0.0.1:5000`.
 
 ```sh
 uv run python -m app.web
-DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.worker
+DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:15432/treasuri uv run python -m app.worker
 docker compose up --build
 docker compose -f compose.yml -f compose.gpu.yml up --build
-DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.migrate
-DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.admin seed-categories
-DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri uv run python -m app.admin load-sample-data
+DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:15432/treasuri uv run python -m app.migrate
+DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:15432/treasuri uv run python -m app.admin seed-categories
+DATABASE_URL=postgresql://treasuri:treasuri@127.0.0.1:15432/treasuri uv run python -m app.admin load-sample-data
 uv run python -m app.admin sync-now
 uv run python -m app.admin enqueue-sync
 uv run pytest
@@ -75,6 +76,7 @@ Migrations are plain, up-only SQL files in `migrations/`. The migration runner c
 The first schema slice creates the PRD core tables for accounts, raw and enriched transactions, merchants, aliases, rules, manual overrides, recurring series, monthly forecasts, sync runs, export runs/files, app settings, and seeded categories.
 
 Postgres integration tests use Testcontainers and start a disposable `postgres:16-alpine` container.
+Docker Compose exposes local Postgres on `127.0.0.1:15432`; services inside Compose still use `db:5432`.
 
 Puppeteer E2E tests also use deterministic sample data. The test harness starts a disposable Postgres container, applies migrations, loads sample data, and launches the Flask app before opening Chrome.
 If a Puppeteer assertion fails, the harness writes screenshots and the thrown stack to `E2E_ARTIFACT_DIR`, or `/tmp/treasuri-e2e-artifacts` when the variable is not set.
