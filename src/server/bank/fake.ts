@@ -1,18 +1,9 @@
 import { sampleAccountIban, sampleTransactions } from "../sample/data.ts";
+import type { BankMutation, BankProvider } from "./types.ts";
 
-export type FakeBankMutation = {
-  accountIban: string;
-  amount: string;
-  balanceAfterMutation: string;
-  bookingDate: string;
-  counterpartyName: string;
-  description: string;
-  sourceHash: string;
-};
-
-export type FakeBankProvider = {
+export type FakeBankProvider = BankProvider & {
   provider: "fake";
-  fetchMutations: () => Promise<readonly FakeBankMutation[]>;
+  fetchMutations: () => Promise<readonly BankMutation[]>;
 };
 
 export function createFakeBankProvider(): FakeBankProvider {
@@ -25,7 +16,10 @@ export function createFakeBankProvider(): FakeBankProvider {
         balanceAfterMutation: String(4000 - index * 100),
         bookingDate: transaction.bookingDate,
         counterpartyName: transaction.counterpartyName,
+        currency: "EUR",
         description: transaction.description,
+        providerTransactionId: transaction.sourceHash,
+        rawPayload: { source: "fake", sourceHash: transaction.sourceHash },
         sourceHash: transaction.sourceHash,
       }));
     },

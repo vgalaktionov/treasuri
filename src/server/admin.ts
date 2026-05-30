@@ -1,3 +1,5 @@
+import { createDefaultBankProvider } from "./bank/fake.ts";
+import { syncBankTransactions } from "./bank/sync.ts";
 import { runMigrations } from "./db/migrations.ts";
 import { withPool } from "./db/pool.ts";
 import { loadSampleData } from "./sample/load.ts";
@@ -25,8 +27,18 @@ switch (command) {
     );
     break;
   }
+  case "sync-now": {
+    const result = await withPool(databaseUrl, async (pool) => {
+      await runMigrations(pool);
+      return syncBankTransactions(pool, createDefaultBankProvider());
+    });
+    console.log(
+      `synced ${result.newTransactionCount} new and ${result.updatedTransactionCount} updated transactions from ${result.provider}`,
+    );
+    break;
+  }
   case undefined: {
-    console.log("Available admin commands: seed-categories, load-sample-data");
+    console.log("Available admin commands: seed-categories, load-sample-data, sync-now");
     break;
   }
   default:
