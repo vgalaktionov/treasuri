@@ -22,7 +22,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY app ./app
 COPY migrations ./migrations
-COPY main.py PRD.md ./
+COPY main.py PRD.v2.md ./
 
 RUN chown -R treasuri:treasuri /app /home/treasuri
 
