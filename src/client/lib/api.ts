@@ -1,5 +1,16 @@
 import { type DashboardResponse, dashboardResponseSchema } from "../../shared/dashboard.ts";
 import {
+  managementCategorySchema,
+  type RulePreviewRequest,
+  recurringResponseSchema,
+  ruleApplyResponseSchema,
+  ruleCreateResponseSchema,
+  rulePreviewResponseSchema,
+  rulesResponseSchema,
+  type TransactionsResponse,
+  transactionsResponseSchema,
+} from "../../shared/management.ts";
+import {
   type ReviewActionRequest,
   type ReviewActionResponse,
   type ReviewInboxResponse,
@@ -21,6 +32,81 @@ export async function fetchReviewInbox(): Promise<ReviewInboxResponse> {
     throw new Error("Failed to load review inbox");
   }
   return reviewInboxResponseSchema.parse(await response.json());
+}
+
+export async function fetchTransactions(query: string): Promise<TransactionsResponse> {
+  const response = await fetch(`/api/transactions?query=${encodeURIComponent(query)}`);
+  if (!response.ok) {
+    throw new Error("Failed to load transactions");
+  }
+  return transactionsResponseSchema.parse(await response.json());
+}
+
+export async function updateTransactionCategory(transactionId: number, categoryId: number) {
+  const response = await fetch(`/api/transactions/${transactionId}`, {
+    body: JSON.stringify({ categoryId }),
+    headers: { "content-type": "application/json" },
+    method: "PATCH",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to update transaction");
+  }
+}
+
+export async function fetchRules() {
+  const response = await fetch("/api/rules");
+  if (!response.ok) {
+    throw new Error("Failed to load rules");
+  }
+  return rulesResponseSchema.parse(await response.json());
+}
+
+export async function fetchCategories() {
+  const response = await fetch("/api/categories");
+  if (!response.ok) {
+    throw new Error("Failed to load categories");
+  }
+  return managementCategorySchema.array().parse(await response.json());
+}
+
+export async function fetchRecurring() {
+  const response = await fetch("/api/recurring");
+  if (!response.ok) {
+    throw new Error("Failed to load recurring series");
+  }
+  return recurringResponseSchema.parse(await response.json());
+}
+
+export async function previewRule(input: RulePreviewRequest) {
+  const response = await fetch("/api/rules/preview", {
+    body: JSON.stringify(input),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to preview rule");
+  }
+  return rulePreviewResponseSchema.parse(await response.json());
+}
+
+export async function createRule(input: RulePreviewRequest) {
+  const response = await fetch("/api/rules", {
+    body: JSON.stringify(input),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to create rule");
+  }
+  return ruleCreateResponseSchema.parse(await response.json());
+}
+
+export async function applyRule(ruleId: number) {
+  const response = await fetch(`/api/rules/${ruleId}/apply`, { method: "POST" });
+  if (!response.ok) {
+    throw new Error("Failed to apply rule");
+  }
+  return ruleApplyResponseSchema.parse(await response.json());
 }
 
 export async function applyReviewAction(

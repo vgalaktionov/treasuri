@@ -2,6 +2,7 @@ import { Home, ListChecks, MoreHorizontal, ReceiptText } from "lucide-react";
 import type { MobileNavItem } from "../../shared/navigation.ts";
 import { navGroups, primaryMobileNav } from "../../shared/navigation.ts";
 import { DashboardPage } from "../dashboard/DashboardPage.tsx";
+import { ManagementPage } from "../management/ManagementPage.tsx";
 import { ReviewPage } from "../review/ReviewPage.tsx";
 
 export function App() {
@@ -43,7 +44,7 @@ export function App() {
       </aside>
 
       <main className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-        {currentPath === "/review" ? <ReviewPage /> : <DashboardPage />}
+        {renderPage(currentPath)}
       </main>
 
       <nav
@@ -65,6 +66,25 @@ export function App() {
       </nav>
     </div>
   );
+}
+
+function renderPage(currentPath: string) {
+  if (currentPath === "/review") {
+    return <ReviewPage />;
+  }
+  if (currentPath === "/transactions") {
+    return <ManagementPage section="transactions" />;
+  }
+  if (currentPath === "/rules") {
+    return <ManagementPage section="rules" />;
+  }
+  if (currentPath === "/categories") {
+    return <ManagementPage section="categories" />;
+  }
+  if (currentPath === "/recurring") {
+    return <ManagementPage section="recurring" />;
+  }
+  return <DashboardPage />;
 }
 
 function isCurrentPath(href: string, currentPath: string): boolean {
