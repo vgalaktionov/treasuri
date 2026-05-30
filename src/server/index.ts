@@ -1,13 +1,14 @@
+import { loadConfig } from "./config/env.ts";
 import { createApp } from "./http/app.ts";
 
-const host = process.env.HTTP_HOST ?? "127.0.0.1";
-const port = Number(process.env.HTTP_PORT ?? "5174");
+const config = loadConfig();
+const { host, port } = config.http;
 
 if (!Number.isInteger(port) || port <= 0) {
   throw new Error("HTTP_PORT must be a positive integer");
 }
 
-const server = createApp().listen(port, host, () => {
+const server = createApp(config).listen(port, host, () => {
   console.log(`treasuri listening on http://${host}:${port}`);
 });
 
