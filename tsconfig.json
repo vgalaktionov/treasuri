@@ -5,6 +5,7 @@
     "declaration": false,
     "exactOptionalPropertyTypes": true,
     "isolatedModules": true,
+    "jsx": "react-jsx",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "module": "NodeNext",
     "moduleDetection": "force",
@@ -19,6 +20,13 @@
     "target": "ES2024",
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src/**/*.ts", "tests-ts/**/*.ts", "vitest.config.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests-ts/**/*.ts",
+    "vitest.config.ts",
+    "vite.config.ts",
+    "playwright.config.ts"
+  ],
   "exclude": ["node_modules", "app", "tests", "e2e"]
 }

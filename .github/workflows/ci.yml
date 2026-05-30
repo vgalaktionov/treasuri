@@ -55,6 +55,9 @@ jobs:
       - name: Run v2 TypeScript checks
         run: npm run check
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
       - name: Run pre-commit gates
         run: uv run pre-commit run --all-files
 

@@ -3,8 +3,11 @@
   "files": {
     "includes": [
       "src/**/*.ts",
+      "src/**/*.tsx",
       "tests-ts/**/*.ts",
       "vitest.config.ts",
+      "vite.config.ts",
+      "playwright.config.ts",
       "package.json",
       "tsconfig.json"
     ]
