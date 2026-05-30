@@ -1,3 +1,4 @@
+import { type DashboardResponse, dashboardResponseSchema } from "../../shared/dashboard.ts";
 import {
   type ReviewActionRequest,
   type ReviewActionResponse,
@@ -5,6 +6,14 @@ import {
   reviewActionResponseSchema,
   reviewInboxResponseSchema,
 } from "../../shared/review.ts";
+
+export async function fetchDashboard(): Promise<DashboardResponse> {
+  const response = await fetch("/api/dashboard");
+  if (!response.ok) {
+    throw new Error("Failed to load dashboard");
+  }
+  return dashboardResponseSchema.parse(await response.json());
+}
 
 export async function fetchReviewInbox(): Promise<ReviewInboxResponse> {
   const response = await fetch("/api/review");

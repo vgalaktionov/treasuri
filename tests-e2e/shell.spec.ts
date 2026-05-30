@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("shell shows the correct navigation for the viewport", async ({ page }, testInfo) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "You are fine for the month." })).toBeVisible();
+  await expect(page.getByText("Safe to spend this month")).toBeVisible();
 
   if (testInfo.project.name === "desktop") {
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();

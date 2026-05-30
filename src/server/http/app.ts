@@ -6,6 +6,7 @@ import { requireAuth } from "../auth/middleware.ts";
 import { createSessionMiddleware } from "../auth/session.ts";
 import type { AppConfig } from "../config/env.ts";
 import { loadConfig } from "../config/env.ts";
+import { registerDashboardRoutes } from "../dashboard/routes.ts";
 import { registerReviewRoutes } from "../review/routes.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -27,6 +28,7 @@ export function createApp(config: AppConfig = loadConfig()) {
     response.json({ user: request.authUser });
   });
 
+  registerDashboardRoutes(app, process.env.DATABASE_URL);
   registerReviewRoutes(app, process.env.DATABASE_URL);
 
   app.get(/.*/, (_request, response) => {
