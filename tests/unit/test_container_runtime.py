@@ -35,6 +35,8 @@ def test_compose_starts_local_runtime_shape_without_caddy_or_frontend_build() ->
     assert "postgres:16-alpine" in compose
     assert "ghcr.io/ggml-org/llama.cpp:server" in compose
     assert "unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL" in compose
+    assert "/root/.cache/huggingface" in compose
+    assert "/root/.cache/llama.cpp" in compose
     assert "postgresql://treasuri:treasuri@db:5432/treasuri" in compose
     assert '"15432:5432"' in compose
     assert '"5432:5432"' not in compose

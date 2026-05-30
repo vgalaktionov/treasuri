@@ -26,7 +26,7 @@ If the machine has a Docker-visible GPU, run the llama service with GPU access:
 docker compose -f compose.yml -f compose.gpu.yml up --build
 ```
 
-The GPU override grants the llama container GPU access and passes `--n-gpu-layers 999`, which asks llama.cpp to offload as many layers as fit in VRAM. The llama logs should mention layers being offloaded to confirm the GPU path is active.
+The GPU override grants the llama container GPU access and passes `--n-gpu-layers 999`, which asks llama.cpp to offload as many layers as fit in VRAM. The first model download can take a while; Compose persists both Hugging Face and llama.cpp caches so recreating the container does not redownload the model. The llama logs should mention layers being offloaded to confirm the GPU path is active.
 It also switches the llama service to `ghcr.io/ggml-org/llama.cpp:server-cuda`; the default `:server` image is CPU-only and will ignore GPU layer flags.
 
 Run the web process with the development OIDC test profile:

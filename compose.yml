@@ -86,8 +86,10 @@ services:
     ports:
       - "8080:8080"
     volumes:
+      - llama-hf-cache:/root/.cache/huggingface
       - llama-cache:/root/.cache/llama.cpp
 
 volumes:
   postgres-data:
+  llama-hf-cache:
   llama-cache:
