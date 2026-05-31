@@ -69,8 +69,12 @@ export function RulesWorkspace() {
   const apply = useMutation({
     mutationFn: (id: number) => applyRule(id),
     onSuccess: (result) => {
+      const affected =
+        result.updatedCount === 1 ? "1 transaction" : `${result.updatedCount} transactions`;
       setMessage(
-        `Applied ${result.updatedCount} ${result.updatedCount === 1 ? "transaction" : "transactions"}; ${result.skippedManualCount} manual skipped.`,
+        result.queued
+          ? `Queued history backfill for ${affected}; ${result.skippedManualCount} manual skipped.`
+          : `Applied ${affected}; ${result.skippedManualCount} manual skipped.`,
       );
       invalidateFinanceWorkspaces(queryClient);
     },

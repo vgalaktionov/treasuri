@@ -218,6 +218,24 @@ describe("management API", () => {
       expect(rule.wouldChangeCount).toBe(1);
       expect(rule.flags).toContain("fixed");
 
+      const queued = await agent
+        .post(`/api/rules/${created.body.ruleId}/apply`)
+        .set("x-csrf-token", csrf)
+        .expect(200);
+      const queuedJobs = await withPool(container.getConnectionUri(), (pool) =>
+        pool.query<{ count: string }>(
+          "SELECT count(*)::text FROM pgboss.job WHERE name = 'backfill_rule'",
+        ),
+      );
+
+      expect(queued.body).toMatchObject({
+        queued: true,
+        skippedManualCount: 0,
+        updatedCount: 1,
+      });
+      expect(queued.body.jobId).toEqual(expect.any(String));
+      expect(queuedJobs.rows[0]?.count).toBe("1");
+
       await agent
         .put(`/api/rules/${created.body.ruleId}`)
         .set("x-csrf-token", csrf)
@@ -243,6 +261,7 @@ describe("management API", () => {
         .set("x-csrf-token", csrf)
         .expect(200);
 
+      expect(inactiveApply.body.queued).toBe(false);
       expect(inactiveApply.body.updatedCount).toBe(0);
     } finally {
       await restore();

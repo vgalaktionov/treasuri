@@ -39,7 +39,9 @@ export async function runJob(pool: pg.Pool, name: JobName, payload: unknown) {
     }
     case "backfill_rule": {
       const parsed = jobPayloadSchemas.backfill_rule.parse(payload);
-      return applyRule(pool, parsed.ruleId);
+      const result = await applyRule(pool, parsed.ruleId);
+      const forecast = await updateMonthlyForecast(pool);
+      return { ...result, forecastYearMonth: forecast.yearMonth };
     }
   }
 }

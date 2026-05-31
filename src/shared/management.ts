@@ -168,6 +168,8 @@ export const ruleDraftFromTransactionResponseSchema = z.object({
 export const ruleCreateResponseSchema = z.object({ ruleId: z.number() });
 
 export const ruleApplyResponseSchema = z.object({
+  jobId: z.string().optional(),
+  queued: z.boolean().default(false),
   skippedManualCount: z.number(),
   updatedCount: z.number(),
 });

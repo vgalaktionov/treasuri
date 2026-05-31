@@ -221,6 +221,14 @@ export async function setRuleActive(
   );
 }
 
+export async function isRuleActive(pool: pg.Pool, ruleId: number): Promise<boolean> {
+  const result = await pool.query<{ is_active: boolean }>(
+    "SELECT is_active FROM categorization_rules WHERE id = $1",
+    [ruleId],
+  );
+  return result.rows[0]?.is_active ?? false;
+}
+
 export async function applyRule(pool: pg.Pool, ruleId: number) {
   const rule = await readRule(pool, ruleId);
   if (!rule.isActive) {
@@ -268,7 +276,7 @@ export async function applyRule(pool: pg.Pool, ruleId: number) {
   return { skippedManualCount: preview.skippedManualCount, updatedCount: preview.matches.length };
 }
 
-async function previewStoredRule(pool: pg.Pool, ruleId: number) {
+export async function previewStoredRule(pool: pg.Pool, ruleId: number) {
   const rule = await readRule(pool, ruleId);
   const result = await matchingTransactions(pool, rule);
   return previewFromMatches(rule, result.rows);

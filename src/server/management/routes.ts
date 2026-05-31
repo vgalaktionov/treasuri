@@ -20,14 +20,16 @@ import {
 } from "../../shared/management.ts";
 import { createPool } from "../db/pool.ts";
 import { updateMonthlyForecast } from "../forecast/service.ts";
+import { enqueueJob } from "../jobs/queue.ts";
 import { listCategories, listCategoryBudgets } from "./categories.ts";
 import { confirmRecurring, disableRecurring, listRecurring, updateRecurring } from "./recurring.ts";
 import {
-  applyRule,
   createRule,
   draftRuleFromTransaction,
+  isRuleActive,
   listRules,
   previewRule,
+  previewStoredRule,
   setRuleActive,
   updateRule,
 } from "./rules.ts";
@@ -296,13 +298,51 @@ export function registerManagementRoutes(
   app.post("/api/rules/:id/apply", async (request, response, next) => {
     try {
       if (!databaseUrl) {
-        response.json(ruleApplyResponseSchema.parse({ skippedManualCount: 0, updatedCount: 0 }));
+        const rules = sampleRulesFor(sampleRuleStores, request);
+        const rule = rules.rules.find((item) => item.id === Number(request.params.id));
+        response.json(
+          ruleApplyResponseSchema.parse({
+            queued: false,
+            skippedManualCount: rule?.manualOverridesSkippedCount ?? 0,
+            updatedCount: rule?.wouldChangeCount ?? 0,
+          }),
+        );
         return;
       }
       const pool = createPool(databaseUrl);
       try {
+        const isActive = await isRuleActive(pool, Number(request.params.id));
+        if (!isActive) {
+          response.json(
+            ruleApplyResponseSchema.parse({
+              queued: false,
+              skippedManualCount: 0,
+              updatedCount: 0,
+            }),
+          );
+          return;
+        }
+        const preview = await previewStoredRule(pool, Number(request.params.id));
+        if (preview.wouldChangeCount === 0) {
+          response.json(
+            ruleApplyResponseSchema.parse({
+              queued: false,
+              skippedManualCount: preview.skippedManualCount,
+              updatedCount: 0,
+            }),
+          );
+          return;
+        }
+        const jobId = await enqueueJob(databaseUrl, "backfill_rule", {
+          ruleId: Number(request.params.id),
+        });
         response.json(
-          ruleApplyResponseSchema.parse(await applyRule(pool, Number(request.params.id))),
+          ruleApplyResponseSchema.parse({
+            jobId,
+            queued: true,
+            skippedManualCount: preview.skippedManualCount,
+            updatedCount: preview.wouldChangeCount,
+          }),
         );
       } finally {
         await pool.end();
