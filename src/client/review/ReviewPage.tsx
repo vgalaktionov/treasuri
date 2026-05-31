@@ -106,7 +106,14 @@ export function ReviewPage() {
           {message}
         </p>
       ) : null}
-      {ruleDraft ? <RuleDraftPanel draft={ruleDraft} onDone={() => setRuleDraft(null)} /> : null}
+      {ruleDraft ? (
+        <RuleDraftPanel
+          categories={data.categories}
+          draft={ruleDraft}
+          key={`${ruleDraft.field}-${ruleDraft.pattern}-${ruleDraft.categoryId}`}
+          onDismiss={() => setRuleDraft(null)}
+        />
+      ) : null}
 
       {data.transactions.length === 0 || !activeTransaction ? (
         <div className="rounded-md border border-treasuri-line bg-white p-3">
@@ -345,24 +352,32 @@ function nextReviewId(transactions: ReviewTransaction[], transactionId: number):
   return transactions[index + 1]?.id ?? transactions[index - 1]?.id ?? null;
 }
 
-function RuleDraftPanel({ draft, onDone }: { draft: RuleEditorRequest; onDone: () => void }) {
+function RuleDraftPanel({
+  categories,
+  draft,
+  onDismiss,
+}: {
+  categories: ReviewInboxResponse["categories"];
+  draft: RuleEditorRequest;
+  onDismiss: () => void;
+}) {
   const queryClient = useQueryClient();
-  const [preview, setPreview] = useState<string | null>(null);
+  const [createdRuleId, setCreatedRuleId] = useState<number | null>(null);
   const previewMutation = useMutation({
     mutationFn: () => previewRule(draft),
-    onSuccess: (result) =>
-      setPreview(
-        `${result.matchCount} matches, ${result.wouldChangeCount} changes, ${result.skippedManualCount} manual skipped`,
-      ),
   });
   const create = useMutation({
     mutationFn: () => createRule(draft),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["rules"] });
-      setPreview("Rule created.");
-      onDone();
+      setCreatedRuleId(result.ruleId);
     },
   });
+  const category = categories.find((item) => item.id === draft.categoryId);
+
+  useEffect(() => {
+    previewMutation.mutate();
+  }, [previewMutation.mutate]);
 
   return (
     <aside className="mb-3 rounded-md border border-treasuri-line bg-white p-2 sm:p-3">
@@ -370,21 +385,26 @@ function RuleDraftPanel({ draft, onDone }: { draft: RuleEditorRequest; onDone: (
         <div>
           <p className="font-semibold text-sm">Rule preview</p>
           <p className="mt-1 text-treasuri-muted text-xs">
-            {draft.field} {draft.operator} "{draft.pattern}" to category {draft.categoryId}
+            {draft.field} {draft.operator} "{draft.pattern}" to {category?.name ?? "category"}
             {draft.merchantName ? ` / ${draft.merchantName}` : ""}
           </p>
-          {preview ? <p className="mt-1 text-treasuri-muted text-xs">{preview}</p> : null}
+          {createdRuleId ? (
+            <p className="mt-1 font-semibold text-emerald-700 text-xs">
+              Rule {createdRuleId} created.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             className="min-h-8 rounded-md border border-treasuri-line px-2 font-medium text-xs"
-            onClick={() => previewMutation.mutate()}
+            onClick={onDismiss}
             type="button"
           >
-            Preview
+            Dismiss
           </button>
           <button
-            className="min-h-8 rounded-md bg-treasuri-action px-3 font-semibold text-white text-xs"
+            className="min-h-8 rounded-md bg-treasuri-action px-3 font-semibold text-white text-xs disabled:opacity-60"
+            disabled={create.isPending || createdRuleId !== null}
             onClick={() => create.mutate()}
             type="button"
           >
@@ -392,7 +412,24 @@ function RuleDraftPanel({ draft, onDone }: { draft: RuleEditorRequest; onDone: (
           </button>
         </div>
       </div>
+      {previewMutation.data ? (
+        <dl className="mt-3 grid grid-cols-4 gap-2 border-t border-treasuri-line pt-3 text-xs">
+          <RulePreviewFact label="matches" value={previewMutation.data.matchCount} />
+          <RulePreviewFact label="changes" value={previewMutation.data.wouldChangeCount} />
+          <RulePreviewFact label="correct" value={previewMutation.data.alreadyCorrectCount} />
+          <RulePreviewFact label="manual" value={previewMutation.data.skippedManualCount} />
+        </dl>
+      ) : null}
     </aside>
+  );
+}
+
+function RulePreviewFact({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <dt className="text-treasuri-muted">{label}</dt>
+      <dd className="font-semibold">{value}</dd>
+    </div>
   );
 }
 

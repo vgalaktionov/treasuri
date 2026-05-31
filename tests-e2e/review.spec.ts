@@ -32,7 +32,7 @@ test("review correction supports merchant flags and rule preview", async ({ page
   await expect(page.getByText("Rule preview")).toBeVisible();
   await expect(page.getByText(/Unknown Sample Merchant/)).toBeVisible();
   await expect(page.getByText("0 to review")).toBeVisible();
-  await page.getByRole("button", { name: "Preview", exact: true }).click();
   await expect(page.getByText(/matches/)).toBeVisible();
   await page.getByRole("button", { name: "Create rule" }).click();
+  await expect(page.getByText(/Rule \d+ created/)).toBeVisible();
 });
