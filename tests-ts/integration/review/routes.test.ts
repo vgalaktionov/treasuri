@@ -26,6 +26,7 @@ describe("review API", () => {
       const transaction = inbox.body.transactions[0];
 
       expect(inbox.body.reviewCount).toBe(1);
+      expect(inbox.body.reviewImpact).toBe("42.10");
       expect(transaction.description).toBe("Needs review sample");
 
       const groceries = inbox.body.categories.find(
@@ -85,8 +86,11 @@ describe("review API", () => {
 
       expect(action.body.reviewCount).toBe(0);
       expect(action.body.correctedCount).toBe(1);
+      expect(action.body.correctedTransactionIds).toEqual([transaction.id]);
+      expect(action.body.reviewImpact).toBe("0.00");
       expect(action.body.ruleDraft.pattern).toBe("Unknown Sample Merchant");
       expect(updated.body.reviewCount).toBe(0);
+      expect(updated.body.reviewImpact).toBe("0.00");
       expect(updated.body.transactions).toEqual([]);
       expect(rows.rows[0]).toMatchObject({
         alias_count: "1",
@@ -138,6 +142,7 @@ describe("review API", () => {
       );
 
       expect(inbox.body.reviewCount).toBe(2);
+      expect(inbox.body.reviewImpact).toBe("77.10");
       expect(transaction.similarCount).toBe(2);
       const action = await agent
         .post(`/api/review/${transaction.id}/action`)
@@ -157,8 +162,10 @@ describe("review API", () => {
       );
 
       expect(action.body.correctedCount).toBe(3);
+      expect(action.body.correctedTransactionIds).toHaveLength(3);
       expect(action.body.similarCount).toBe(2);
       expect(action.body.reviewCount).toBe(0);
+      expect(action.body.reviewImpact).toBe("0.00");
       expect(updated.body.transactions).toEqual([]);
       expect(reviewed.rows[0]?.count).toBe("3");
     } finally {
@@ -224,6 +231,7 @@ describe("review API", () => {
 
       expect(action.body.correctedCount).toBe(1);
       expect(action.body.reviewCount).toBe(0);
+      expect(action.body.reviewImpact).toBe("0.00");
       expect(excluded.rows[0]).toMatchObject({
         is_excluded_from_budget: true,
         needs_review: false,

@@ -1,9 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, EyeOff, ListPlus, Save, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { RuleEditorRequest, RulePreviewResponse } from "../../shared/management.ts";
-import type { ReviewInboxResponse } from "../../shared/review.ts";
+import type { ReviewActionResponse, ReviewInboxResponse } from "../../shared/review.ts";
 import { applyReviewAction, createRule, fetchReviewInbox, previewRule } from "../lib/api.ts";
 import { invalidateFinanceWorkspaces } from "../lib/invalidation.ts";
 
@@ -64,6 +64,7 @@ export function ReviewPage() {
       });
     },
     onSuccess: (result) => {
+      applyReviewResultToCache(queryClient, result);
       setMessage(`${result.correctedCount} corrected, ${result.reviewCount} left`);
       setRuleDraft(result.ruleDraft);
       selectReview(nextReviewId(inbox.data?.transactions ?? [], result.transactionId));
@@ -73,6 +74,7 @@ export function ReviewPage() {
   const accept = useMutation({
     mutationFn: (id: number) => applyReviewAction(id, { action: "accept" }),
     onSuccess: (result) => {
+      applyReviewResultToCache(queryClient, result);
       setMessage(`Accepted. ${result.reviewCount} left`);
       selectReview(nextReviewId(inbox.data?.transactions ?? [], result.transactionId));
       invalidateFinanceWorkspaces(queryClient);
@@ -131,8 +133,10 @@ export function ReviewPage() {
         </p>
       </header>
 
+      <ReviewSummary data={data} />
+
       {message ? (
-        <p className="mb-3 rounded-md border border-treasuri-line bg-white p-2 text-sm">
+        <p className="my-3 rounded-md border border-treasuri-line bg-white p-2 text-sm">
           {message}
         </p>
       ) : null}
@@ -172,6 +176,48 @@ export function ReviewPage() {
         </div>
       )}
     </section>
+  );
+}
+
+function ReviewSummary({ data }: { data: ReviewInboxResponse }) {
+  const similarTotal = data.transactions.reduce(
+    (total, transaction) => total + transaction.similarCount,
+    0,
+  );
+  const nextAmount = data.transactions[0]?.amount ?? "0.00";
+
+  return (
+    <section aria-label="Review impact" className="mb-3 grid grid-cols-3 gap-2">
+      <ReviewMetric label="Open" value={String(data.reviewCount)} />
+      <ReviewMetric label="Forecast impact" tone="warn" value={`EUR ${data.reviewImpact}`} />
+      <ReviewMetric
+        detail={nextAmount === "0.00" ? undefined : `next ${nextAmount}`}
+        label="Similar"
+        value={String(similarTotal)}
+      />
+    </section>
+  );
+}
+
+function ReviewMetric({
+  detail,
+  label,
+  tone = "default",
+  value,
+}: {
+  detail?: string | undefined;
+  label: string;
+  tone?: "default" | "warn";
+  value: string;
+}) {
+  return (
+    <article className="rounded-md border border-treasuri-line bg-white p-2">
+      <p className="font-medium text-treasuri-muted text-xs">{label}</p>
+      <p className={`mt-1 font-semibold text-sm ${tone === "warn" ? "text-amber-700" : ""}`}>
+        {value}
+      </p>
+      {detail ? <p className="mt-1 truncate text-treasuri-muted text-[0.68rem]">{detail}</p> : null}
+    </article>
   );
 }
 
@@ -417,6 +463,21 @@ function reviewUrl(transactionId: number | null): string {
     return "/review";
   }
   return `/review?${new URLSearchParams({ transactionId: String(transactionId) }).toString()}`;
+}
+
+function applyReviewResultToCache(queryClient: QueryClient, result: ReviewActionResponse): void {
+  queryClient.setQueryData<ReviewInboxResponse>(["review-inbox"], (current) => {
+    if (!current) {
+      return current;
+    }
+    const corrected = new Set(result.correctedTransactionIds);
+    return {
+      ...current,
+      reviewCount: result.reviewCount,
+      reviewImpact: result.reviewImpact,
+      transactions: current.transactions.filter((transaction) => !corrected.has(transaction.id)),
+    };
+  });
 }
 
 function RuleDraftPanel({

@@ -23,6 +23,7 @@ export const reviewTransactionSchema = z.object({
 export const reviewInboxResponseSchema = z.object({
   categories: z.array(reviewCategorySchema),
   reviewCount: z.number(),
+  reviewImpact: z.string(),
   transactions: z.array(reviewTransactionSchema),
 });
 
@@ -60,7 +61,9 @@ export const reviewActionRequestSchema = z.discriminatedUnion("action", [
 
 export const reviewActionResponseSchema = z.object({
   correctedCount: z.number().default(1),
+  correctedTransactionIds: z.array(z.number()).default([]),
   reviewCount: z.number(),
+  reviewImpact: z.string(),
   ruleDraft: z
     .object({
       categoryId: z.number(),

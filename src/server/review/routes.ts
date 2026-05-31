@@ -43,7 +43,9 @@ export function registerReviewRoutes(app: express.Express, databaseUrl: string |
         sampleInboxes.set(request.sessionID, sampleInbox);
         response.json({
           correctedCount: action.action === "accept" ? 1 : action.applySimilar ? 2 : 1,
+          correctedTransactionIds: [transactionId],
           reviewCount: sampleInbox.reviewCount,
+          reviewImpact: sampleInbox.reviewImpact,
           ruleDraft:
             action.action === "change" && action.next === "rule-preview"
               ? {
@@ -103,6 +105,7 @@ function createSampleInbox(): ReviewInboxResponse {
       { id: 3, name: "Unknown" },
     ],
     reviewCount: 1,
+    reviewImpact: "42.10",
     transactions: [
       {
         amount: "-42.10",
@@ -128,5 +131,16 @@ function applySampleAction(
   _action: ReviewActionRequest,
 ): ReviewInboxResponse {
   const transactions = inbox.transactions.filter((transaction) => transaction.id !== transactionId);
-  return { ...inbox, reviewCount: transactions.length, transactions };
+  return {
+    ...inbox,
+    reviewCount: transactions.length,
+    reviewImpact: reviewImpact(transactions),
+    transactions,
+  };
+}
+
+function reviewImpact(transactions: ReviewInboxResponse["transactions"]): string {
+  return transactions
+    .reduce((total, transaction) => total + Math.abs(Number(transaction.amount) || 0), 0)
+    .toFixed(2);
 }

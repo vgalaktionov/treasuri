@@ -8,7 +8,7 @@ import type {
 import { sql, toQuery } from "../db/sql.ts";
 
 export async function listReviewInbox(pool: pg.Pool): Promise<ReviewInboxResponse> {
-  const [categories, transactions, count] = await Promise.all([
+  const [categories, transactions, count, impact] = await Promise.all([
     pool.query<{ id: string; name: string }>("SELECT id, name FROM categories ORDER BY name"),
     pool.query<{
       amount: string;
@@ -89,11 +89,13 @@ export async function listReviewInbox(pool: pg.Pool): Promise<ReviewInboxRespons
       LIMIT 50
     `),
     reviewCount(pool),
+    reviewImpact(pool),
   ]);
 
   return {
     categories: categories.rows.map((row) => ({ id: Number(row.id), name: row.name })),
     reviewCount: count,
+    reviewImpact: impact,
     transactions: transactions.rows.map((row) => ({
       amount: row.amount,
       bookingDate: row.booking_date,
@@ -137,10 +139,13 @@ export async function applyReviewAction(
         await setManualOverride(client, similarId, action.categoryId, merchantId, action.flags);
       }
       const count = await reviewCount(client);
+      const impact = await reviewImpact(client);
       await client.query("COMMIT");
       return {
         correctedCount: 1 + similarIds.length,
+        correctedTransactionIds: [transactionId, ...similarIds],
         reviewCount: count,
+        reviewImpact: impact,
         ruleDraft:
           action.next === "rule-preview"
             ? await ruleDraftForTransaction(
@@ -178,10 +183,13 @@ export async function applyReviewAction(
         });
       }
       const count = await reviewCount(client);
+      const impact = await reviewImpact(client);
       await client.query("COMMIT");
       return {
         correctedCount: 1 + similarIds.length,
+        correctedTransactionIds: [transactionId, ...similarIds],
         reviewCount: count,
+        reviewImpact: impact,
         ruleDraft: null,
         similarCount: similarIds.length,
         transactionId,
@@ -189,10 +197,13 @@ export async function applyReviewAction(
     }
 
     const count = await reviewCount(client);
+    const impact = await reviewImpact(client);
     await client.query("COMMIT");
     return {
       correctedCount: 1,
+      correctedTransactionIds: [transactionId],
       reviewCount: count,
+      reviewImpact: impact,
       ruleDraft: null,
       similarCount: 0,
       transactionId,
@@ -432,4 +443,19 @@ async function reviewCount(clientOrPool: pg.Pool | pg.PoolClient): Promise<numbe
     "SELECT count(*) FROM enriched_transactions WHERE needs_review = true",
   );
   return Number(result.rows[0]?.count ?? 0);
+}
+
+async function reviewImpact(clientOrPool: pg.Pool | pg.PoolClient): Promise<string> {
+  const result = await clientOrPool.query<{ impact: string }>(`
+    SELECT COALESCE(sum(abs(raw_transactions.amount)), 0)::text AS impact
+    FROM enriched_transactions
+    JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+    WHERE enriched_transactions.needs_review = true
+  `);
+  return formatMoney(result.rows[0]?.impact ?? "0");
+}
+
+function formatMoney(value: string): string {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
 }
