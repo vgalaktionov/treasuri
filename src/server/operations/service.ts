@@ -88,6 +88,7 @@ export async function loadStatus(pool: pg.Pool, config: AppConfig): Promise<Stat
     pool.query<{
       error_message: string | null;
       finished_at: string | null;
+      metadata_json: Record<string, unknown>;
       new_transaction_count: number;
       provider: string;
       status: string;
@@ -95,7 +96,7 @@ export async function loadStatus(pool: pg.Pool, config: AppConfig): Promise<Stat
     }>(
       `
         SELECT provider, status, finished_at::text, new_transaction_count,
-          updated_transaction_count, error_message
+          updated_transaction_count, error_message, metadata_json
         FROM sync_runs
         ORDER BY started_at DESC, id DESC
         LIMIT 1
@@ -271,6 +272,7 @@ function syncRows(
     | {
         error_message: string | null;
         finished_at: string | null;
+        metadata_json: Record<string, unknown>;
         new_transaction_count: number;
         provider: string;
         status: string;
@@ -288,7 +290,32 @@ function syncRows(
       value: `${row.provider} ${row.status}`,
     },
     ...(row.error_message ? [{ label: "Last error", value: redact(row.error_message) ?? "" }] : []),
+    ...syncMetadataRows(row.metadata_json),
   ];
+}
+
+function syncMetadataRows(metadata: Record<string, unknown>) {
+  const rows: { detail?: string; label: string; value: string }[] = [];
+  const lastMutationKey = stringMetadata(metadata.last_mutation_key);
+  if (lastMutationKey) {
+    rows.push({
+      detail: "Stored from the latest completed ABN mutation page.",
+      label: "ABN cursor",
+      value: lastMutationKey,
+    });
+  }
+  if (metadata.clear_cache_indicator === true || metadata.cursor_reset === true) {
+    rows.push({
+      detail: "ABN requested local cursor reset on the last sync.",
+      label: "ABN cursor reset",
+      value: metadata.cursor_reset === true ? "yes" : "pending",
+    });
+  }
+  return rows;
+}
+
+function stringMetadata(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
 }
 
 function transactionRows(

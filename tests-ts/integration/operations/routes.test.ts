@@ -154,6 +154,40 @@ describe("operations API", () => {
     }
   }, 120_000);
 
+  it("reports ABN cursor metadata in status", async () => {
+    const { app, container, databaseUrl, restore } = await appWithSampleData();
+    try {
+      await withPool(databaseUrl, async (pool) => {
+        await pool.query(`
+          INSERT INTO sync_runs (
+            provider, status, finished_at, metadata_json
+          )
+          VALUES (
+            'abn_amro',
+            'completed',
+            now(),
+            '{"source":"bank-sync","last_mutation_key":"cursor-visible","cursor_reset":false}'::jsonb
+          )
+        `);
+      });
+
+      const status = await request(app).get("/api/status").expect(200);
+      const syncSection = status.body.sections.find(
+        (section: { title: string }) => section.title === "Sync",
+      );
+
+      expect(syncSection.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: "Last sync", value: "abn_amro completed" }),
+          expect.objectContaining({ label: "ABN cursor", value: "cursor-visible" }),
+        ]),
+      );
+    } finally {
+      await restore();
+      await container.stop();
+    }
+  }, 120_000);
+
   it("runs a manual bank sync and records status-visible sync data", async () => {
     const { app, container, databaseUrl, restore } = await appWithSampleData();
     try {
