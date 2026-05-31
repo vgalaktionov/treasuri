@@ -153,6 +153,29 @@ describe("management API", () => {
     }
   }, 60_000);
 
+  it("drafts a rule from transaction context with preview counts", async () => {
+    const { app, container, restore } = await appWithSampleData();
+    try {
+      const { agent } = await csrfAgent(app);
+      const transactions = await agent.get("/api/transactions?query=groceries").expect(200);
+      const transaction = transactions.body.transactions[0];
+      const drafted = await agent
+        .get(`/api/rules/draft-from-transaction/${transaction.id}`)
+        .expect(200);
+
+      expect(drafted.body.transactionId).toBe(transaction.id);
+      expect(drafted.body.rule.name).toBe("Classify Sample Supermarket");
+      expect(drafted.body.rule.field).toBe("counterparty_name");
+      expect(drafted.body.rule.pattern).toBe("Sample Supermarket");
+      expect(drafted.body.rule.categoryId).toBe(transaction.categoryId);
+      expect(drafted.body.preview.matchCount).toBeGreaterThan(0);
+      expect(drafted.body.preview.alreadyCorrectCount).toBeGreaterThan(0);
+    } finally {
+      await restore();
+      await container.stop();
+    }
+  }, 60_000);
+
   it("edits rules, toggles active state, and reports history preview counts", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {

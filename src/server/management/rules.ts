@@ -94,6 +94,69 @@ export async function previewRule(pool: pg.Pool, rule: RulePreviewRequest) {
   return previewFromMatches(rule, result.rows);
 }
 
+export async function draftRuleFromTransaction(
+  pool: pg.Pool,
+  transactionId: number,
+): Promise<RuleEditorRequest> {
+  const result = await pool.query<{
+    category_id: string | null;
+    counterparty_name: string | null;
+    description: string;
+    fallback_category_id: string | null;
+    is_excluded_from_budget: boolean;
+    is_fixed_cost: boolean;
+    is_income: boolean;
+    is_savings: boolean;
+    is_transfer: boolean;
+    merchant_name: string | null;
+  }>(
+    `
+      SELECT raw_transactions.counterparty_name,
+        raw_transactions.description,
+        enriched_transactions.category_id::text,
+        merchants.name AS merchant_name,
+        enriched_transactions.is_income,
+        enriched_transactions.is_transfer,
+        enriched_transactions.is_savings,
+        enriched_transactions.is_fixed_cost,
+        enriched_transactions.is_excluded_from_budget,
+        (
+          SELECT id::text FROM categories
+          ORDER BY CASE WHEN name = 'Unknown' THEN 0 ELSE 1 END, name
+          LIMIT 1
+        ) AS fallback_category_id
+      FROM enriched_transactions
+      JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+      LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+      WHERE enriched_transactions.id = $1
+    `,
+    [transactionId],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw new Error("Transaction not found");
+  }
+
+  const pattern = row.counterparty_name?.trim() || row.description.trim();
+  return {
+    categoryId: Number(row.category_id ?? row.fallback_category_id),
+    field: row.counterparty_name?.trim() ? "counterparty_name" : "description",
+    flags: {
+      setIsExcludedFromBudget: row.is_excluded_from_budget,
+      setIsFixedCost: row.is_fixed_cost,
+      setIsIncome: row.is_income,
+      setIsSavings: row.is_savings,
+      setIsTransfer: row.is_transfer,
+    },
+    isActive: true,
+    merchantName: row.merchant_name ?? undefined,
+    name: `Classify ${pattern}`,
+    operator: "contains",
+    pattern,
+    priority: 100,
+  };
+}
+
 export async function createRule(pool: pg.Pool, rule: RuleEditorRequest): Promise<number> {
   const merchantId = await upsertMerchant(pool, rule.merchantName, rule.categoryId);
   const result = await pool.query<{ id: string }>(

@@ -140,6 +140,30 @@ export function sampleRuleFromInput(
   };
 }
 
+export function sampleRuleDraftForTransaction(id: number): RuleEditorRequest {
+  const transaction = sampleTransactions({}).transactions.find((item) => item.id === id);
+  if (!transaction) {
+    throw new Error("Transaction not found");
+  }
+  return {
+    categoryId: transaction.categoryId ?? 3,
+    field: "merchant",
+    flags: {
+      setIsExcludedFromBudget: transaction.flags.includes("excluded"),
+      setIsFixedCost: transaction.flags.includes("fixed"),
+      setIsIncome: false,
+      setIsSavings: transaction.flags.includes("savings"),
+      setIsTransfer: transaction.flags.includes("transfer"),
+    },
+    isActive: true,
+    merchantName: transaction.merchant === "Unknown" ? undefined : transaction.merchant,
+    name: `Classify ${transaction.merchant}`,
+    operator: "contains",
+    pattern: transaction.merchant,
+    priority: 100,
+  };
+}
+
 export function sampleRecurringFor(
   stores: Map<string, RecurringResponse>,
   request: express.Request,

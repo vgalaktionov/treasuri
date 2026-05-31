@@ -7,6 +7,7 @@ import {
   ruleActiveUpdateRequestSchema,
   ruleApplyResponseSchema,
   ruleCreateResponseSchema,
+  ruleDraftFromTransactionResponseSchema,
   ruleEditorRequestSchema,
   rulePreviewRequestSchema,
   rulePreviewResponseSchema,
@@ -22,6 +23,7 @@ import { confirmRecurring, disableRecurring, listRecurring } from "./recurring.t
 import {
   applyRule,
   createRule,
+  draftRuleFromTransaction,
   listRules,
   previewRule,
   setRuleActive,
@@ -32,6 +34,7 @@ import {
   sampleCategoryBudgets,
   sampleRawDetails,
   sampleRecurringFor,
+  sampleRuleDraftForTransaction,
   sampleRuleFromInput,
   sampleRulesFor,
   sampleTransactions,
@@ -167,6 +170,43 @@ export function registerManagementRoutes(
       const pool = createPool(databaseUrl);
       try {
         response.json(rulePreviewResponseSchema.parse(await previewRule(pool, rule)));
+      } finally {
+        await pool.end();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/rules/draft-from-transaction/:id", async (request, response, next) => {
+    try {
+      if (!databaseUrl) {
+        const rule = sampleRuleDraftForTransaction(Number(request.params.id));
+        response.json(
+          ruleDraftFromTransactionResponseSchema.parse({
+            preview: {
+              alreadyCorrectCount: 0,
+              matchCount: sampleTransactions({ query: rule.pattern }).transactions.length,
+              matches: sampleTransactions({ query: rule.pattern }).transactions,
+              skippedManualCount: 0,
+              wouldChangeCount: sampleTransactions({ query: rule.pattern }).transactions.length,
+            },
+            rule,
+            transactionId: Number(request.params.id),
+          }),
+        );
+        return;
+      }
+      const pool = createPool(databaseUrl);
+      try {
+        const rule = await draftRuleFromTransaction(pool, Number(request.params.id));
+        response.json(
+          ruleDraftFromTransactionResponseSchema.parse({
+            preview: await previewRule(pool, rule),
+            rule,
+            transactionId: Number(request.params.id),
+          }),
+        );
       } finally {
         await pool.end();
       }

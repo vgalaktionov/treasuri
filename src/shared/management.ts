@@ -147,6 +147,12 @@ export const rulePreviewResponseSchema = z.object({
   wouldChangeCount: z.number().default(0),
 });
 
+export const ruleDraftFromTransactionResponseSchema = z.object({
+  preview: rulePreviewResponseSchema,
+  rule: ruleEditorRequestSchema,
+  transactionId: z.number(),
+});
+
 export const ruleCreateResponseSchema = z.object({ ruleId: z.number() });
 
 export const ruleApplyResponseSchema = z.object({
@@ -204,6 +210,9 @@ export const recurringActionResponseSchema = z.object({ ok: z.boolean() });
 export const ruleActiveUpdateRequestSchema = z.object({ isActive: z.boolean() });
 export type CategoryBudgetResponse = z.infer<typeof categoryBudgetResponseSchema>;
 export type RulePreviewRequest = z.infer<typeof rulePreviewRequestSchema>;
+export type RuleDraftFromTransactionResponse = z.infer<
+  typeof ruleDraftFromTransactionResponseSchema
+>;
 export type RuleEditorRequest = z.infer<typeof ruleEditorRequestSchema>;
 export type RulesResponse = z.infer<typeof rulesResponseSchema>;
 export type RecurringResponse = z.infer<typeof recurringResponseSchema>;

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Database, Filter, RotateCcw, Save, Search } from "lucide-react";
+import { ChevronDown, Database, FilePlus2, Filter, RotateCcw, Save, Search } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 
@@ -8,7 +8,13 @@ import type {
   TransactionsResponse,
   TransactionUpdateRequest,
 } from "../../shared/management.ts";
-import { fetchTransactionRawDetails, fetchTransactions, updateTransaction } from "../lib/api.ts";
+import {
+  createRule,
+  draftRuleFromTransaction,
+  fetchTransactionRawDetails,
+  fetchTransactions,
+  updateTransaction,
+} from "../lib/api.ts";
 
 type TransactionItem = TransactionsResponse["transactions"][number];
 
@@ -335,6 +341,7 @@ function TransactionInspector({
   onSave: (transaction: TransactionItem, input: TransactionUpdateRequest) => void;
   transaction: TransactionItem | null;
 }) {
+  const queryClient = useQueryClient();
   const [showRaw, setShowRaw] = useState(false);
   const [categoryId, setCategoryId] = useState(0);
   const [merchantName, setMerchantName] = useState("");
@@ -344,6 +351,21 @@ function TransactionInspector({
     enabled: showRaw && transaction !== null,
     queryFn: () => fetchTransactionRawDetails(transaction?.id ?? 0),
     queryKey: ["transaction-raw", transaction?.id],
+  });
+  const ruleDraft = useMutation({
+    mutationFn: () => draftRuleFromTransaction(transaction?.id ?? 0),
+  });
+  const createDraftRule = useMutation({
+    mutationFn: () => {
+      if (!ruleDraft.data) {
+        throw new Error("No drafted rule to create");
+      }
+      return createRule(ruleDraft.data.rule);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rules"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
   });
 
   useEffect(() => {
@@ -465,8 +487,56 @@ function TransactionInspector({
             <Database aria-hidden="true" className="size-4" />
             Raw data
           </button>
+          <button
+            className="col-span-2 inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-treasuri-line px-2 font-medium text-xs disabled:opacity-60 sm:text-sm"
+            disabled={ruleDraft.isPending}
+            onClick={() => ruleDraft.mutate()}
+            type="button"
+          >
+            <FilePlus2 aria-hidden="true" className="size-4" />
+            Preview rule
+          </button>
         </div>
       </form>
+
+      {ruleDraft.data ? (
+        <div className="mt-3 rounded-md border border-treasuri-line bg-treasuri-panel p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="font-semibold text-sm">{ruleDraft.data.rule.name}</p>
+              <p className="mt-1 text-treasuri-muted text-xs">
+                {ruleDraft.data.rule.field} {ruleDraft.data.rule.operator} "
+                {ruleDraft.data.rule.pattern}"
+              </p>
+            </div>
+            <button
+              className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-xs text-white disabled:opacity-60 sm:text-sm"
+              disabled={createDraftRule.isPending}
+              onClick={() => createDraftRule.mutate()}
+              type="button"
+            >
+              <FilePlus2 aria-hidden="true" className="size-4" />
+              Create rule
+            </button>
+          </div>
+          <dl className="mt-2 grid grid-cols-4 gap-2 text-xs">
+            <RulePreviewFact label="matches" value={ruleDraft.data.preview.matchCount} />
+            <RulePreviewFact label="changes" value={ruleDraft.data.preview.wouldChangeCount} />
+            <RulePreviewFact label="correct" value={ruleDraft.data.preview.alreadyCorrectCount} />
+            <RulePreviewFact label="manual" value={ruleDraft.data.preview.skippedManualCount} />
+          </dl>
+          {createDraftRule.data ? (
+            <p className="mt-2 text-emerald-700 text-xs">
+              Rule {createDraftRule.data.ruleId} created.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {ruleDraft.isError ? (
+        <p className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-red-700 text-xs">
+          Rule preview failed.
+        </p>
+      ) : null}
 
       {showRaw ? (
         <div className="mt-3 border-t border-treasuri-line pt-3">
@@ -490,6 +560,15 @@ function TransactionInspector({
         </div>
       ) : null}
     </aside>
+  );
+}
+
+function RulePreviewFact({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <dt className="text-treasuri-muted">{label}</dt>
+      <dd className="font-semibold">{value}</dd>
+    </div>
   );
 }
 

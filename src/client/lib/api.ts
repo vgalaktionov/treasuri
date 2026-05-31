@@ -3,6 +3,7 @@ import {
   type CategoryBudgetResponse,
   categoryBudgetResponseSchema,
   managementCategorySchema,
+  type RuleDraftFromTransactionResponse,
   type RuleEditorRequest,
   type RulePreviewRequest,
   recurringActionResponseSchema,
@@ -10,6 +11,7 @@ import {
   ruleActiveUpdateRequestSchema,
   ruleApplyResponseSchema,
   ruleCreateResponseSchema,
+  ruleDraftFromTransactionResponseSchema,
   ruleEditorRequestSchema,
   rulePreviewResponseSchema,
   rulesResponseSchema,
@@ -116,6 +118,16 @@ export async function fetchRules() {
     throw new Error("Failed to load rules");
   }
   return rulesResponseSchema.parse(await response.json());
+}
+
+export async function draftRuleFromTransaction(
+  transactionId: number,
+): Promise<RuleDraftFromTransactionResponse> {
+  const response = await fetch(`/api/rules/draft-from-transaction/${transactionId}`);
+  if (!response.ok) {
+    throw new Error("Failed to draft rule from transaction");
+  }
+  return ruleDraftFromTransactionResponseSchema.parse(await response.json());
 }
 
 export async function fetchCategories() {
