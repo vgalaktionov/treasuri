@@ -62,16 +62,60 @@ export const transactionRawDetailsSchema = z.object({
   payloadJson: z.string(),
 });
 
-export const rulePreviewRequestSchema = z.object({
+export const ruleFieldSchema = z.enum([
+  "account_id",
+  "amount",
+  "counterparty_iban",
+  "counterparty_name",
+  "description",
+  "merchant",
+]);
+
+export const ruleOperatorSchema = z.enum([
+  "amount_between",
+  "contains",
+  "ends_with",
+  "exact",
+  "regex",
+  "starts_with",
+]);
+
+export const ruleFlagsSchema = z
+  .object({
+    setIsExcludedFromBudget: z.boolean().default(false),
+    setIsFixedCost: z.boolean().default(false),
+    setIsIncome: z.boolean().default(false),
+    setIsSavings: z.boolean().default(false),
+    setIsTransfer: z.boolean().default(false),
+  })
+  .default({
+    setIsExcludedFromBudget: false,
+    setIsFixedCost: false,
+    setIsIncome: false,
+    setIsSavings: false,
+    setIsTransfer: false,
+  });
+
+export const ruleEditorRequestSchema = z.object({
   categoryId: z.number(),
-  field: z.enum(["description", "counterparty_name"]),
+  field: ruleFieldSchema,
+  flags: ruleFlagsSchema,
+  isActive: z.boolean().default(true),
+  merchantName: z.string().optional(),
   name: z.string().min(1),
+  operator: ruleOperatorSchema.default("contains"),
   pattern: z.string().min(1),
+  priority: z.number().int().min(0).default(100),
 });
 
+export const rulePreviewRequestSchema = ruleEditorRequestSchema;
+
 export const rulePreviewResponseSchema = z.object({
+  alreadyCorrectCount: z.number().default(0),
+  matchCount: z.number().default(0),
   matches: z.array(transactionListItemSchema),
-  skippedManualCount: z.number(),
+  skippedManualCount: z.number().default(0),
+  wouldChangeCount: z.number().default(0),
 });
 
 export const ruleCreateResponseSchema = z.object({ ruleId: z.number() });
@@ -83,14 +127,25 @@ export const ruleApplyResponseSchema = z.object({
 
 export const rulesResponseSchema = z.object({
   categories: z.array(managementCategorySchema),
+  fields: z.array(ruleFieldSchema),
+  operators: z.array(ruleOperatorSchema),
   rules: z.array(
     z.object({
+      alreadyCorrectCount: z.number(),
+      categoryId: z.number().nullable(),
       categoryName: z.string().nullable(),
-      field: z.string(),
+      field: ruleFieldSchema,
+      flags: z.array(z.string()),
       id: z.number(),
       isActive: z.boolean(),
+      manualOverridesSkippedCount: z.number(),
+      matchCount: z.number(),
+      merchantName: z.string().nullable(),
       name: z.string(),
+      operator: ruleOperatorSchema,
       pattern: z.string(),
+      priority: z.number(),
+      wouldChangeCount: z.number(),
     }),
   ),
 });
@@ -101,15 +156,22 @@ export const recurringResponseSchema = z.object({
       amount: z.string().nullable(),
       categoryName: z.string().nullable(),
       cadence: z.string(),
+      confidence: z.string().nullable().default(null),
       id: z.number(),
       isConfirmed: z.boolean(),
       name: z.string(),
       nextExpectedDate: z.string().nullable(),
+      warnings: z.array(z.string()).default([]),
     }),
   ),
 });
 
+export const recurringActionResponseSchema = z.object({ ok: z.boolean() });
+export const ruleActiveUpdateRequestSchema = z.object({ isActive: z.boolean() });
 export type RulePreviewRequest = z.infer<typeof rulePreviewRequestSchema>;
+export type RuleEditorRequest = z.infer<typeof ruleEditorRequestSchema>;
+export type RulesResponse = z.infer<typeof rulesResponseSchema>;
+export type RecurringResponse = z.infer<typeof recurringResponseSchema>;
 export type TransactionFilters = z.infer<typeof transactionFiltersSchema>;
 export type TransactionUpdateRequest = z.infer<typeof transactionUpdateRequestSchema>;
 export type TransactionRawDetails = z.infer<typeof transactionRawDetailsSchema>;

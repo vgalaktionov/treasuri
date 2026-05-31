@@ -9,7 +9,7 @@ import type {
 import { sql, toQuery } from "../db/sql.ts";
 import { listCategories } from "./service.ts";
 
-type TransactionRow = {
+export type TransactionRow = {
   amount: string;
   booking_date: string;
   category_id: string | null;
@@ -26,6 +26,12 @@ type TransactionRow = {
   is_transfer: boolean;
   merchant: string | null;
   needs_review: boolean;
+};
+
+export type TransactionMatchRow = TransactionRow & {
+  category_matches: boolean;
+  has_manual_override: boolean;
+  merchant_matches: boolean;
 };
 
 export async function listTransactions(
@@ -381,7 +387,7 @@ function kindFilter(kind: string | undefined): string {
   }
 }
 
-function transactionRow(row: TransactionRow) {
+export function transactionRow(row: TransactionRow) {
   return {
     amount: row.amount,
     bookingDate: row.booking_date,

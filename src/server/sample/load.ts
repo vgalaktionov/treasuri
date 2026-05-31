@@ -189,7 +189,7 @@ async function replaceSampleRecurringSeries(client: pg.PoolClient): Promise<void
         (SELECT id FROM categories WHERE name = 'Rent / Mortgage')
       ),
       (
-        'Sample Streaming', 'monthly', 'fixed', 14.99, 0, 15, '2026-06-15', 0.95, true, true,
+        'Sample Streaming', 'monthly', 'fixed', 14.99, 0, 15, '2026-06-15', 0.80, false, true,
         (SELECT id FROM categories WHERE name = 'Subscriptions')
       )
   `);

@@ -1,26 +1,47 @@
 import type express from "express";
 
 import {
+  recurringActionResponseSchema,
   recurringResponseSchema,
+  ruleActiveUpdateRequestSchema,
   ruleApplyResponseSchema,
   ruleCreateResponseSchema,
+  ruleEditorRequestSchema,
   rulePreviewRequestSchema,
   rulePreviewResponseSchema,
   rulesResponseSchema,
-  type TransactionsResponse,
   transactionFiltersSchema,
   transactionRawDetailsSchema,
   transactionsResponseSchema,
   transactionUpdateRequestSchema,
 } from "../../shared/management.ts";
 import { createPool } from "../db/pool.ts";
-import { applyRule, createRule, listRecurring, listRules, previewRule } from "./service.ts";
+import { confirmRecurring, disableRecurring, listRecurring } from "./recurring.ts";
+import {
+  applyRule,
+  createRule,
+  listRules,
+  previewRule,
+  setRuleActive,
+  updateRule,
+} from "./rules.ts";
+import {
+  sampleCategories,
+  sampleRawDetails,
+  sampleRecurringFor,
+  sampleRuleFromInput,
+  sampleRulesFor,
+  sampleTransactions,
+} from "./sample.ts";
 import { getTransactionRawDetails, listTransactions, updateTransaction } from "./transactions.ts";
 
 export function registerManagementRoutes(
   app: express.Express,
   databaseUrl: string | undefined,
 ): void {
+  const sampleRuleStores = new Map<string, ReturnType<typeof sampleRulesFor>>();
+  const sampleRecurringStores = new Map<string, ReturnType<typeof sampleRecurringFor>>();
+
   app.get("/api/transactions", async (request, response, next) => {
     try {
       if (!databaseUrl) {
@@ -94,10 +115,10 @@ export function registerManagementRoutes(
     }
   });
 
-  app.get("/api/rules", async (_request, response, next) => {
+  app.get("/api/rules", async (request, response, next) => {
     try {
       if (!databaseUrl) {
-        response.json(rulesResponseSchema.parse({ categories: sampleCategories, rules: [] }));
+        response.json(rulesResponseSchema.parse(sampleRulesFor(sampleRuleStores, request)));
         return;
       }
       const pool = createPool(databaseUrl);
@@ -136,14 +157,68 @@ export function registerManagementRoutes(
 
   app.post("/api/rules", async (request, response, next) => {
     try {
-      const rule = rulePreviewRequestSchema.parse(request.body);
+      const rule = ruleEditorRequestSchema.parse(request.body);
       if (!databaseUrl) {
-        response.json(ruleCreateResponseSchema.parse({ ruleId: 1 }));
+        const rules = sampleRulesFor(sampleRuleStores, request);
+        const ruleId = Math.max(0, ...rules.rules.map((item) => item.id)) + 1;
+        rules.rules.unshift(sampleRuleFromInput(ruleId, rule));
+        sampleRuleStores.set(request.sessionID, rules);
+        response.json(ruleCreateResponseSchema.parse({ ruleId }));
         return;
       }
       const pool = createPool(databaseUrl);
       try {
         response.json(ruleCreateResponseSchema.parse({ ruleId: await createRule(pool, rule) }));
+      } finally {
+        await pool.end();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/rules/:id", async (request, response, next) => {
+    try {
+      const rule = ruleEditorRequestSchema.parse(request.body);
+      if (!databaseUrl) {
+        const rules = sampleRulesFor(sampleRuleStores, request);
+        rules.rules = rules.rules.map((item) =>
+          item.id === Number(request.params.id)
+            ? sampleRuleFromInput(Number(request.params.id), rule)
+            : item,
+        );
+        sampleRuleStores.set(request.sessionID, rules);
+        response.json({ ok: true });
+        return;
+      }
+      const pool = createPool(databaseUrl);
+      try {
+        await updateRule(pool, Number(request.params.id), rule);
+        response.json({ ok: true });
+      } finally {
+        await pool.end();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/rules/:id/active", async (request, response, next) => {
+    try {
+      const body = ruleActiveUpdateRequestSchema.parse(request.body);
+      if (!databaseUrl) {
+        const rules = sampleRulesFor(sampleRuleStores, request);
+        rules.rules = rules.rules.map((item) =>
+          item.id === Number(request.params.id) ? { ...item, isActive: body.isActive } : item,
+        );
+        sampleRuleStores.set(request.sessionID, rules);
+        response.json({ ok: true });
+        return;
+      }
+      const pool = createPool(databaseUrl);
+      try {
+        await setRuleActive(pool, Number(request.params.id), body.isActive);
+        response.json({ ok: true });
       } finally {
         await pool.end();
       }
@@ -171,15 +246,71 @@ export function registerManagementRoutes(
     }
   });
 
-  app.get("/api/recurring", async (_request, response, next) => {
+  app.get("/api/recurring", async (request, response, next) => {
     try {
       if (!databaseUrl) {
-        response.json(recurringResponseSchema.parse({ series: [] }));
+        response.json(
+          recurringResponseSchema.parse(sampleRecurringFor(sampleRecurringStores, request)),
+        );
         return;
       }
       const pool = createPool(databaseUrl);
       try {
         response.json(recurringResponseSchema.parse(await listRecurring(pool)));
+      } finally {
+        await pool.end();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/recurring/:id/confirm", async (request, response, next) => {
+    try {
+      if (!databaseUrl) {
+        const recurring = sampleRecurringFor(sampleRecurringStores, request);
+        recurring.series = recurring.series.map((series) =>
+          series.id === Number(request.params.id)
+            ? { ...series, confidence: "0.90", isConfirmed: true, warnings: [] }
+            : series,
+        );
+        sampleRecurringStores.set(request.sessionID, recurring);
+        response.json(recurringActionResponseSchema.parse({ ok: true }));
+        return;
+      }
+      const pool = createPool(databaseUrl);
+      try {
+        response.json(
+          recurringActionResponseSchema.parse({
+            ok: await confirmRecurring(pool, Number(request.params.id)),
+          }),
+        );
+      } finally {
+        await pool.end();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/recurring/:id/disable", async (request, response, next) => {
+    try {
+      if (!databaseUrl) {
+        const recurring = sampleRecurringFor(sampleRecurringStores, request);
+        recurring.series = recurring.series.filter(
+          (series) => series.id !== Number(request.params.id),
+        );
+        sampleRecurringStores.set(request.sessionID, recurring);
+        response.json(recurringActionResponseSchema.parse({ ok: true }));
+        return;
+      }
+      const pool = createPool(databaseUrl);
+      try {
+        response.json(
+          recurringActionResponseSchema.parse({
+            ok: await disableRecurring(pool, Number(request.params.id)),
+          }),
+        );
       } finally {
         await pool.end();
       }
@@ -200,13 +331,6 @@ async function managementData(databaseUrl: string | undefined) {
     await pool.end();
   }
 }
-
-const sampleCategories = [
-  { id: 1, name: "Dog" },
-  { id: 2, name: "Groceries" },
-  { id: 3, name: "Unknown" },
-  { id: 4, name: "Savings" },
-];
 
 function filtersFromQuery(query: express.Request["query"]) {
   return transactionFiltersSchema.parse({
@@ -229,94 +353,4 @@ function stringQuery(value: unknown): string | undefined {
     return undefined;
   }
   return value;
-}
-
-function sampleTransactions(filters: ReturnType<typeof filtersFromQuery>): TransactionsResponse {
-  const needle = (filters.query ?? "").toLowerCase();
-  const transactions = [
-    {
-      amount: "-89.95",
-      bookingDate: "2026-05-20",
-      categoryId: 1,
-      categoryName: "Dog",
-      classificationMethod: "sample",
-      description: "Dog food sample",
-      flags: [],
-      id: 1,
-      merchant: "Sample Pet Care",
-      needsReview: false,
-    },
-    {
-      amount: "-64.35",
-      bookingDate: "2026-05-26",
-      categoryId: 2,
-      categoryName: "Groceries",
-      classificationMethod: "sample",
-      description: "Groceries sample",
-      flags: [],
-      id: 2,
-      merchant: "Sample Supermarket",
-      needsReview: false,
-    },
-    {
-      amount: "-500.00",
-      bookingDate: "2026-05-16",
-      categoryId: 3,
-      categoryName: "Unknown",
-      classificationMethod: "sample",
-      description: "Savings transfer sample",
-      flags: ["transfer", "savings"],
-      id: 3,
-      merchant: "Sample Own Savings",
-      needsReview: false,
-    },
-    {
-      amount: "-42.10",
-      bookingDate: "2026-05-27",
-      categoryId: 3,
-      categoryName: "Unknown",
-      classificationMethod: "uncategorized",
-      description: "Needs review sample",
-      flags: [],
-      id: 4,
-      merchant: "Unknown Sample Merchant",
-      needsReview: true,
-    },
-  ].filter((transaction) => {
-    const matchesSearch = needle
-      ? `${transaction.description} ${transaction.merchant}`.toLowerCase().includes(needle)
-      : true;
-    const matchesCategory = filters.category ? transaction.categoryName === filters.category : true;
-    const matchesMerchant = filters.merchant ? transaction.merchant === filters.merchant : true;
-    const matchesReview = filters.needsReview ? transaction.needsReview : true;
-    const matchesKind = filters.kind ? transaction.flags.includes(filters.kind) : true;
-    return matchesSearch && matchesCategory && matchesMerchant && matchesReview && matchesKind;
-  });
-  return {
-    categories: sampleCategories,
-    merchants: [...new Set(transactions.map((transaction) => transaction.merchant))],
-    transactions,
-  };
-}
-
-function sampleRawDetails(id: number) {
-  const transaction = sampleTransactions({}).transactions.find((item) => item.id === id);
-  if (!transaction) {
-    throw new Error("Transaction not found");
-  }
-  return {
-    amount: transaction.amount,
-    bookingDate: transaction.bookingDate,
-    categoryName: transaction.categoryName,
-    description: transaction.description,
-    details: [
-      { label: "Account", value: "Sample current account" },
-      { label: "IBAN", value: "NL00FAKE0123456789" },
-      { label: "Provider", value: "fake" },
-      { label: "Currency", value: "EUR" },
-    ],
-    id: transaction.id,
-    merchant: transaction.merchant,
-    payloadJson: JSON.stringify({ source: "sample" }, null, 2),
-  };
 }

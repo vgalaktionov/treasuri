@@ -119,6 +119,94 @@ describe("management API", () => {
       await container.stop();
     }
   }, 60_000);
+
+  it("edits rules, toggles active state, and reports history preview counts", async () => {
+    const { app, container, restore } = await appWithSampleData();
+    try {
+      const transactions = await request(app).get("/api/transactions?query=groceries").expect(200);
+      const groceries = transactions.body.categories.find(
+        (category: { name: string }) => category.name === "Groceries",
+      );
+      const created = await request(app)
+        .post("/api/rules")
+        .send({
+          categoryId: groceries.id,
+          field: "merchant",
+          flags: { setIsFixedCost: true },
+          isActive: true,
+          merchantName: "Sample Supermarket",
+          name: "Supermarket merchant",
+          operator: "contains",
+          pattern: "Supermarket",
+          priority: 25,
+        })
+        .expect(200);
+
+      const listed = await request(app).get("/api/rules").expect(200);
+      const rule = listed.body.rules.find(
+        (item: { id: number }) => item.id === created.body.ruleId,
+      );
+
+      expect(rule.priority).toBe(25);
+      expect(rule.matchCount).toBe(1);
+      expect(rule.wouldChangeCount).toBe(1);
+      expect(rule.flags).toContain("fixed");
+
+      await request(app)
+        .put(`/api/rules/${created.body.ruleId}`)
+        .send({
+          categoryId: groceries.id,
+          field: "description",
+          flags: { setIsSavings: true },
+          isActive: true,
+          merchantName: "Sample Supermarket",
+          name: "Groceries description",
+          operator: "starts_with",
+          pattern: "Groceries",
+          priority: 5,
+        })
+        .expect(200);
+      await request(app)
+        .patch(`/api/rules/${created.body.ruleId}/active`)
+        .send({ isActive: false })
+        .expect(200);
+      const inactiveApply = await request(app)
+        .post(`/api/rules/${created.body.ruleId}/apply`)
+        .expect(200);
+
+      expect(inactiveApply.body.updatedCount).toBe(0);
+    } finally {
+      await restore();
+      await container.stop();
+    }
+  }, 60_000);
+
+  it("confirms and disables recurring series", async () => {
+    const { app, container, restore } = await appWithSampleData();
+    try {
+      const recurring = await request(app).get("/api/recurring").expect(200);
+      const detected = recurring.body.series.find(
+        (series: { isConfirmed: boolean }) => !series.isConfirmed,
+      );
+
+      expect(recurring.body.series[0].confidence).toBeDefined();
+      await request(app).post(`/api/recurring/${detected.id}/confirm`).expect(200);
+      const confirmed = await request(app).get("/api/recurring").expect(200);
+      expect(
+        confirmed.body.series.find((series: { id: number }) => series.id === detected.id)
+          .isConfirmed,
+      ).toBe(true);
+
+      await request(app).post(`/api/recurring/${detected.id}/disable`).expect(200);
+      const disabled = await request(app).get("/api/recurring").expect(200);
+      expect(disabled.body.series.some((series: { id: number }) => series.id === detected.id)).toBe(
+        false,
+      );
+    } finally {
+      await restore();
+      await container.stop();
+    }
+  }, 60_000);
 });
 
 async function appWithSampleData() {

@@ -3,7 +3,7 @@ import type pg from "pg";
 import { createDefaultBankProvider } from "../bank/fake.ts";
 import { syncBankTransactions } from "../bank/sync.ts";
 import { calculateSafeToSpend, daysLeftInMonth, formatMoney } from "../forecast/calculator.ts";
-import { applyRule } from "../management/service.ts";
+import { applyRule } from "../management/rules.ts";
 import { createXlsxExport } from "../operations/exportService.ts";
 import { normalizePendingTransactions } from "../transactions/normalize.ts";
 import { type JobName, jobPayloadSchemas } from "./definitions.ts";

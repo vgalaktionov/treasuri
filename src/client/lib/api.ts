@@ -1,10 +1,14 @@
 import { type DashboardResponse, dashboardResponseSchema } from "../../shared/dashboard.ts";
 import {
   managementCategorySchema,
+  type RuleEditorRequest,
   type RulePreviewRequest,
+  recurringActionResponseSchema,
   recurringResponseSchema,
+  ruleActiveUpdateRequestSchema,
   ruleApplyResponseSchema,
   ruleCreateResponseSchema,
+  ruleEditorRequestSchema,
   rulePreviewResponseSchema,
   rulesResponseSchema,
   type TransactionFilters,
@@ -121,9 +125,9 @@ export async function previewRule(input: RulePreviewRequest) {
   return rulePreviewResponseSchema.parse(await response.json());
 }
 
-export async function createRule(input: RulePreviewRequest) {
+export async function createRule(input: RuleEditorRequest) {
   const response = await fetch("/api/rules", {
-    body: JSON.stringify(input),
+    body: JSON.stringify(ruleEditorRequestSchema.parse(input)),
     headers: { "content-type": "application/json" },
     method: "POST",
   });
@@ -133,12 +137,50 @@ export async function createRule(input: RulePreviewRequest) {
   return ruleCreateResponseSchema.parse(await response.json());
 }
 
+export async function updateRule(ruleId: number, input: RuleEditorRequest) {
+  const response = await fetch(`/api/rules/${ruleId}`, {
+    body: JSON.stringify(ruleEditorRequestSchema.parse(input)),
+    headers: { "content-type": "application/json" },
+    method: "PUT",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to update rule");
+  }
+}
+
+export async function setRuleActive(ruleId: number, isActive: boolean) {
+  const response = await fetch(`/api/rules/${ruleId}/active`, {
+    body: JSON.stringify(ruleActiveUpdateRequestSchema.parse({ isActive })),
+    headers: { "content-type": "application/json" },
+    method: "PATCH",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to update rule status");
+  }
+}
+
 export async function applyRule(ruleId: number) {
   const response = await fetch(`/api/rules/${ruleId}/apply`, { method: "POST" });
   if (!response.ok) {
     throw new Error("Failed to apply rule");
   }
   return ruleApplyResponseSchema.parse(await response.json());
+}
+
+export async function confirmRecurring(seriesId: number) {
+  const response = await fetch(`/api/recurring/${seriesId}/confirm`, { method: "POST" });
+  if (!response.ok) {
+    throw new Error("Failed to confirm recurring series");
+  }
+  return recurringActionResponseSchema.parse(await response.json());
+}
+
+export async function disableRecurring(seriesId: number) {
+  const response = await fetch(`/api/recurring/${seriesId}/disable`, { method: "POST" });
+  if (!response.ok) {
+    throw new Error("Failed to disable recurring series");
+  }
+  return recurringActionResponseSchema.parse(await response.json());
 }
 
 export async function applyReviewAction(
