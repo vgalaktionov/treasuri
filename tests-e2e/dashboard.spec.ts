@@ -14,6 +14,10 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
   await expect(page.getByText("EUR 1000.00").first()).toBeVisible();
   await expect(page.getByText("Review blockers")).toBeVisible();
   await expect(page.getByText("Unknown Sample Merchant")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Unknown Sample Merchant review/ })).toHaveAttribute(
+    "href",
+    "/review?transactionId=4",
+  );
   await page.getByRole("tab", { name: "After review" }).click();
   await expect(page.getByRole("heading", { name: /EUR 56\.35/ })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "After review impact" })).toBeVisible();

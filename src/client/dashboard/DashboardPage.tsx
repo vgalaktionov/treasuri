@@ -385,8 +385,6 @@ function TransactionMiniList({
   linkPrefix: string;
   title?: string;
 }) {
-  const href = linkPrefix.includes("?") ? `${linkPrefix}&needsReview=true` : linkPrefix;
-
   return (
     <div className={title ? "mt-3 border-t border-treasuri-line pt-3" : "mt-2"}>
       {title ? <p className="font-semibold text-sm">{title}</p> : null}
@@ -399,7 +397,11 @@ function TransactionMiniList({
           {items.map((transaction) => (
             <a
               className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-2 first:pt-0 last:pb-0 hover:text-treasuri-action"
-              href={transaction.needsReview ? href : transactionHref(linkPrefix, transaction)}
+              href={
+                transaction.needsReview && linkPrefix !== "/review"
+                  ? reviewFilterHref(linkPrefix)
+                  : transactionHref(linkPrefix, transaction)
+              }
               key={transaction.id}
             >
               <span className="min-w-0">
@@ -437,6 +439,10 @@ function transactionHref(
 ): string {
   const separator = linkPrefix.includes("?") ? "&" : "?";
   return `${linkPrefix}${separator}transactionId=${transaction.id}`;
+}
+
+function reviewFilterHref(linkPrefix: string): string {
+  return linkPrefix.includes("?") ? `${linkPrefix}&needsReview=true` : linkPrefix;
 }
 
 function amountClass(amount: string): string {

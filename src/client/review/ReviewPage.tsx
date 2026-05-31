@@ -39,7 +39,7 @@ type ReviewMutationInput =
 export function ReviewPage() {
   const queryClient = useQueryClient();
   const inbox = useQuery({ queryFn: fetchReviewInbox, queryKey: ["review-inbox"] });
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(readReviewActiveIdFromUrl);
   const [ruleDraft, setRuleDraft] = useState<RuleEditorRequest | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const action = useMutation({
@@ -66,7 +66,7 @@ export function ReviewPage() {
     onSuccess: (result) => {
       setMessage(`${result.correctedCount} corrected, ${result.reviewCount} left`);
       setRuleDraft(result.ruleDraft);
-      setActiveId(nextReviewId(inbox.data?.transactions ?? [], result.transactionId));
+      selectReview(nextReviewId(inbox.data?.transactions ?? [], result.transactionId));
       invalidateFinanceWorkspaces(queryClient);
     },
   });
@@ -74,21 +74,35 @@ export function ReviewPage() {
     mutationFn: (id: number) => applyReviewAction(id, { action: "accept" }),
     onSuccess: (result) => {
       setMessage(`Accepted. ${result.reviewCount} left`);
-      setActiveId(nextReviewId(inbox.data?.transactions ?? [], result.transactionId));
+      selectReview(nextReviewId(inbox.data?.transactions ?? [], result.transactionId));
       invalidateFinanceWorkspaces(queryClient);
     },
   });
   const transactions = inbox.data?.transactions ?? [];
 
   useEffect(() => {
+    if (!inbox.data) {
+      return;
+    }
     if (transactions.length === 0) {
       setActiveId(null);
+      window.history.replaceState(null, "", "/review");
+      return;
+    }
+    const requestedId = readReviewActiveIdFromUrl();
+    if (requestedId && transactions.some((transaction) => transaction.id === requestedId)) {
+      setActiveId(requestedId);
       return;
     }
     if (!activeId || !transactions.some((transaction) => transaction.id === activeId)) {
       setActiveId(transactions[0]?.id ?? null);
     }
-  }, [activeId, transactions]);
+  }, [activeId, inbox.data, transactions]);
+
+  function selectReview(id: number | null) {
+    setActiveId(id);
+    window.history.replaceState(null, "", reviewUrl(id));
+  }
 
   if (inbox.isLoading) {
     return <p className="text-treasuri-muted">Loading review inbox...</p>;
@@ -139,7 +153,7 @@ export function ReviewPage() {
         <div className="grid gap-3 xl:grid-cols-[minmax(16rem,0.65fr)_minmax(0,1fr)]">
           <ReviewQueue
             activeId={activeTransaction.id}
-            onSelect={setActiveId}
+            onSelect={selectReview}
             transactions={data.transactions}
           />
           <ActiveReviewPanel
@@ -387,6 +401,22 @@ function nextReviewId(transactions: ReviewTransaction[], transactionId: number):
     return transactions[0]?.id ?? null;
   }
   return transactions[index + 1]?.id ?? transactions[index - 1]?.id ?? null;
+}
+
+function readReviewActiveIdFromUrl(): number | null {
+  const value = new URLSearchParams(window.location.search).get("transactionId");
+  if (!value) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function reviewUrl(transactionId: number | null): string {
+  if (!transactionId) {
+    return "/review";
+  }
+  return `/review?${new URLSearchParams({ transactionId: String(transactionId) }).toString()}`;
 }
 
 function RuleDraftPanel({

@@ -114,7 +114,7 @@ function createSampleInbox(): ReviewInboxResponse {
         currency: "EUR",
         description: "Needs review sample",
         flags: [],
-        id: 1,
+        id: 4,
         merchantName: "Unknown Sample Merchant",
         similarCount: 1,
       },
