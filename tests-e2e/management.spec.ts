@@ -7,9 +7,9 @@ test("transaction filters preserve context and edits stay in place", async ({ pa
   await page.getByRole("button", { exact: true, name: "Filter" }).click();
 
   await expect(page).toHaveURL(/\/transactions\?query=dog$/);
-  await expect(page.getByText("Dog food sample")).toBeVisible();
+  await expect(page.getByText("Dog food sample").first()).toBeVisible();
   await expect(page.getByText("Groceries sample")).toHaveCount(0);
-  await page.getByRole("button", { name: "Edit" }).click();
+  await expect(page.getByText("1 shown")).toBeVisible();
   await page.getByLabel("Category for Dog food sample").selectOption({ label: "Groceries" });
   await page.getByLabel("Merchant for Dog food sample").fill("Sample Dog Store");
   await page.getByLabel("Remember merchant").check();
@@ -25,7 +25,8 @@ test("transaction workspace exposes advanced filters and raw details", async ({ 
   await page.getByRole("button", { exact: true, name: "Filter" }).click();
 
   await expect(page).toHaveURL(/kind=savings/);
-  await expect(page.getByText("Savings transfer sample")).toBeVisible();
+  await expect(page.getByText("Savings transfer sample").first()).toBeVisible();
+  await expect(page.getByText("1 shown")).toBeVisible();
   await page.getByRole("button", { name: "Raw data" }).click();
   await expect(page.getByText("Sample current account")).toBeVisible();
   await expect(page.getByText('"source": "sample"')).toBeVisible();

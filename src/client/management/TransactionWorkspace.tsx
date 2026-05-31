@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Database, Filter, RotateCcw, Save, Search } from "lucide-react";
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type {
   TransactionFilters,
@@ -9,6 +9,8 @@ import type {
   TransactionUpdateRequest,
 } from "../../shared/management.ts";
 import { fetchTransactionRawDetails, fetchTransactions, updateTransaction } from "../lib/api.ts";
+
+type TransactionItem = TransactionsResponse["transactions"][number];
 
 const kindOptions = [
   ["", "All types"],
@@ -26,6 +28,7 @@ const kindOptions = [
 export function TransactionWorkspace() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState(readFiltersFromUrl);
+  const [activeId, setActiveId] = useState<number | null>(null);
   const transactions = useQuery({
     queryFn: () => fetchTransactions(filters),
     queryKey: ["transactions", filters],
@@ -35,6 +38,19 @@ export function TransactionWorkspace() {
       updateTransaction(id, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["transactions"] }),
   });
+  const items = transactions.data?.transactions ?? [];
+  const activeTransaction =
+    items.find((transaction) => transaction.id === activeId) ?? items[0] ?? null;
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setActiveId(null);
+      return;
+    }
+    if (!activeId || !items.some((transaction) => transaction.id === activeId)) {
+      setActiveId(items[0]?.id ?? null);
+    }
+  }, [activeId, items]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -49,9 +65,16 @@ export function TransactionWorkspace() {
 
   return (
     <section>
-      <header className="mb-4">
-        <p className="font-medium text-treasuri-muted text-xs sm:text-sm">History</p>
-        <h1 className="mt-1 font-semibold text-lg sm:text-xl">Transactions</h1>
+      <header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="font-medium text-treasuri-muted text-xs sm:text-sm">History</p>
+          <h1 className="mt-1 font-semibold text-lg sm:text-xl">Transactions</h1>
+        </div>
+        {transactions.data ? (
+          <p className="font-semibold text-treasuri-muted text-sm">
+            {items.length} shown / {transactions.data.merchants.length} merchants
+          </p>
+        ) : null}
       </header>
 
       <TransactionFiltersBar
@@ -62,21 +85,22 @@ export function TransactionWorkspace() {
         onSubmit={submit}
       />
 
-      <div className="mt-3 space-y-2">
-        {transactions.data?.transactions.map((transaction) => (
-          <TransactionRow
-            categories={transactions.data.categories}
-            disabled={update.isPending}
-            key={transaction.id}
-            onSave={(input) => update.mutate({ id: transaction.id, input })}
-            transaction={transaction}
-          />
-        ))}
-        {transactions.data?.transactions.length === 0 ? (
-          <div className="rounded-md border border-treasuri-line bg-white p-2 text-sm sm:p-3">
-            No transactions match these filters.
-          </div>
-        ) : null}
+      <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.72fr)]">
+        <TransactionLedger
+          activeId={activeTransaction?.id ?? null}
+          className="order-2 xl:order-1"
+          isLoading={transactions.isLoading}
+          onSelect={setActiveId}
+          transactions={items}
+        />
+        <TransactionInspector
+          categories={transactions.data?.categories ?? []}
+          className="order-1 xl:order-2"
+          disabled={update.isPending}
+          key={activeTransaction?.id ?? "empty"}
+          onSave={(transaction, input) => update.mutate({ id: transaction.id, input })}
+          transaction={activeTransaction}
+        />
       </div>
     </section>
   );
@@ -99,19 +123,16 @@ function TransactionFiltersBar({
   const update = (patch: Partial<TransactionFilters>) => onChange({ ...filters, ...patch });
 
   return (
-    <form
-      className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3"
-      onSubmit={onSubmit}
-    >
-      <div className="grid gap-2 md:grid-cols-[minmax(180px,1.5fr)_repeat(4,minmax(120px,1fr))_auto]">
-        <label className="relative block">
+    <form className="rounded-md border border-treasuri-line bg-white p-2" onSubmit={onSubmit}>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(180px,1.5fr)_repeat(4,minmax(120px,1fr))_auto]">
+        <label className="relative col-span-2 block md:col-span-1">
           <Search
             aria-hidden="true"
             className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-treasuri-muted"
           />
           <input
             aria-label="Search transactions"
-            className="min-h-8 w-full rounded-md border border-treasuri-line bg-white pr-3 pl-9 text-xs sm:min-h-9 sm:text-sm"
+            className="min-h-8 w-full rounded-md border border-treasuri-line bg-white pr-3 pl-9 text-xs sm:text-sm"
             onChange={(event) => update({ query: event.target.value || undefined })}
             placeholder="Merchant or description"
             value={filters.query ?? ""}
@@ -119,14 +140,14 @@ function TransactionFiltersBar({
         </label>
         <input
           aria-label="Month"
-          className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm"
+          className="min-h-8 min-w-0 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
           onChange={(event) => update({ month: event.target.value || undefined })}
           type="month"
           value={filters.month ?? ""}
         />
         <select
           aria-label="Category filter"
-          className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm"
+          className="min-h-8 min-w-0 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
           onChange={(event) => update({ category: event.target.value || undefined })}
           value={filters.category ?? ""}
         >
@@ -139,7 +160,7 @@ function TransactionFiltersBar({
         </select>
         <select
           aria-label="Merchant filter"
-          className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm"
+          className="min-h-8 min-w-0 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
           onChange={(event) => update({ merchant: event.target.value || undefined })}
           value={filters.merchant ?? ""}
         >
@@ -152,7 +173,7 @@ function TransactionFiltersBar({
         </select>
         <select
           aria-label="Type filter"
-          className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm"
+          className="min-h-8 min-w-0 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
           onChange={(event) => update({ kind: event.target.value || undefined })}
           value={filters.kind ?? ""}
         >
@@ -164,7 +185,7 @@ function TransactionFiltersBar({
         </select>
         <div className="flex gap-2">
           <button
-            className="inline-flex min-h-8 items-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-xs text-white sm:min-h-9 sm:text-sm"
+            className="inline-flex min-h-8 items-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-xs text-white sm:text-sm"
             type="submit"
           >
             <Filter aria-hidden="true" className="size-4" />
@@ -172,7 +193,7 @@ function TransactionFiltersBar({
           </button>
           {hasFilters ? (
             <button
-              className="inline-flex min-h-8 items-center rounded-md border border-treasuri-line px-3 sm:min-h-9"
+              className="inline-flex min-h-8 items-center rounded-md border border-treasuri-line px-3"
               onClick={onClear}
               type="button"
             >
@@ -189,7 +210,7 @@ function TransactionFiltersBar({
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           <input
             aria-label="Amount at least"
-            className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm"
+            className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
             min="0"
             onChange={(event) => update({ minAmount: event.target.value || undefined })}
             placeholder="Min amount"
@@ -199,7 +220,7 @@ function TransactionFiltersBar({
           />
           <input
             aria-label="Amount at most"
-            className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm"
+            className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
             min="0"
             onChange={(event) => update({ maxAmount: event.target.value || undefined })}
             placeholder="Max amount"
@@ -207,7 +228,7 @@ function TransactionFiltersBar({
             type="number"
             value={filters.maxAmount ?? ""}
           />
-          <label className="flex min-h-8 items-center gap-2 rounded-md border border-treasuri-line px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm">
+          <label className="flex min-h-8 items-center gap-2 rounded-md border border-treasuri-line px-2 text-xs sm:text-sm">
             <input
               checked={filters.needsReview ?? false}
               onChange={(event) => update({ needsReview: event.target.checked || undefined })}
@@ -221,88 +242,160 @@ function TransactionFiltersBar({
   );
 }
 
-function TransactionRow({
+function TransactionLedger({
+  activeId,
+  className,
+  isLoading,
+  onSelect,
+  transactions,
+}: {
+  activeId: number | null;
+  className: string;
+  isLoading: boolean;
+  onSelect: (id: number) => void;
+  transactions: TransactionItem[];
+}) {
+  if (isLoading) {
+    return (
+      <div
+        className={`${className} rounded-md border border-treasuri-line bg-white p-3 text-treasuri-muted text-sm`}
+      >
+        Loading transactions...
+      </div>
+    );
+  }
+
+  if (transactions.length === 0) {
+    return (
+      <div className={`${className} rounded-md border border-treasuri-line bg-white p-3 text-sm`}>
+        No transactions match these filters.
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${className} overflow-hidden rounded-md border border-treasuri-line bg-white`}>
+      <div className="hidden grid-cols-[5.5rem_minmax(0,1fr)_7.5rem_6.5rem_7rem] gap-2 border-b border-treasuri-line bg-treasuri-panel px-3 py-2 font-semibold text-treasuri-muted text-xs lg:grid">
+        <span>Date</span>
+        <span>Merchant</span>
+        <span>Category</span>
+        <span>Method</span>
+        <span className="text-right">Amount</span>
+      </div>
+      <div className="divide-y divide-treasuri-line">
+        {transactions.map((transaction) => (
+          <button
+            aria-current={transaction.id === activeId ? "true" : undefined}
+            className={`grid w-full gap-2 px-3 py-2 text-left text-sm hover:bg-treasuri-panel lg:grid-cols-[5.5rem_minmax(0,1fr)_7.5rem_6.5rem_7rem] lg:items-center ${
+              transaction.id === activeId ? "bg-teal-50" : "bg-white"
+            }`}
+            key={transaction.id}
+            onClick={() => onSelect(transaction.id)}
+            type="button"
+          >
+            <span className="font-medium text-treasuri-muted text-xs">
+              {transaction.bookingDate}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate font-semibold">{transaction.merchant}</span>
+              <span className="block truncate text-treasuri-muted text-xs">
+                {transaction.description}
+              </span>
+              <span className="mt-1 flex flex-wrap gap-1 lg:hidden">
+                <Badge label={transaction.categoryName ?? "Uncategorized"} />
+                {transaction.needsReview ? <Badge label="review" tone="warn" /> : null}
+              </span>
+            </span>
+            <span className="hidden truncate text-xs lg:block">
+              {transaction.categoryName ?? "Uncategorized"}
+            </span>
+            <span className="hidden truncate text-treasuri-muted text-xs lg:block">
+              {transaction.classificationMethod ?? "none"}
+            </span>
+            <span className={`font-semibold text-sm lg:text-right ${amountClass(transaction)}`}>
+              EUR {transaction.amount}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TransactionInspector({
   categories,
+  className,
   disabled,
   onSave,
   transaction,
 }: {
   categories: TransactionsResponse["categories"];
+  className: string;
   disabled: boolean;
-  onSave: (input: TransactionUpdateRequest) => void;
-  transaction: TransactionsResponse["transactions"][number];
+  onSave: (transaction: TransactionItem, input: TransactionUpdateRequest) => void;
+  transaction: TransactionItem | null;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
-  const [categoryId, setCategoryId] = useState(transaction.categoryId ?? categories[0]?.id ?? 0);
-  const [merchantName, setMerchantName] = useState(transaction.merchant);
+  const [categoryId, setCategoryId] = useState(0);
+  const [merchantName, setMerchantName] = useState("");
   const [createAlias, setCreateAlias] = useState(false);
-  const [flags, setFlags] = useState(() => flagsFromLabels(transaction.flags));
+  const [flags, setFlags] = useState(flagsFromLabels([]));
   const rawDetails = useQuery({
-    enabled: showRaw,
-    queryFn: () => fetchTransactionRawDetails(transaction.id),
-    queryKey: ["transaction-raw", transaction.id],
+    enabled: showRaw && transaction !== null,
+    queryFn: () => fetchTransactionRawDetails(transaction?.id ?? 0),
+    queryKey: ["transaction-raw", transaction?.id],
   });
-  const amountClass = transaction.amount.startsWith("-") ? "text-stone-950" : "text-emerald-700";
 
-  const flagLabels = useMemo(
-    () => transaction.flags.concat(transaction.needsReview ? ["review"] : []),
-    [transaction.flags, transaction.needsReview],
-  );
+  useEffect(() => {
+    setShowRaw(false);
+    setCategoryId(transaction?.categoryId ?? categories[0]?.id ?? 0);
+    setMerchantName(transaction?.merchant ?? "");
+    setCreateAlias(false);
+    setFlags(flagsFromLabels(transaction?.flags ?? []));
+  }, [categories, transaction]);
+
+  if (!transaction) {
+    return (
+      <aside
+        className={`${className} rounded-md border border-treasuri-line bg-white p-3 text-treasuri-muted text-sm`}
+      >
+        Select a transaction to inspect or edit it.
+      </aside>
+    );
+  }
 
   return (
-    <article className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3">
-      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+    <aside className={`${className} rounded-md border border-treasuri-line bg-white p-3`}>
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-treasuri-muted">
-            <span>{transaction.bookingDate}</span>
-            <span>{transaction.categoryName ?? "Uncategorized"}</span>
-            <span>{transaction.classificationMethod ?? "none"}</span>
-            {flagLabels.map((flag) => (
-              <span className="rounded border border-treasuri-line px-1.5 py-0.5" key={flag}>
-                {flag}
-              </span>
+          <div className="flex flex-wrap gap-1">
+            <Badge label={transaction.bookingDate} />
+            <Badge label={transaction.categoryName ?? "Uncategorized"} />
+            {transaction.needsReview ? <Badge label="review" tone="warn" /> : null}
+            {transaction.flags.map((flag) => (
+              <Badge key={flag} label={flag} />
             ))}
           </div>
-          <h2 className="mt-1 truncate font-semibold text-sm sm:text-base">
-            {transaction.merchant}
-          </h2>
-          <p className="mt-1 text-treasuri-muted text-xs sm:text-sm">{transaction.description}</p>
+          <h2 className="mt-2 font-semibold text-base">{transaction.merchant}</h2>
+          <p className="mt-1 text-treasuri-muted text-sm">{transaction.description}</p>
         </div>
-        <div className="flex items-center justify-between gap-2 md:block md:text-right">
-          <p className={`font-semibold text-sm sm:text-base ${amountClass}`}>
-            EUR {transaction.amount}
-          </p>
-          <div className="mt-2 flex gap-2 md:justify-end">
-            <button
-              className="min-h-8 rounded-md border border-treasuri-line px-2 font-medium text-xs sm:text-sm"
-              onClick={() => setIsEditing((current) => !current)}
-              type="button"
-            >
-              Edit
-            </button>
-            <button
-              className="inline-flex min-h-8 items-center rounded-md border border-treasuri-line px-2"
-              onClick={() => setShowRaw((current) => !current)}
-              type="button"
-            >
-              <Database aria-label="Raw data" className="size-4" />
-            </button>
-          </div>
-        </div>
+        <p className={`font-semibold text-base ${amountClass(transaction)}`}>
+          EUR {transaction.amount}
+        </p>
       </div>
 
-      {isEditing ? (
-        <form
-          className="mt-3 grid gap-2 border-t border-treasuri-line pt-3 md:grid-cols-[180px_minmax(180px,1fr)_repeat(2,auto)]"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSave({ categoryId, createAlias, flags, merchantName });
-          }}
-        >
+      <form
+        className="mt-4 grid gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(transaction, { categoryId, createAlias, flags, merchantName });
+        }}
+      >
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-treasuri-muted">Category</span>
           <select
             aria-label={`Category for ${transaction.description}`}
-            className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm"
+            className="min-h-9 rounded-md border border-treasuri-line bg-white px-2 text-sm"
             onChange={(event) => setCategoryId(Number(event.target.value))}
             value={categoryId}
           >
@@ -312,64 +405,77 @@ function TransactionRow({
               </option>
             ))}
           </select>
+        </label>
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-treasuri-muted">Merchant</span>
           <input
             aria-label={`Merchant for ${transaction.description}`}
-            className="min-h-8 rounded-md border border-treasuri-line px-2 text-xs sm:min-h-9 sm:px-3 sm:text-sm"
+            className="min-h-9 rounded-md border border-treasuri-line px-2 text-sm"
             onChange={(event) => setMerchantName(event.target.value)}
             value={merchantName}
           />
-          <label className="flex min-h-8 items-center gap-2 text-xs sm:min-h-9 sm:text-sm">
-            <input
-              checked={createAlias}
-              onChange={(event) => setCreateAlias(event.target.checked)}
-              type="checkbox"
-            />
-            Remember merchant
-          </label>
+        </label>
+        <label className="flex min-h-8 items-center gap-2 text-xs">
+          <input
+            checked={createAlias}
+            onChange={(event) => setCreateAlias(event.target.checked)}
+            type="checkbox"
+          />
+          Remember merchant
+        </label>
+        <fieldset className="grid grid-cols-2 gap-2">
+          <legend className="sr-only">Budget flags</legend>
+          <FlagCheckbox
+            checked={flags.isTransfer}
+            label="Transfer"
+            onChange={(isTransfer) => setFlags((current) => ({ ...current, isTransfer }))}
+          />
+          <FlagCheckbox
+            checked={flags.isSavings}
+            label="Savings"
+            onChange={(isSavings) => setFlags((current) => ({ ...current, isSavings }))}
+          />
+          <FlagCheckbox
+            checked={flags.isOneOff}
+            label="One-off"
+            onChange={(isOneOff) => setFlags((current) => ({ ...current, isOneOff }))}
+          />
+          <FlagCheckbox
+            checked={flags.isExcludedFromBudget}
+            label="Exclude"
+            onChange={(isExcludedFromBudget) =>
+              setFlags((current) => ({ ...current, isExcludedFromBudget }))
+            }
+          />
+        </fieldset>
+        <div className="grid grid-cols-2 gap-2 border-t border-treasuri-line pt-3">
           <button
-            className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-xs text-white disabled:opacity-60 sm:min-h-9 sm:text-sm"
+            className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-xs text-white disabled:opacity-60 sm:text-sm"
             disabled={disabled || categoryId === 0}
             type="submit"
           >
             <Save aria-hidden="true" className="size-4" />
             Save
           </button>
-          <fieldset className="flex flex-wrap gap-x-4 gap-y-2 md:col-span-4">
-            <legend className="sr-only">Budget flags</legend>
-            <FlagCheckbox
-              checked={flags.isTransfer}
-              label="Transfer"
-              onChange={(isTransfer) => setFlags((current) => ({ ...current, isTransfer }))}
-            />
-            <FlagCheckbox
-              checked={flags.isSavings}
-              label="Savings"
-              onChange={(isSavings) => setFlags((current) => ({ ...current, isSavings }))}
-            />
-            <FlagCheckbox
-              checked={flags.isOneOff}
-              label="One-off"
-              onChange={(isOneOff) => setFlags((current) => ({ ...current, isOneOff }))}
-            />
-            <FlagCheckbox
-              checked={flags.isExcludedFromBudget}
-              label="Exclude"
-              onChange={(isExcludedFromBudget) =>
-                setFlags((current) => ({ ...current, isExcludedFromBudget }))
-              }
-            />
-          </fieldset>
-        </form>
-      ) : null}
+          <button
+            className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-treasuri-line px-2 font-medium text-xs sm:text-sm"
+            onClick={() => setShowRaw((current) => !current)}
+            type="button"
+          >
+            <Database aria-hidden="true" className="size-4" />
+            Raw data
+          </button>
+        </div>
+      </form>
 
       {showRaw ? (
         <div className="mt-3 border-t border-treasuri-line pt-3">
           {rawDetails.data ? (
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,420px)]">
+            <div className="grid gap-3">
               <dl className="grid gap-2 sm:grid-cols-2">
                 {rawDetails.data.details.map((detail) => (
                   <div key={detail.label}>
-                    <dt className="text-xs text-treasuri-muted">{detail.label}</dt>
+                    <dt className="text-treasuri-muted text-xs">{detail.label}</dt>
                     <dd className="break-words text-xs sm:text-sm">{detail.value}</dd>
                   </div>
                 ))}
@@ -383,7 +489,21 @@ function TransactionRow({
           )}
         </div>
       ) : null}
-    </article>
+    </aside>
+  );
+}
+
+function Badge({ label, tone = "default" }: { label: string; tone?: "default" | "warn" }) {
+  return (
+    <span
+      className={`rounded border px-1.5 py-0.5 font-medium text-[0.68rem] ${
+        tone === "warn"
+          ? "border-amber-200 bg-amber-50 text-amber-800"
+          : "border-treasuri-line text-treasuri-muted"
+      }`}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -406,6 +526,10 @@ function FlagCheckbox({
       {label}
     </label>
   );
+}
+
+function amountClass(transaction: TransactionItem): string {
+  return transaction.amount.startsWith("-") ? "text-stone-950" : "text-emerald-700";
 }
 
 function flagsFromLabels(labels: string[]) {
