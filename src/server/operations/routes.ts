@@ -233,6 +233,12 @@ function sampleSettings() {
           name: "Sample current account",
           provider: "fake",
           status: "Active",
+          syncedBalance: {
+            amount: "3478.45",
+            asOf: "2026-05-28 08:00:00+00",
+            currency: "EUR",
+            source: "sample",
+          },
         },
       ],
       sync: {

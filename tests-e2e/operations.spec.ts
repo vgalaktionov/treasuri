@@ -23,6 +23,8 @@ test("operations workspace covers settings, status, and exports", async ({ page 
   await expect(page.getByText("Matches saved settings")).toBeVisible();
   await expect(page.getByText("+EUR 0.00").first()).toBeVisible();
   await expect(page.getByText("Accounts")).toBeVisible();
+  await expect(page.getByText("Synced balance")).toBeVisible();
+  await expect(page.getByText("EUR 3478.45")).toBeVisible();
   await expect(page.getByText("Category taxonomy")).toBeVisible();
   await expect(page.getByText("Sync schedule")).toBeVisible();
 

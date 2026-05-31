@@ -13,6 +13,15 @@ export const settingsResponseSchema = z.object({
         name: z.string(),
         provider: z.string(),
         status: z.string(),
+        syncedBalance: z
+          .object({
+            amount: z.string(),
+            asOf: z.string(),
+            currency: z.string(),
+            source: z.string(),
+          })
+          .nullable()
+          .default(null),
       }),
     ),
     sync: z.object({

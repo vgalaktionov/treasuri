@@ -593,6 +593,17 @@ function RuntimeContext({
                 <p className="text-treasuri-muted text-xs">
                   {account.currency} - {account.status}
                 </p>
+                {account.syncedBalance ? (
+                  <dl className="mt-2 rounded-md border border-treasuri-line bg-treasuri-panel p-2">
+                    <InlineMetric
+                      detail={`${account.syncedBalance.source}, ${account.syncedBalance.asOf}`}
+                      label="Synced balance"
+                      value={`${account.syncedBalance.currency} ${account.syncedBalance.amount}`}
+                    />
+                  </dl>
+                ) : (
+                  <p className="mt-2 text-treasuri-muted text-xs">No synced balance yet.</p>
+                )}
               </div>
             ))}
           </div>
@@ -937,11 +948,20 @@ function OverviewCard({ children, title }: { children: ReactNode; title: string 
   );
 }
 
-function InlineMetric({ label, value }: { label: string; value: string }) {
+function InlineMetric({
+  detail,
+  label,
+  value,
+}: {
+  detail?: string | undefined;
+  label: string;
+  value: string;
+}) {
   return (
     <div>
       <dt className="text-treasuri-muted text-xs">{label}</dt>
       <dd className="break-words font-semibold text-sm">{value}</dd>
+      {detail ? <dd className="mt-0.5 break-words text-treasuri-muted text-xs">{detail}</dd> : null}
     </div>
   );
 }

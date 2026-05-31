@@ -49,6 +49,11 @@ describe("operations API", () => {
       expect(saved.body.variableBaseline3m).toBe("700.00");
       expect(saved.body.variableBaseline6m).toBe("650.00");
       expect(saved.body.overview.accounts.length).toBeGreaterThan(0);
+      expect(saved.body.overview.accounts[0].syncedBalance).toMatchObject({
+        amount: "3478.45",
+        currency: "EUR",
+        source: "sample",
+      });
       expect(saved.body.overview.sync.lookbackDays).toBe(120);
       expect(saved.body.overview.taxonomy.categoryCount).toBeGreaterThan(0);
     } finally {

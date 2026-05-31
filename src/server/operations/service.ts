@@ -209,13 +209,37 @@ export async function loadStatus(pool: pg.Pool, config: AppConfig): Promise<Stat
 async function loadSettingsOverview(pool: pg.Pool, lookbackDays: number) {
   const [accounts, categories, sync] = await Promise.all([
     pool.query<{
+      balance_amount: string | null;
+      balance_as_of: string | null;
+      balance_currency: string | null;
+      balance_source: string | null;
       currency: string;
       iban: string;
       is_active: boolean;
       name: string;
       provider: string;
     }>(
-      "SELECT name, provider, iban, currency, is_active FROM accounts ORDER BY is_active DESC, provider, name",
+      `
+        SELECT
+          accounts.name,
+          accounts.provider,
+          accounts.iban,
+          accounts.currency,
+          accounts.is_active,
+          latest_balance.balance::text AS balance_amount,
+          latest_balance.currency AS balance_currency,
+          latest_balance.source AS balance_source,
+          latest_balance.as_of::text AS balance_as_of
+        FROM accounts
+        LEFT JOIN LATERAL (
+          SELECT balance, currency, source, as_of
+          FROM account_balance_snapshots
+          WHERE account_balance_snapshots.account_id = accounts.id
+          ORDER BY as_of DESC, id DESC
+          LIMIT 1
+        ) AS latest_balance ON true
+        ORDER BY accounts.is_active DESC, accounts.provider, accounts.name
+      `,
     ),
     pool.query<{ name: string }>("SELECT name FROM categories ORDER BY name"),
     pool.query<{ finished_at: string | null; provider: string; status: string }>(
@@ -229,6 +253,14 @@ async function loadSettingsOverview(pool: pg.Pool, lookbackDays: number) {
       name: row.name,
       provider: row.provider,
       status: row.is_active ? "Active" : "Inactive",
+      syncedBalance: row.balance_amount
+        ? {
+            amount: row.balance_amount,
+            asOf: row.balance_as_of ?? "unknown",
+            currency: row.balance_currency ?? row.currency,
+            source: row.balance_source ?? "unknown",
+          }
+        : null,
     })),
     sync: {
       lastSync: sync.rows[0]
