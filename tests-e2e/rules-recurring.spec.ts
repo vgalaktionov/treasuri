@@ -16,10 +16,10 @@ test("rules workspace previews, creates, edits, and toggles rules", async ({ pag
   await page.getByRole("button", { name: "Save rule" }).first().click();
 
   await expect(page.getByText("Groceries rule")).toBeVisible();
-  await page.getByRole("button", { name: "Edit" }).last().click();
-  await page.getByLabel("Rule operator").last().selectOption("starts_with");
-  await page.getByRole("button", { name: "Save rule" }).last().click();
-  await page.getByRole("button", { name: "Disable" }).last().click();
+  await page.getByRole("button", { name: /Groceries rule/ }).click();
+  await page.getByLabel("Rule operator").selectOption("starts_with");
+  await page.getByRole("button", { name: "Save rule" }).click();
+  await page.getByRole("button", { name: "Disable" }).click();
   await expect(page.getByText("inactive")).toBeVisible();
 });
 
