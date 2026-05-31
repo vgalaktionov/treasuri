@@ -1,6 +1,6 @@
 import type pg from "pg";
 
-import { createDefaultBankProvider } from "../bank/fake.ts";
+import { createDefaultBankProviderForSync } from "../bank/fake.ts";
 import { syncBankTransactions } from "../bank/sync.ts";
 import { classifyPendingTransactions } from "../classify/service.ts";
 import { updateMonthlyForecast } from "../forecast/service.ts";
@@ -17,7 +17,7 @@ export async function runJob(pool: pg.Pool, name: JobName, payload: unknown) {
   switch (name) {
     case "sync_abn_transactions":
       jobPayloadSchemas.sync_abn_transactions.parse(payload);
-      return syncBankTransactions(pool, createDefaultBankProvider());
+      return syncBankTransactions(pool, await createDefaultBankProviderForSync(pool));
     case "normalize_transactions":
       jobPayloadSchemas.normalize_transactions.parse(payload);
       return normalizeTransactions(pool);

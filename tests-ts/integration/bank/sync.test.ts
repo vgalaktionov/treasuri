@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import { getCurrentBalance } from "../../../src/server/balance/snapshots.ts";
 import { AbnBankProvider, parseMutationsListResponse } from "../../../src/server/bank/abn/index.ts";
-import { createFakeBankProvider } from "../../../src/server/bank/fake.ts";
+import {
+  createDefaultBankProviderForSync,
+  createFakeBankProvider,
+} from "../../../src/server/bank/fake.ts";
 import { syncBankTransactions } from "../../../src/server/bank/sync.ts";
 import type { BankProvider } from "../../../src/server/bank/types.ts";
 import { runMigrations } from "../../../src/server/db/migrations.ts";
@@ -181,13 +184,71 @@ describe("syncBankTransactions", () => {
       await container.stop();
     }
   }, 120_000);
+
+  it("continues ABN sync from the last completed mutation cursor", async () => {
+    const container = await new PostgreSqlContainer("postgres:16-alpine").start();
+    let requestedCursor: string | undefined;
+
+    try {
+      await withPool(container.getConnectionUri(), async (pool) => {
+        await runMigrations(pool);
+        await pool.query(`
+          INSERT INTO sync_runs (
+            provider, status, finished_at, metadata_json
+          )
+          VALUES (
+            'abn_amro',
+            'completed',
+            now(),
+            '{"source":"bank-sync","last_mutation_key":"cursor-before"}'::jsonb
+          )
+        `);
+
+        const provider = await createDefaultBankProviderForSync(
+          pool,
+          {
+            ABN_ACCOUNT_IBAN: "NL25ABNA0123456789",
+            ABN_CARD_NUMBER: "123",
+            ABN_SOFT_TOKEN: "12345",
+            BANK_PROVIDER: "abn",
+          },
+          {
+            abnClient: {
+              async fetchMutations(startCursor) {
+                requestedCursor = startCursor;
+                return parseMutationsListResponse(
+                  abnMutationsPayload("cursor-after"),
+                  "NL25ABNA0123456789",
+                );
+              },
+            },
+          },
+        );
+        await syncBankTransactions(pool, provider);
+        const latest = await pool.query<{ metadata_json: Record<string, unknown> }>(`
+          SELECT metadata_json
+          FROM sync_runs
+          WHERE provider = 'abn_amro'
+          ORDER BY id DESC
+          LIMIT 1
+        `);
+
+        expect(requestedCursor).toBe("cursor-before");
+        expect(latest.rows[0]?.metadata_json).toMatchObject({
+          last_mutation_key: "cursor-after",
+        });
+      });
+    } finally {
+      await container.stop();
+    }
+  }, 120_000);
 });
 
-function abnMutationsPayload() {
+function abnMutationsPayload(lastMutationKey = "cursor-abn") {
   return {
     mutationsList: {
       clearCacheIndicator: false,
-      lastMutationKey: "cursor-abn",
+      lastMutationKey,
       mutations: [
         {
           mutation: {

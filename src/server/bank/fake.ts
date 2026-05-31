@@ -1,11 +1,18 @@
 import fs from "node:fs";
+import type pg from "pg";
 import { sampleAccountIban, sampleTransactions } from "../sample/data.ts";
+import type { AbnClient } from "./abn/index.ts";
 import { createAbnBankProvider } from "./abn/index.ts";
 import type { BankMutation, BankProvider } from "./types.ts";
 
 export type FakeBankProvider = BankProvider & {
   provider: "fake";
   fetchMutations: () => Promise<readonly BankMutation[]>;
+};
+
+export type DefaultBankProviderOptions = {
+  abnClient?: Pick<AbnClient, "fetchMutations">;
+  startCursor?: string;
 };
 
 export function createFakeBankProvider(): FakeBankProvider {
@@ -28,7 +35,10 @@ export function createFakeBankProvider(): FakeBankProvider {
   };
 }
 
-export function createDefaultBankProvider(env: NodeJS.ProcessEnv = process.env): BankProvider {
+export function createDefaultBankProvider(
+  env: NodeJS.ProcessEnv = process.env,
+  options: DefaultBankProviderOptions = {},
+): BankProvider {
   const provider = env.BANK_PROVIDER ?? "fake";
 
   if (provider === "fake") {
@@ -36,19 +46,64 @@ export function createDefaultBankProvider(env: NodeJS.ProcessEnv = process.env):
   }
 
   if (provider === "abn" || provider === "abn_amro") {
+    const providerOptions: NonNullable<Parameters<typeof createAbnBankProvider>[1]> = {
+      maxPages: readPositiveInteger(env.ABN_SYNC_PAGES ?? "1", "ABN_SYNC_PAGES"),
+    };
+    if (options.abnClient) {
+      providerOptions.client = options.abnClient;
+    }
+    if (options.startCursor) {
+      providerOptions.startCursor = options.startCursor;
+    }
     return createAbnBankProvider(
       {
         accountIban: requiredEnv(env, "ABN_ACCOUNT_IBAN"),
         cardNumber: readSecret(env, "ABN_CARD_NUMBER"),
         softToken: readSecret(env, "ABN_SOFT_TOKEN"),
       },
-      {
-        maxPages: readPositiveInteger(env.ABN_SYNC_PAGES ?? "1", "ABN_SYNC_PAGES"),
-      },
+      providerOptions,
     );
   }
 
   throw new Error(`Unsupported bank provider: ${provider}`);
+}
+
+export async function createDefaultBankProviderForSync(
+  pool: pg.Pool,
+  env: NodeJS.ProcessEnv = process.env,
+  options: Omit<DefaultBankProviderOptions, "startCursor"> = {},
+): Promise<BankProvider> {
+  const providerName = configuredProviderName(env);
+  const startCursor = providerName === "abn_amro" ? await latestMutationCursor(pool) : undefined;
+  const providerOptions: DefaultBankProviderOptions = { ...options };
+  if (startCursor) {
+    providerOptions.startCursor = startCursor;
+  }
+  return createDefaultBankProvider(env, providerOptions);
+}
+
+export function configuredProviderName(env: NodeJS.ProcessEnv = process.env): string {
+  const provider = env.BANK_PROVIDER ?? "fake";
+  if (provider === "fake") {
+    return "fake";
+  }
+  if (provider === "abn" || provider === "abn_amro") {
+    return "abn_amro";
+  }
+  throw new Error(`Unsupported bank provider: ${provider}`);
+}
+
+async function latestMutationCursor(pool: pg.Pool): Promise<string | undefined> {
+  const result = await pool.query<{ last_mutation_key: string | null }>(`
+    SELECT metadata_json->>'last_mutation_key' AS last_mutation_key
+    FROM sync_runs
+    WHERE provider = 'abn_amro'
+      AND status = 'completed'
+      AND metadata_json ? 'last_mutation_key'
+    ORDER BY finished_at DESC NULLS LAST, id DESC
+    LIMIT 1
+  `);
+  return result.rows[0]?.last_mutation_key ?? undefined;
 }
 
 function readSecret(env: NodeJS.ProcessEnv, name: string): string {
