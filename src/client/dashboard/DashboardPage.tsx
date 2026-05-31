@@ -7,10 +7,12 @@ import type { DashboardResponse } from "../../shared/dashboard.ts";
 import { fetchDashboard } from "../lib/api.ts";
 
 type DashboardMode = "explain" | "month" | "now";
+type GuardrailMode = "base" | "review";
 
 export function DashboardPage() {
   const dashboard = useQuery({ queryFn: fetchDashboard, queryKey: ["dashboard"] });
   const [mode, setMode] = useState<DashboardMode>("now");
+  const [guardrailMode, setGuardrailMode] = useState<GuardrailMode>("base");
 
   if (dashboard.isLoading) {
     return <p className="text-treasuri-muted">Loading dashboard...</p>;
@@ -20,8 +22,11 @@ export function DashboardPage() {
   }
 
   const data = dashboard.data;
-  const safeToSpendClass = Number(data.safeToSpend) < 0 ? "text-red-700" : "text-treasuri-ink";
-  const safeTodayClass = Number(data.safeToday) < 0 ? "text-red-700" : "text-treasuri-ink";
+  const activeGuardrail = guardrailFor(data, guardrailMode);
+  const safeToSpendClass =
+    Number(activeGuardrail.safeToSpend) < 0 ? "text-red-700" : "text-treasuri-ink";
+  const safeTodayClass =
+    Number(activeGuardrail.safeToday) < 0 ? "text-red-700" : "text-treasuri-ink";
   const reviewClass = data.reviewCount > 0 ? "text-amber-700" : "text-emerald-700";
 
   return (
@@ -40,42 +45,35 @@ export function DashboardPage() {
               className={`font-semibold text-xl leading-tight ${safeToSpendClass}`}
               id="dashboard-heading"
             >
-              EUR {data.safeToSpend}
+              EUR {activeGuardrail.safeToSpend}
             </h1>
             <p className="font-medium text-treasuri-muted text-sm">safe to spend this month</p>
           </div>
-          <p className="mt-1 max-w-3xl text-treasuri-muted text-xs">{data.paceSummary}</p>
+          <p className="mt-1 max-w-3xl text-treasuri-muted text-xs">{activeGuardrail.summary}</p>
           <MonthProgressBar progress={data.monthProgress} />
         </div>
 
         <TodayLimit
           className="border-t border-treasuri-line pt-3 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-3"
+          guardrail={activeGuardrail}
           data={data}
           valueClassName={safeTodayClass}
         />
       </header>
 
-      <div
-        aria-label="Dashboard view"
-        className="mb-3 inline-grid w-full grid-cols-3 rounded-md border border-treasuri-line bg-white p-1 text-xs sm:w-auto"
-        role="tablist"
-      >
-        {dashboardModes.map(([value, label]) => (
-          <button
-            aria-selected={mode === value}
-            className={`min-h-8 rounded px-3 font-semibold ${
-              mode === value
-                ? "bg-treasuri-action text-white"
-                : "text-treasuri-muted hover:bg-treasuri-panel"
-            }`}
-            key={value}
-            onClick={() => setMode(value)}
-            role="tab"
-            type="button"
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <SegmentedControl
+          label="Dashboard view"
+          onChange={setMode}
+          options={dashboardModes}
+          value={mode}
+        />
+        <SegmentedControl
+          label="Guardrail basis"
+          onChange={setGuardrailMode}
+          options={guardrailModes}
+          value={guardrailMode}
+        />
       </div>
 
       <section className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_18rem]">
@@ -84,7 +82,7 @@ export function DashboardPage() {
             <MetricCard
               icon={<Wallet className="size-4" />}
               label="Safe today"
-              value={`EUR ${data.safeToday}`}
+              value={`EUR ${activeGuardrail.safeToday}`}
               valueClassName={safeTodayClass}
             />
             <MetricCard
@@ -107,7 +105,9 @@ export function DashboardPage() {
 
           <NextActions className="lg:hidden" data={data} />
 
-          {mode === "now" ? <NowWorkspace data={data} reviewClass={reviewClass} /> : null}
+          {mode === "now" ? (
+            <NowWorkspace data={data} guardrail={activeGuardrail} reviewClass={reviewClass} />
+          ) : null}
           {mode === "month" ? <MonthWorkspace data={data} /> : null}
           {mode === "explain" ? <ExplainWorkspace data={data} /> : null}
         </div>
@@ -124,26 +124,72 @@ const dashboardModes: readonly [DashboardMode, string][] = [
   ["explain", "Explain"],
 ];
 
+const guardrailModes: readonly [GuardrailMode, string][] = [
+  ["base", "Synced forecast"],
+  ["review", "After review"],
+];
+
+function SegmentedControl<TValue extends string>({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: TValue) => void;
+  options: readonly [TValue, string][];
+  value: TValue;
+}) {
+  return (
+    <div
+      aria-label={label}
+      className="inline-grid w-full rounded-md border border-treasuri-line bg-white p-1 text-xs sm:w-auto"
+      role="tablist"
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
+      {options.map(([optionValue, optionLabel]) => (
+        <button
+          aria-selected={value === optionValue}
+          className={`min-h-8 rounded px-3 font-semibold ${
+            value === optionValue
+              ? "bg-treasuri-action text-white"
+              : "text-treasuri-muted hover:bg-treasuri-panel"
+          }`}
+          key={optionValue}
+          onClick={() => onChange(optionValue)}
+          role="tab"
+          type="button"
+        >
+          {optionLabel}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TodayLimit({
   className,
   data,
+  guardrail,
   valueClassName,
 }: {
   className: string;
   data: DashboardResponse;
+  guardrail: ActiveGuardrail;
   valueClassName: string;
 }) {
   return (
     <aside className={className}>
       <p className="font-medium text-treasuri-muted text-xs">Today</p>
       <p className={`mt-1 font-semibold text-lg leading-tight ${valueClassName}`}>
-        EUR {data.safeToday}
+        EUR {guardrail.safeToday}
       </p>
       <p className="mt-1 text-treasuri-muted text-xs">safe to spend today</p>
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        <InlineMetric label="Safe/day" value={`EUR ${data.safePerDay}`} />
+        <InlineMetric label="Safe/day" value={`EUR ${guardrail.safeToday}`} />
         <InlineMetric label="Days left" value={String(data.monthProgress.remainingDays)} />
       </dl>
+      <p className="mt-2 text-treasuri-muted text-[0.68rem]">{guardrail.label}</p>
     </aside>
   );
 }
@@ -164,7 +210,15 @@ function MonthProgressBar({ progress }: { progress: DashboardResponse["monthProg
   );
 }
 
-function NowWorkspace({ data, reviewClass }: { data: DashboardResponse; reviewClass: string }) {
+function NowWorkspace({
+  data,
+  guardrail,
+  reviewClass,
+}: {
+  data: DashboardResponse;
+  guardrail: ActiveGuardrail;
+  reviewClass: string;
+}) {
   return (
     <div className="grid gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
       <article className="rounded-md border border-treasuri-line bg-white p-3">
@@ -179,14 +233,15 @@ function NowWorkspace({ data, reviewClass }: { data: DashboardResponse; reviewCl
         </div>
 
         <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-          <InlineMetric label="Today limit" value={`EUR ${data.safeToday}`} />
-          <InlineMetric label="Safe per day" value={`EUR ${data.safePerDay}/day`} />
+          <InlineMetric label="Today limit" value={`EUR ${guardrail.safeToday}`} />
+          <InlineMetric label="Safe per day" value={`EUR ${guardrail.safeToday}/day`} />
           <InlineMetric
             label="Synced balance"
             value={data.currentBalance ? `EUR ${data.currentBalance.amount}` : "Missing"}
           />
           <InlineMetric label="Income received" value={`EUR ${data.incomeReceived}`} />
           <InlineMetric label="Projected savings" value={`EUR ${data.projectedSavings}`} />
+          <InlineMetric label={guardrail.metricLabel} value={`EUR ${guardrail.safeToSpend}`} />
         </dl>
 
         {data.currentBalance ? (
@@ -215,6 +270,49 @@ function NowWorkspace({ data, reviewClass }: { data: DashboardResponse; reviewCl
       </article>
     </div>
   );
+}
+
+type ActiveGuardrail = {
+  label: string;
+  metricLabel: string;
+  safeToday: string;
+  safeToSpend: string;
+  summary: string;
+};
+
+function guardrailFor(data: DashboardResponse, mode: GuardrailMode): ActiveGuardrail {
+  if (mode === "review") {
+    const safeToSpend = formatClientMoney(
+      moneyNumber(data.safeToSpend) - moneyNumber(data.reviewImpact),
+    );
+    const safeToday = formatClientMoney(
+      moneyNumber(safeToSpend) / Math.max(1, data.monthProgress.remainingDays),
+    );
+    return {
+      label: "Review impact reserved",
+      metricLabel: "After review impact",
+      safeToday,
+      safeToSpend,
+      summary: `${data.paceSummary} Reserving EUR ${data.reviewImpact} for ${data.reviewCount} review ${data.reviewCount === 1 ? "item" : "items"}.`,
+    };
+  }
+
+  return {
+    label: "Synced forecast",
+    metricLabel: "Month allowance",
+    safeToday: data.safeToday,
+    safeToSpend: data.safeToSpend,
+    summary: data.paceSummary,
+  };
+}
+
+function moneyNumber(value: string): number {
+  const parsed = Number(value.replace(",", ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatClientMoney(value: number): string {
+  return value.toFixed(2);
 }
 
 function MonthWorkspace({ data }: { data: DashboardResponse }) {

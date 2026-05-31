@@ -10,6 +10,12 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
   await expect(page.locator("dt:visible").filter({ hasText: "Income status" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Uncategorized impact" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Synced balance" })).toBeVisible();
+  await page.getByRole("tab", { name: "After review" }).click();
+  await expect(page.getByRole("heading", { name: /EUR 56\.35/ })).toBeVisible();
+  await expect(page.locator("dt:visible").filter({ hasText: "After review impact" })).toBeVisible();
+  await expect(page.getByText(/Review impact reserved/)).toBeVisible();
+  await page.getByRole("tab", { name: "Synced forecast" }).click();
+  await expect(page.getByRole("heading", { name: /EUR 98\.45/ })).toBeVisible();
 
   await page.getByRole("tab", { name: "Month" }).click();
   await expect(page.locator("h2:visible").filter({ hasText: "Category pace" })).toBeVisible();
