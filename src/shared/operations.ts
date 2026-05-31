@@ -53,6 +53,13 @@ export const exportCreateResponseSchema = z.object({
   fileId: z.number(),
 });
 
+export const syncCreateResponseSchema = z.object({
+  newTransactionCount: z.number(),
+  provider: z.string(),
+  syncRunId: z.number(),
+  updatedTransactionCount: z.number(),
+});
+
 export const statusResponseSchema = z.object({
   failedJobs: z.array(
     z.object({ error: z.string().nullable(), name: z.string(), startedAt: z.string() }),
@@ -77,3 +84,4 @@ export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
 export type ExportCreateResponse = z.infer<typeof exportCreateResponseSchema>;
 export type ExportsResponse = z.infer<typeof exportsResponseSchema>;
 export type StatusResponse = z.infer<typeof statusResponseSchema>;
+export type SyncCreateResponse = z.infer<typeof syncCreateResponseSchema>;

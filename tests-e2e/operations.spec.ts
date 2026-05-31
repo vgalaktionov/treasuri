@@ -31,6 +31,8 @@ test("operations workspace covers settings, status, and exports", async ({ page 
   await expect(page.getByRole("heading", { name: "Runtime" })).toBeVisible();
   await expect(page.getByText("Secrets")).toBeVisible();
   await expect(page.getByText("redacted")).toBeVisible();
+  await page.getByRole("button", { name: "Sync now" }).click();
+  await expect(page.getByText(/Synced fake:/)).toBeVisible();
 
   await page.goto("/export");
   await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();

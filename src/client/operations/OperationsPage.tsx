@@ -10,6 +10,7 @@ import {
   fetchSettings,
   fetchStatus,
   saveSettings,
+  syncNow,
 } from "../lib/api.ts";
 
 export function OperationsPage({ section }: { section: "export" | "settings" | "status" }) {
@@ -237,14 +238,45 @@ function SettingsPage() {
 }
 
 function StatusPage() {
+  const queryClient = useQueryClient();
   const status = useQuery({ queryFn: fetchStatus, queryKey: ["status"], refetchInterval: 30_000 });
+  const sync = useMutation({
+    mutationFn: syncNow,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["status"] });
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
 
   return (
     <section>
-      <header className="mb-4">
-        <p className="font-medium text-sm text-treasuri-muted">Runtime</p>
-        <h1 className="mt-1 font-semibold text-xl">Status</h1>
+      <header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="font-medium text-sm text-treasuri-muted">Runtime</p>
+          <h1 className="mt-1 font-semibold text-xl">Status</h1>
+        </div>
+        <button
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white disabled:opacity-60"
+          disabled={sync.isPending}
+          onClick={() => sync.mutate()}
+          type="button"
+        >
+          <RefreshCw aria-hidden="true" className="size-4" />
+          Sync now
+        </button>
       </header>
+      {sync.data ? (
+        <p className="mb-3 rounded-md border border-treasuri-line bg-white p-3 text-sm">
+          Synced {sync.data.provider}: {sync.data.newTransactionCount} new,{" "}
+          {sync.data.updatedTransactionCount} updated.
+        </p>
+      ) : null}
+      {sync.isError ? (
+        <p className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-red-700 text-sm">
+          Sync failed. Check status for the latest error.
+        </p>
+      ) : null}
       <div className="grid gap-2 lg:grid-cols-2">
         {status.data?.sections.map((section) => (
           <section

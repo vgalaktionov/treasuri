@@ -124,6 +124,36 @@ describe("operations API", () => {
       await container.stop();
     }
   }, 120_000);
+
+  it("runs a manual bank sync and records status-visible sync data", async () => {
+    const { app, container, databaseUrl, restore } = await appWithSampleData();
+    try {
+      const synced = await request(app).post("/api/sync-now").expect(200);
+      const status = await request(app).get("/api/status").expect(200);
+      const database = await withPool(databaseUrl, async (pool) => {
+        const syncRuns = await pool.query<{ count: string }>(
+          "SELECT count(*) FROM sync_runs WHERE status = 'completed' AND metadata_json @> '{\"source\":\"bank-sync\"}'::jsonb",
+        );
+        const balanceSnapshots = await pool.query<{ count: string }>(
+          "SELECT count(*) FROM account_balance_snapshots WHERE source = 'fake'",
+        );
+        return {
+          balanceSnapshots: Number(balanceSnapshots.rows[0]?.count ?? 0),
+          syncRuns: Number(syncRuns.rows[0]?.count ?? 0),
+        };
+      });
+
+      expect(synced.body.provider).toBe("fake");
+      expect(synced.body.syncRunId).toBeGreaterThan(0);
+      expect(synced.body.updatedTransactionCount).toBeGreaterThan(0);
+      expect(database.syncRuns).toBeGreaterThan(0);
+      expect(database.balanceSnapshots).toBeGreaterThan(1);
+      expect(JSON.stringify(status.body.sections)).toContain("fake completed");
+    } finally {
+      await restore();
+      await container.stop();
+    }
+  }, 120_000);
 });
 
 async function appWithSampleData() {

@@ -27,9 +27,11 @@ import {
   type SettingsResponse,
   type SettingsUpdate,
   type StatusResponse,
+  type SyncCreateResponse,
   settingsResponseSchema,
   settingsUpdateSchema,
   statusResponseSchema,
+  syncCreateResponseSchema,
 } from "../../shared/operations.ts";
 import {
   type ReviewActionRequest,
@@ -251,4 +253,12 @@ export async function createExport(): Promise<ExportCreateResponse> {
     throw new Error("Failed to create export");
   }
   return exportCreateResponseSchema.parse(await response.json());
+}
+
+export async function syncNow(): Promise<SyncCreateResponse> {
+  const response = await fetch("/api/sync-now", { method: "POST" });
+  if (!response.ok) {
+    throw new Error("Failed to run sync");
+  }
+  return syncCreateResponseSchema.parse(await response.json());
 }

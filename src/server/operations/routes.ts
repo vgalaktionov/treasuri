@@ -6,10 +6,12 @@ import {
   settingsResponseSchema,
   settingsUpdateSchema,
   statusResponseSchema,
+  syncCreateResponseSchema,
 } from "../../shared/operations.ts";
 import { createPool } from "../db/pool.ts";
 import { createXlsxExport, getExportFile, listExports } from "./exportService.ts";
 import { loadSettings, loadStatus, saveSettings } from "./service.ts";
+import { runSyncNow } from "./syncService.ts";
 
 export function registerOperationsRoutes(
   app: express.Express,
@@ -71,6 +73,30 @@ export function registerOperationsRoutes(
       const pool = createPool(databaseUrl);
       try {
         response.json(statusResponseSchema.parse(await loadStatus(pool)));
+      } finally {
+        await pool.end();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/sync-now", async (_request, response, next) => {
+    try {
+      if (!databaseUrl) {
+        response.json(
+          syncCreateResponseSchema.parse({
+            newTransactionCount: 0,
+            provider: "fake",
+            syncRunId: 1,
+            updatedTransactionCount: 7,
+          }),
+        );
+        return;
+      }
+      const pool = createPool(databaseUrl);
+      try {
+        response.json(syncCreateResponseSchema.parse(await runSyncNow(pool)));
       } finally {
         await pool.end();
       }
