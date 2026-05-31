@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2, Play, Save, ToggleLeft, ToggleRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { RuleEditorRequest, RulesResponse } from "../../shared/management.ts";
+import type {
+  RuleEditorRequest,
+  RulePreviewResponse,
+  RulesResponse,
+} from "../../shared/management.ts";
 import {
   applyRule,
   createRule,
@@ -14,18 +18,12 @@ import {
 
 type RuleItem = RulesResponse["rules"][number];
 type EditorMode = { kind: "new" } | { id: number; kind: "edit" };
-type RulePreviewSummary = {
-  matchCount: number;
-  skippedManualCount: number;
-  wouldChangeCount: number;
-};
-
 export function RulesWorkspace() {
   const queryClient = useQueryClient();
   const rules = useQuery({ queryFn: fetchRules, queryKey: ["rules"] });
   const [mode, setMode] = useState<EditorMode>({ kind: "new" });
   const [draft, setDraft] = useState<RuleEditorRequest>(() => emptyRule(1));
-  const [preview, setPreview] = useState<RulePreviewSummary | null>(null);
+  const [preview, setPreview] = useState<RulePreviewResponse | null>(null);
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["rules"] });
   const data = rules.data;
   const categories = data?.categories ?? [];
@@ -39,12 +37,7 @@ export function RulesWorkspace() {
 
   const previewMutation = useMutation({
     mutationFn: () => previewRule(normalizedDraft),
-    onSuccess: (result) =>
-      setPreview({
-        matchCount: result.matchCount,
-        skippedManualCount: result.skippedManualCount,
-        wouldChangeCount: result.wouldChangeCount,
-      }),
+    onSuccess: setPreview,
   });
   const save = useMutation({
     mutationFn: async () => {
@@ -248,7 +241,7 @@ function RuleEditorPanel({
   onSave: () => void;
   onToggle: (() => void) | undefined;
   operators: RulesResponse["operators"];
-  preview: RulePreviewSummary | null;
+  preview: RulePreviewResponse | null;
   rule: RuleEditorRequest;
   selectedRule: RuleItem | null;
 }) {
@@ -282,6 +275,8 @@ function RuleEditorPanel({
         preview={preview}
         rule={rule}
       />
+
+      {preview ? <RulePreviewPanel preview={preview} /> : null}
 
       {selectedRule ? (
         <div className="mt-3 grid grid-cols-2 gap-2 border-t border-treasuri-line pt-3 sm:flex sm:flex-wrap">
@@ -329,7 +324,7 @@ function RuleForm({
   onPreview: () => void;
   onSave: () => void;
   operators: RulesResponse["operators"];
-  preview: RulePreviewSummary | null;
+  preview: RulePreviewResponse | null;
   rule: RuleEditorRequest;
 }) {
   const patch = (next: Partial<RuleEditorRequest>) => onChange({ ...rule, ...next });
@@ -487,6 +482,46 @@ function RuleForm({
         ) : null}
       </div>
     </form>
+  );
+}
+
+function RulePreviewPanel({ preview }: { preview: RulePreviewResponse }) {
+  return (
+    <section className="mt-3 rounded-md border border-treasuri-line bg-treasuri-panel p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-sm">Preview matches</p>
+          <p className="mt-1 text-treasuri-muted text-xs">
+            {preview.matchCount} matched, {preview.wouldChangeCount} would change,{" "}
+            {preview.alreadyCorrectCount} already correct, {preview.skippedManualCount} manual
+            skipped
+          </p>
+        </div>
+      </div>
+      {preview.matches.length > 0 ? (
+        <div className="mt-3 divide-y divide-treasuri-line rounded-md border border-treasuri-line bg-white">
+          {preview.matches.slice(0, 6).map((match) => (
+            <div
+              className="grid gap-2 px-2 py-2 text-xs sm:grid-cols-[5.5rem_minmax(0,1fr)_7rem_6rem]"
+              key={match.id}
+            >
+              <span className="font-medium text-treasuri-muted">{match.bookingDate}</span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold text-sm">{match.merchant}</span>
+                <span className="block truncate text-treasuri-muted">{match.description}</span>
+              </span>
+              <span>{match.categoryName ?? "Uncategorized"}</span>
+              <span className="font-semibold sm:text-right">EUR {match.amount}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-md border border-treasuri-line bg-white p-2 text-treasuri-muted text-xs">
+          No eligible transactions would change. Manual overrides and already-correct rows are
+          intentionally left alone.
+        </p>
+      )}
+    </section>
   );
 }
 

@@ -13,6 +13,8 @@ test("rules workspace previews, creates, edits, and toggles rules", async ({ pag
   await page.getByLabel("Fixed").check();
   await page.getByRole("button", { name: "Preview" }).click();
   await expect(page.getByText(/matches/)).toBeVisible();
+  await expect(page.getByText("Preview matches")).toBeVisible();
+  await expect(page.getByText("Groceries sample")).toBeVisible();
   await page.getByRole("button", { name: "Save rule" }).first().click();
 
   await expect(page.getByText("Groceries rule")).toBeVisible();

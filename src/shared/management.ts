@@ -222,6 +222,7 @@ export const recurringActionResponseSchema = z.object({ ok: z.boolean() });
 export const ruleActiveUpdateRequestSchema = z.object({ isActive: z.boolean() });
 export type CategoryBudgetResponse = z.infer<typeof categoryBudgetResponseSchema>;
 export type RulePreviewRequest = z.infer<typeof rulePreviewRequestSchema>;
+export type RulePreviewResponse = z.infer<typeof rulePreviewResponseSchema>;
 export type RuleDraftFromTransactionResponse = z.infer<
   typeof ruleDraftFromTransactionResponseSchema
 >;

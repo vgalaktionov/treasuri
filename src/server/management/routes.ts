@@ -159,10 +159,14 @@ export function registerManagementRoutes(
     try {
       const rule = rulePreviewRequestSchema.parse(request.body);
       if (!databaseUrl) {
+        const matches = sampleTransactions({ query: rule.pattern }).transactions;
         response.json(
           rulePreviewResponseSchema.parse({
-            matches: sampleTransactions({ query: rule.pattern }).transactions,
+            alreadyCorrectCount: 0,
+            matchCount: matches.length,
+            matches,
             skippedManualCount: 0,
+            wouldChangeCount: matches.length,
           }),
         );
         return;
