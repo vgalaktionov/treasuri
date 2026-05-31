@@ -35,6 +35,7 @@ export function TransactionWorkspace() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState(readFiltersFromUrl);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const transactions = useQuery({
     queryFn: () => fetchTransactions(filters),
     queryKey: ["transactions", filters],
@@ -42,7 +43,10 @@ export function TransactionWorkspace() {
   const update = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TransactionUpdateRequest }) =>
       updateTransaction(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+    onSuccess: () => {
+      setMessage("Transaction saved.");
+      invalidateFinanceWorkspaces(queryClient);
+    },
   });
   const items = transactions.data?.transactions ?? [];
   const activeTransaction =
@@ -90,6 +94,14 @@ export function TransactionWorkspace() {
         onClear={clearFilters}
         onSubmit={submit}
       />
+      {message ? (
+        <p
+          aria-live="polite"
+          className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-emerald-800 text-sm"
+        >
+          {message}
+        </p>
+      ) : null}
       {transactions.data ? <TransactionSummary summary={transactions.data.summary} /> : null}
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.72fr)]">
@@ -111,6 +123,19 @@ export function TransactionWorkspace() {
       </div>
     </section>
   );
+}
+
+function invalidateFinanceWorkspaces(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const queryKey of [
+    ["category-budgets"],
+    ["dashboard"],
+    ["recurring"],
+    ["review-inbox"],
+    ["rules"],
+    ["transactions"],
+  ]) {
+    queryClient.invalidateQueries({ queryKey });
+  }
 }
 
 function TransactionSummary({ summary }: { summary: TransactionsResponse["summary"] }) {

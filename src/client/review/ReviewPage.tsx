@@ -51,7 +51,7 @@ export function ReviewPage() {
       setMessage(`${result.correctedCount} corrected, ${result.reviewCount} left`);
       setRuleDraft(result.ruleDraft);
       setActiveId(nextReviewId(inbox.data?.transactions ?? [], result.transactionId));
-      queryClient.invalidateQueries({ queryKey: ["review-inbox"] });
+      invalidateFinanceWorkspaces(queryClient);
     },
   });
   const accept = useMutation({
@@ -59,7 +59,7 @@ export function ReviewPage() {
     onSuccess: (result) => {
       setMessage(`Accepted. ${result.reviewCount} left`);
       setActiveId(nextReviewId(inbox.data?.transactions ?? [], result.transactionId));
-      queryClient.invalidateQueries({ queryKey: ["review-inbox"] });
+      invalidateFinanceWorkspaces(queryClient);
     },
   });
   const transactions = inbox.data?.transactions ?? [];
@@ -140,6 +140,19 @@ export function ReviewPage() {
       )}
     </section>
   );
+}
+
+function invalidateFinanceWorkspaces(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const queryKey of [
+    ["category-budgets"],
+    ["dashboard"],
+    ["recurring"],
+    ["review-inbox"],
+    ["rules"],
+    ["transactions"],
+  ]) {
+    queryClient.invalidateQueries({ queryKey });
+  }
 }
 
 function ReviewQueue({

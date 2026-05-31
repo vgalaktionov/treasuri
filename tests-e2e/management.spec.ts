@@ -25,6 +25,7 @@ test("transaction filters preserve context and edits stay in place", async ({ pa
   await page.getByLabel("Remember merchant").check();
   await page.getByLabel("One-off").check();
   await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Transaction saved.")).toBeVisible();
   await expect(page).toHaveURL(/\/transactions\?query=dog$/);
 });
 
