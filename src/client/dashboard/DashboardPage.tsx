@@ -21,14 +21,21 @@ export function DashboardPage() {
 
   const data = dashboard.data;
   const safeToSpendClass = Number(data.safeToSpend) < 0 ? "text-red-700" : "text-treasuri-ink";
+  const safeTodayClass = Number(data.safeToday) < 0 ? "text-red-700" : "text-treasuri-ink";
   const reviewClass = data.reviewCount > 0 ? "text-amber-700" : "text-emerald-700";
 
   return (
     <section aria-labelledby="dashboard-heading">
-      <header className="mb-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-        <div>
-          <p className="font-medium text-treasuri-muted text-xs">{monthLabel(data.yearMonth)}</p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <header className="mb-3 grid gap-3 rounded-md border border-treasuri-line bg-white p-3 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-stretch">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium text-treasuri-muted text-xs">{monthLabel(data.yearMonth)}</p>
+            <span className="rounded border border-treasuri-line px-1.5 py-0.5 font-semibold text-treasuri-muted text-[0.68rem]">
+              {data.monthProgress.label}
+            </span>
+            <span className={`font-semibold text-xs ${reviewClass}`}>{data.confidenceNote}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h1
               className={`font-semibold text-xl leading-tight ${safeToSpendClass}`}
               id="dashboard-heading"
@@ -38,43 +45,47 @@ export function DashboardPage() {
             <p className="font-medium text-treasuri-muted text-sm">safe to spend this month</p>
           </div>
           <p className="mt-1 max-w-3xl text-treasuri-muted text-xs">{data.paceSummary}</p>
+          <MonthProgressBar progress={data.monthProgress} />
         </div>
 
-        <div
-          aria-label="Dashboard view"
-          className="inline-grid grid-cols-3 rounded-md border border-treasuri-line bg-white p-1 text-xs lg:hidden"
-          role="tablist"
-        >
-          {[
-            ["now", "Now"],
-            ["month", "Month"],
-            ["explain", "Explain"],
-          ].map(([value, label]) => (
-            <button
-              aria-selected={mode === value}
-              className={`min-h-8 rounded px-3 font-semibold ${
-                mode === value
-                  ? "bg-treasuri-action text-white"
-                  : "text-treasuri-muted hover:bg-treasuri-panel"
-              }`}
-              key={value}
-              onClick={() => setMode(value as DashboardMode)}
-              role="tab"
-              type="button"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <TodayLimit
+          className="border-t border-treasuri-line pt-3 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-3"
+          data={data}
+          valueClassName={safeTodayClass}
+        />
       </header>
+
+      <div
+        aria-label="Dashboard view"
+        className="mb-3 inline-grid w-full grid-cols-3 rounded-md border border-treasuri-line bg-white p-1 text-xs sm:w-auto"
+        role="tablist"
+      >
+        {dashboardModes.map(([value, label]) => (
+          <button
+            aria-selected={mode === value}
+            className={`min-h-8 rounded px-3 font-semibold ${
+              mode === value
+                ? "bg-treasuri-action text-white"
+                : "text-treasuri-muted hover:bg-treasuri-panel"
+            }`}
+            key={value}
+            onClick={() => setMode(value)}
+            role="tab"
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       <section className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="grid gap-3">
           <div className="grid grid-cols-2 items-start gap-2 xl:grid-cols-4">
             <MetricCard
               icon={<Wallet className="size-4" />}
-              label="Safe/day"
-              value={`EUR ${data.safePerDay}`}
+              label="Safe today"
+              value={`EUR ${data.safeToday}`}
+              valueClassName={safeTodayClass}
             />
             <MetricCard
               icon={<Gauge className="size-4" />}
@@ -96,13 +107,9 @@ export function DashboardPage() {
 
           <NextActions className="lg:hidden" data={data} />
 
-          <div className="lg:hidden">
-            {mode === "now" ? <NowWorkspace data={data} reviewClass={reviewClass} /> : null}
-            {mode === "month" ? <MonthWorkspace data={data} /> : null}
-            {mode === "explain" ? <ExplainWorkspace data={data} /> : null}
-          </div>
-
-          <DesktopWorkspace data={data} reviewClass={reviewClass} />
+          {mode === "now" ? <NowWorkspace data={data} reviewClass={reviewClass} /> : null}
+          {mode === "month" ? <MonthWorkspace data={data} /> : null}
+          {mode === "explain" ? <ExplainWorkspace data={data} /> : null}
         </div>
 
         <NextActions className="hidden lg:block" data={data} />
@@ -111,12 +118,48 @@ export function DashboardPage() {
   );
 }
 
-function DesktopWorkspace({ data, reviewClass }: { data: DashboardResponse; reviewClass: string }) {
+const dashboardModes: readonly [DashboardMode, string][] = [
+  ["now", "Now"],
+  ["month", "Month"],
+  ["explain", "Explain"],
+];
+
+function TodayLimit({
+  className,
+  data,
+  valueClassName,
+}: {
+  className: string;
+  data: DashboardResponse;
+  valueClassName: string;
+}) {
   return (
-    <div className="hidden gap-2 lg:grid">
-      <NowWorkspace data={data} reviewClass={reviewClass} />
-      <MonthWorkspace data={data} />
-      <ExplainWorkspace data={data} />
+    <aside className={className}>
+      <p className="font-medium text-treasuri-muted text-xs">Today</p>
+      <p className={`mt-1 font-semibold text-lg leading-tight ${valueClassName}`}>
+        EUR {data.safeToday}
+      </p>
+      <p className="mt-1 text-treasuri-muted text-xs">safe to spend today</p>
+      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <InlineMetric label="Safe/day" value={`EUR ${data.safePerDay}`} />
+        <InlineMetric label="Days left" value={String(data.monthProgress.remainingDays)} />
+      </dl>
+    </aside>
+  );
+}
+
+function MonthProgressBar({ progress }: { progress: DashboardResponse["monthProgress"] }) {
+  const width = `${Math.min(100, Math.max(0, Math.round((progress.elapsedDays / progress.totalDays) * 100)))}%`;
+
+  return (
+    <div className="mt-3 max-w-3xl">
+      <div className="h-1.5 overflow-hidden rounded bg-treasuri-panel">
+        <div className="h-full rounded bg-treasuri-action" style={{ width }} />
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-3 text-treasuri-muted text-[0.68rem]">
+        <span>{progress.elapsedDays} elapsed</span>
+        <span>{progress.remainingDays} left including today</span>
+      </div>
     </div>
   );
 }
@@ -136,11 +179,12 @@ function NowWorkspace({ data, reviewClass }: { data: DashboardResponse; reviewCl
         </div>
 
         <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+          <InlineMetric label="Today limit" value={`EUR ${data.safeToday}`} />
+          <InlineMetric label="Safe per day" value={`EUR ${data.safePerDay}/day`} />
           <InlineMetric
             label="Synced balance"
             value={data.currentBalance ? `EUR ${data.currentBalance.amount}` : "Missing"}
           />
-          <InlineMetric label="Safe per day" value={`EUR ${data.safePerDay}/day`} />
           <InlineMetric label="Income received" value={`EUR ${data.incomeReceived}`} />
           <InlineMetric label="Projected savings" value={`EUR ${data.projectedSavings}`} />
         </dl>

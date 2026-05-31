@@ -1,26 +1,21 @@
 import { expect, test } from "@playwright/test";
 
-test("dashboard shows safe-to-spend and an accessible forecast explanation", async ({
-  page,
-}, testInfo) => {
+test("dashboard shows safe-to-spend and an accessible forecast explanation", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: /EUR 98\.45/ })).toBeVisible();
   await expect(page.getByText("safe to spend this month")).toBeVisible();
+  await expect(page.getByText("safe to spend today")).toBeVisible();
   await expect(page.locator("aside:visible").filter({ hasText: "Next actions" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Income status" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Uncategorized impact" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Synced balance" })).toBeVisible();
 
-  if (testInfo.project.name === "mobile") {
-    await page.getByRole("tab", { name: "Month" }).click();
-  }
+  await page.getByRole("tab", { name: "Month" }).click();
   await expect(page.locator("h2:visible").filter({ hasText: "Category pace" })).toBeVisible();
   await expect(page.locator("p:visible").filter({ hasText: "Groceries" })).toBeVisible();
 
-  if (testInfo.project.name === "mobile") {
-    await page.getByRole("tab", { name: "Explain" }).click();
-  }
+  await page.getByRole("tab", { name: "Explain" }).click();
   await expect(page.locator("p:visible").filter({ hasText: "Forecast explanation" })).toBeVisible();
   await expect(
     page.locator("dt:visible").filter({ hasText: "synced current liquid balance" }),

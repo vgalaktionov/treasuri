@@ -26,6 +26,13 @@ export const currentBalanceSchema = z.object({
   source: z.string(),
 });
 
+export const monthProgressSchema = z.object({
+  elapsedDays: z.number(),
+  label: z.string(),
+  remainingDays: z.number(),
+  totalDays: z.number(),
+});
+
 export const dashboardResponseSchema = z.object({
   categoryPace: z.array(categoryPaceSchema),
   confidence: z.string(),
@@ -36,10 +43,12 @@ export const dashboardResponseSchema = z.object({
   incomeReceived: z.string(),
   metrics: z.array(dashboardMetricSchema),
   monthFacts: z.array(monthFactSchema),
+  monthProgress: monthProgressSchema,
   paceSummary: z.string(),
   projectedSavings: z.string(),
   reviewCount: z.number(),
   reviewImpact: z.string(),
+  safeToday: z.string(),
   safePerDay: z.string(),
   safeToSpend: z.string(),
   topVariances: z.array(dashboardMetricSchema),

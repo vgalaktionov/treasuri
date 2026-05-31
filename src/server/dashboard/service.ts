@@ -1,7 +1,12 @@
 import type pg from "pg";
 
 import type { DashboardResponse } from "../../shared/dashboard.ts";
-import { calculateSafeToSpend, daysLeftInMonth, formatMoney } from "../forecast/calculator.ts";
+import {
+  calculateSafeToSpend,
+  daysInMonth,
+  daysLeftInMonth,
+  formatMoney,
+} from "../forecast/calculator.ts";
 
 export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<DashboardResponse> {
   const forecast = await readLatestForecast(pool);
@@ -31,6 +36,9 @@ export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<D
   const fixedCostsTotal = formatMoney(
     Number(forecast.fixed_costs_paid) + Number(forecast.fixed_costs_upcoming),
   );
+  const totalDays = daysInMonth(asOf);
+  const remainingDays = daysLeftInMonth(asOf);
+  const elapsedDays = Math.min(asOf.getUTCDate(), totalDays);
 
   return {
     categoryPace: await readCategoryPace(pool, forecast.year_month),
@@ -63,10 +71,17 @@ export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<D
         value: `EUR ${formatMoney(uncategorized.amount)}`,
       },
     ],
+    monthProgress: {
+      elapsedDays,
+      label: `${elapsedDays}/${totalDays} days elapsed`,
+      remainingDays,
+      totalDays,
+    },
     paceSummary: paceSummary(explanation),
     projectedSavings,
     reviewCount: review.count,
     reviewImpact: formatMoney(review.amount),
+    safeToday: calculated.safePerDay,
     safePerDay: calculated.safePerDay,
     safeToSpend: calculated.safeToSpend,
     topVariances: await readTopCategorySpend(pool, forecast.year_month),
@@ -132,10 +147,17 @@ export function sampleDashboard(): DashboardResponse {
         value: "EUR 42.10",
       },
     ],
+    monthProgress: {
+      elapsedDays: 26,
+      label: "26/31 days elapsed",
+      remainingDays: 6,
+      totalDays: 31,
+    },
     paceSummary: "Variable pace is tracking the sample forecast.",
     projectedSavings: "1098.45",
     reviewCount: 1,
     reviewImpact: "42.10",
+    safeToday: "16.41",
     safePerDay: "16.41",
     safeToSpend: "98.45",
     topVariances: [

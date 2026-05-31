@@ -27,6 +27,13 @@ describe("dashboard API", () => {
         source: "sample",
       });
       expect(response.body.explanation.formula).toContain("synced_current_liquid_balance");
+      expect(response.body.safeToday).toBe(response.body.safePerDay);
+      expect(response.body.monthProgress).toMatchObject({
+        elapsedDays: expect.any(Number),
+        label: expect.stringContaining("days elapsed"),
+        remainingDays: expect.any(Number),
+        totalDays: expect.any(Number),
+      });
       expect(response.body.reviewCount).toBe(1);
       expect(response.body.monthFacts).toEqual(
         expect.arrayContaining([
