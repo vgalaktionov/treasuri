@@ -8,10 +8,12 @@ import { createApp } from "../../../src/server/http/app.ts";
 import { loadSampleData } from "../../../src/server/sample/load.ts";
 
 describe("management API", () => {
-  it("filters transactions and persists manual category edits", async () => {
+  it("filters transactions and persists manual transaction edits", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {
-      const filtered = await request(app).get("/api/transactions?query=dog").expect(200);
+      const filtered = await request(app)
+        .get("/api/transactions?query=dog&month=2026-05&kind=spending&minAmount=80&maxAmount=90")
+        .expect(200);
       const transaction = filtered.body.transactions[0];
       const groceries = filtered.body.categories.find(
         (category: { name: string }) => category.name === "Groceries",
@@ -21,13 +23,52 @@ describe("management API", () => {
       expect(transaction.description).toBe("Dog food sample");
       await request(app)
         .patch(`/api/transactions/${transaction.id}`)
-        .send({ categoryId: groceries.id })
+        .send({
+          categoryId: groceries.id,
+          createAlias: true,
+          flags: {
+            isExcludedFromBudget: true,
+            isOneOff: true,
+            isSavings: false,
+            isTransfer: false,
+          },
+          merchantName: "Dog Supplies",
+        })
         .expect(200);
 
       const updated = await request(app).get("/api/transactions?query=dog").expect(200);
+      const alias = await withPool(container.getConnectionUri(), async (pool) =>
+        pool.query<{ count: string }>(
+          "SELECT count(*) FROM merchant_aliases WHERE match_text = 'Sample Pet Care'",
+        ),
+      );
 
       expect(updated.body.transactions[0].categoryName).toBe("Groceries");
+      expect(updated.body.transactions[0].merchant).toBe("Dog Supplies");
       expect(updated.body.transactions[0].needsReview).toBe(false);
+      expect(updated.body.transactions[0].flags).toContain("one-off");
+      expect(updated.body.transactions[0].flags).toContain("excluded");
+      expect(alias.rows[0]?.count).toBe("1");
+    } finally {
+      await restore();
+      await container.stop();
+    }
+  }, 60_000);
+
+  it("exposes raw transaction details", async () => {
+    const { app, container, restore } = await appWithSampleData();
+    try {
+      const transactions = await request(app).get("/api/transactions?query=review").expect(200);
+      const transaction = transactions.body.transactions[0];
+      const raw = await request(app).get(`/api/transactions/${transaction.id}/raw`).expect(200);
+
+      expect(raw.body.details).toEqual(
+        expect.arrayContaining([
+          { label: "Provider", value: "fake" },
+          { label: "Currency", value: "EUR" },
+        ]),
+      );
+      expect(raw.body.payloadJson).toContain("sample");
     } finally {
       await restore();
       await container.stop();
@@ -45,7 +86,7 @@ describe("management API", () => {
 
       await request(app)
         .patch(`/api/transactions/${transaction.id}`)
-        .send({ categoryId: groceries.id })
+        .send({ categoryId: groceries.id, merchantName: transaction.merchant })
         .expect(200);
       const preview = await request(app)
         .post("/api/rules/preview")

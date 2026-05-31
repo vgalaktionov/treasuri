@@ -1,6 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search } from "lucide-react";
-import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 
 import {
@@ -9,10 +7,9 @@ import {
   fetchCategories,
   fetchRecurring,
   fetchRules,
-  fetchTransactions,
   previewRule,
-  updateTransactionCategory,
 } from "../lib/api.ts";
+import { TransactionWorkspace } from "./TransactionWorkspace.tsx";
 
 export function ManagementPage({
   section,
@@ -23,7 +20,7 @@ export function ManagementPage({
     return <RulesPage />;
   }
   if (section === "transactions") {
-    return <TransactionsPage />;
+    return <TransactionWorkspace />;
   }
   if (section === "categories") {
     return <CategoriesPage />;
@@ -76,100 +73,6 @@ function RecurringPage() {
               {series.cadence} - {series.amount ?? "0.00"} -{" "}
               {series.nextExpectedDate ?? "not scheduled"}
             </p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function TransactionsPage() {
-  const queryClient = useQueryClient();
-  const [query, setQuery] = useState(
-    new URLSearchParams(window.location.search).get("query") ?? "",
-  );
-  const transactions = useQuery({
-    queryFn: () => fetchTransactions(query),
-    queryKey: ["transactions", query],
-  });
-  const updateCategory = useMutation({
-    mutationFn: ({ categoryId, id }: { categoryId: number; id: number }) =>
-      updateTransactionCategory(id, categoryId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["transactions"] }),
-  });
-
-  function submitFilter(event: FormEvent) {
-    event.preventDefault();
-    window.history.replaceState(
-      null,
-      "",
-      query ? `/transactions?query=${encodeURIComponent(query)}` : "/transactions",
-    );
-    queryClient.invalidateQueries({ queryKey: ["transactions"] });
-  }
-
-  return (
-    <section>
-      <header className="mb-4">
-        <p className="font-medium text-sm text-treasuri-muted">History</p>
-        <h1 className="mt-1 font-semibold text-xl">Transactions</h1>
-      </header>
-      <form className="mb-3 flex gap-2" onSubmit={submitFilter}>
-        <label className="relative block flex-1">
-          <Search
-            aria-hidden="true"
-            className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-treasuri-muted"
-          />
-          <input
-            aria-label="Search transactions"
-            className="min-h-9 w-full rounded-md border border-treasuri-line bg-white pr-3 pl-9 text-sm"
-            onChange={(event) => setQuery(event.target.value)}
-            value={query}
-          />
-        </label>
-        <button
-          className="rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white"
-          type="submit"
-        >
-          Search
-        </button>
-      </form>
-      <div className="space-y-2">
-        {transactions.data?.transactions.map((transaction) => (
-          <article
-            className="rounded-md border border-treasuri-line bg-white p-3"
-            key={transaction.id}
-          >
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold">{transaction.merchant}</p>
-                <p className="text-sm text-treasuri-muted">{transaction.description}</p>
-                <p className="mt-1 text-sm">{transaction.bookingDate}</p>
-              </div>
-              <p className="font-semibold">EUR {transaction.amount}</p>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <select
-                aria-label={`Category for ${transaction.description}`}
-                className="min-h-9 rounded-md border border-treasuri-line bg-white px-3 text-sm"
-                defaultValue={transaction.categoryId ?? ""}
-                onChange={(event) =>
-                  updateCategory.mutate({
-                    categoryId: Number(event.target.value),
-                    id: transaction.id,
-                  })
-                }
-              >
-                {transactions.data.categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              {transaction.needsReview ? (
-                <span className="text-sm text-treasuri-muted">Needs review</span>
-              ) : null}
-            </div>
           </article>
         ))}
       </div>

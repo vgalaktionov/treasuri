@@ -127,6 +127,13 @@ async function upsertSampleTransaction(
       DO UPDATE SET
         merchant_id = EXCLUDED.merchant_id,
         category_id = EXCLUDED.category_id,
+        is_income = EXCLUDED.is_income,
+        is_transfer = EXCLUDED.is_transfer,
+        is_savings = EXCLUDED.is_savings,
+        is_fixed_cost = EXCLUDED.is_fixed_cost,
+        is_variable_cost = EXCLUDED.is_variable_cost,
+        is_one_off = EXCLUDED.is_one_off,
+        is_excluded_from_budget = EXCLUDED.is_excluded_from_budget,
         needs_review = EXCLUDED.needs_review,
         classification_method = EXCLUDED.classification_method,
         classification_confidence = EXCLUDED.classification_confidence,

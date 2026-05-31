@@ -7,7 +7,10 @@ import {
   ruleCreateResponseSchema,
   rulePreviewResponseSchema,
   rulesResponseSchema,
+  type TransactionFilters,
   type TransactionsResponse,
+  type TransactionUpdateRequest,
+  transactionRawDetailsSchema,
   transactionsResponseSchema,
 } from "../../shared/management.ts";
 import {
@@ -45,23 +48,41 @@ export async function fetchReviewInbox(): Promise<ReviewInboxResponse> {
   return reviewInboxResponseSchema.parse(await response.json());
 }
 
-export async function fetchTransactions(query: string): Promise<TransactionsResponse> {
-  const response = await fetch(`/api/transactions?query=${encodeURIComponent(query)}`);
+export async function fetchTransactions(
+  filters: TransactionFilters = {},
+): Promise<TransactionsResponse> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === "" || value === false) {
+      continue;
+    }
+    params.set(key, String(value));
+  }
+  const query = params.toString();
+  const response = await fetch(query ? `/api/transactions?${query}` : "/api/transactions");
   if (!response.ok) {
     throw new Error("Failed to load transactions");
   }
   return transactionsResponseSchema.parse(await response.json());
 }
 
-export async function updateTransactionCategory(transactionId: number, categoryId: number) {
+export async function updateTransaction(transactionId: number, input: TransactionUpdateRequest) {
   const response = await fetch(`/api/transactions/${transactionId}`, {
-    body: JSON.stringify({ categoryId }),
+    body: JSON.stringify(input),
     headers: { "content-type": "application/json" },
     method: "PATCH",
   });
   if (!response.ok) {
     throw new Error("Failed to update transaction");
   }
+}
+
+export async function fetchTransactionRawDetails(transactionId: number) {
+  const response = await fetch(`/api/transactions/${transactionId}/raw`);
+  if (!response.ok) {
+    throw new Error("Failed to load transaction details");
+  }
+  return transactionRawDetailsSchema.parse(await response.json());
 }
 
 export async function fetchRules() {

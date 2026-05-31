@@ -7,7 +7,9 @@ export const transactionListItemSchema = z.object({
   bookingDate: z.string(),
   categoryId: z.number().nullable(),
   categoryName: z.string().nullable(),
+  classificationMethod: z.string().nullable().default(null),
   description: z.string(),
+  flags: z.array(z.string()).default([]),
   id: z.number(),
   merchant: z.string(),
   needsReview: z.boolean(),
@@ -15,10 +17,50 @@ export const transactionListItemSchema = z.object({
 
 export const transactionsResponseSchema = z.object({
   categories: z.array(managementCategorySchema),
+  merchants: z.array(z.string()).default([]),
   transactions: z.array(transactionListItemSchema),
 });
 
-export const categoryUpdateRequestSchema = z.object({ categoryId: z.number() });
+export const transactionFiltersSchema = z.object({
+  category: z.string().optional(),
+  kind: z.string().optional(),
+  maxAmount: z.string().optional(),
+  merchant: z.string().optional(),
+  minAmount: z.string().optional(),
+  month: z.string().optional(),
+  needsReview: z.boolean().optional(),
+  query: z.string().optional(),
+});
+
+export const transactionUpdateRequestSchema = z.object({
+  categoryId: z.number(),
+  createAlias: z.boolean().default(false),
+  flags: z
+    .object({
+      isExcludedFromBudget: z.boolean().default(false),
+      isOneOff: z.boolean().default(false),
+      isSavings: z.boolean().default(false),
+      isTransfer: z.boolean().default(false),
+    })
+    .default({
+      isExcludedFromBudget: false,
+      isOneOff: false,
+      isSavings: false,
+      isTransfer: false,
+    }),
+  merchantName: z.string().optional(),
+});
+
+export const transactionRawDetailsSchema = z.object({
+  amount: z.string(),
+  bookingDate: z.string(),
+  categoryName: z.string().nullable(),
+  description: z.string(),
+  details: z.array(z.object({ label: z.string(), value: z.string() })),
+  id: z.number(),
+  merchant: z.string(),
+  payloadJson: z.string(),
+});
 
 export const rulePreviewRequestSchema = z.object({
   categoryId: z.number(),
@@ -68,4 +110,7 @@ export const recurringResponseSchema = z.object({
 });
 
 export type RulePreviewRequest = z.infer<typeof rulePreviewRequestSchema>;
+export type TransactionFilters = z.infer<typeof transactionFiltersSchema>;
+export type TransactionUpdateRequest = z.infer<typeof transactionUpdateRequestSchema>;
+export type TransactionRawDetails = z.infer<typeof transactionRawDetailsSchema>;
 export type TransactionsResponse = z.infer<typeof transactionsResponseSchema>;
