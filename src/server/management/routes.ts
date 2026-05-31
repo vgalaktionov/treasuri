@@ -4,6 +4,7 @@ import {
   categoryBudgetResponseSchema,
   recurringActionResponseSchema,
   recurringResponseSchema,
+  recurringUpdateRequestSchema,
   ruleActiveUpdateRequestSchema,
   ruleApplyResponseSchema,
   ruleCreateResponseSchema,
@@ -18,8 +19,9 @@ import {
   transactionUpdateRequestSchema,
 } from "../../shared/management.ts";
 import { createPool } from "../db/pool.ts";
+import { updateMonthlyForecast } from "../forecast/service.ts";
 import { listCategories, listCategoryBudgets } from "./categories.ts";
-import { confirmRecurring, disableRecurring, listRecurring } from "./recurring.ts";
+import { confirmRecurring, disableRecurring, listRecurring, updateRecurring } from "./recurring.ts";
 import {
   applyRule,
   createRule,
@@ -320,7 +322,12 @@ export function registerManagementRoutes(
       }
       const pool = createPool(databaseUrl);
       try {
-        response.json(recurringResponseSchema.parse(await listRecurring(pool)));
+        response.json(
+          recurringResponseSchema.parse({
+            ...(await listRecurring(pool)),
+            categories: await listCategories(pool),
+          }),
+        );
       } finally {
         await pool.end();
       }
@@ -344,11 +351,56 @@ export function registerManagementRoutes(
       }
       const pool = createPool(databaseUrl);
       try {
+        const ok = await confirmRecurring(pool, Number(request.params.id));
+        if (ok) {
+          await updateMonthlyForecast(pool);
+        }
         response.json(
           recurringActionResponseSchema.parse({
-            ok: await confirmRecurring(pool, Number(request.params.id)),
+            ok,
           }),
         );
+      } finally {
+        await pool.end();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/recurring/:id", async (request, response, next) => {
+    try {
+      const body = recurringUpdateRequestSchema.parse(request.body);
+      if (!databaseUrl) {
+        const recurring = sampleRecurringFor(sampleRecurringStores, request);
+        const category = sampleCategories.find((item) => item.id === body.categoryId);
+        recurring.series = recurring.series.map((series) =>
+          series.id === Number(request.params.id)
+            ? {
+                ...series,
+                amount: body.expectedAmount,
+                categoryId: body.categoryId,
+                categoryName: category?.name ?? null,
+                confidence: "0.90",
+                expectedDayOfMonth: body.expectedDayOfMonth,
+                isConfirmed: true,
+                name: body.name,
+                nextExpectedDate: body.nextExpectedDate,
+                warnings: [],
+              }
+            : series,
+        );
+        sampleRecurringStores.set(request.sessionID, recurring);
+        response.json(recurringActionResponseSchema.parse({ ok: true }));
+        return;
+      }
+      const pool = createPool(databaseUrl);
+      try {
+        const ok = await updateRecurring(pool, Number(request.params.id), body);
+        if (ok) {
+          await updateMonthlyForecast(pool);
+        }
+        response.json(recurringActionResponseSchema.parse({ ok }));
       } finally {
         await pool.end();
       }
@@ -370,9 +422,13 @@ export function registerManagementRoutes(
       }
       const pool = createPool(databaseUrl);
       try {
+        const ok = await disableRecurring(pool, Number(request.params.id));
+        if (ok) {
+          await updateMonthlyForecast(pool);
+        }
         response.json(
           recurringActionResponseSchema.parse({
-            ok: await disableRecurring(pool, Number(request.params.id)),
+            ok,
           }),
         );
       } finally {

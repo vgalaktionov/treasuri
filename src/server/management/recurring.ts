@@ -1,5 +1,7 @@
 import type pg from "pg";
 
+import type { RecurringUpdateRequest } from "../../shared/management.ts";
+
 type RecurringCandidate = {
   categoryId: number | null;
   expectedAmount: string;
@@ -23,6 +25,7 @@ export async function listRecurring(pool: pg.Pool) {
   const result = await pool.query<{
     amount_tolerance: string | null;
     cadence: string;
+    category_id: string | null;
     category_name: string | null;
     confidence: string;
     expected_amount: string | null;
@@ -46,6 +49,7 @@ export async function listRecurring(pool: pg.Pool) {
       recurring_series.is_confirmed,
       recurring_series.amount_tolerance::text,
       recurring_series.expected_day_of_month,
+      recurring_series.category_id::text,
       categories.name AS category_name,
       activity.min_amount::text,
       activity.max_amount::text,
@@ -101,6 +105,7 @@ export async function listRecurring(pool: pg.Pool) {
     series: result.rows.map((row) => ({
       amount: row.expected_amount,
       amountTolerance: row.amount_tolerance,
+      categoryId: row.category_id ? Number(row.category_id) : null,
       categoryName: row.category_name,
       cadence: row.cadence,
       confidence: Number(row.confidence).toFixed(2),
@@ -188,6 +193,37 @@ export async function confirmRecurring(pool: pg.Pool, seriesId: number): Promise
       WHERE id = $1 AND is_active = true
     `,
     [seriesId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function updateRecurring(
+  pool: pg.Pool,
+  seriesId: number,
+  input: RecurringUpdateRequest,
+): Promise<boolean> {
+  const result = await pool.query(
+    `
+      UPDATE recurring_series
+      SET
+        name = $2,
+        category_id = $3,
+        expected_amount = $4,
+        expected_day_of_month = $5,
+        next_expected_date = $6,
+        is_confirmed = true,
+        confidence = greatest(confidence, 0.90),
+        updated_at = now()
+      WHERE id = $1 AND is_active = true
+    `,
+    [
+      seriesId,
+      input.name,
+      input.categoryId,
+      input.expectedAmount,
+      input.expectedDayOfMonth,
+      input.nextExpectedDate,
+    ],
   );
   return result.rowCount === 1;
 }

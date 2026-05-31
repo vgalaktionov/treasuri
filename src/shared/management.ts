@@ -198,10 +198,12 @@ export const rulesResponseSchema = z.object({
 });
 
 export const recurringResponseSchema = z.object({
+  categories: z.array(managementCategorySchema).default([]),
   series: z.array(
     z.object({
       amount: z.string().nullable(),
       amountTolerance: z.string().nullable().default(null),
+      categoryId: z.number().nullable().default(null),
       categoryName: z.string().nullable(),
       cadence: z.string(),
       confidence: z.string().nullable().default(null),
@@ -230,6 +232,21 @@ export const recurringResponseSchema = z.object({
   ),
 });
 
+export const recurringUpdateRequestSchema = z.object({
+  categoryId: z.number().nullable(),
+  expectedAmount: z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d{1,2})?$/, "Expected amount must be a positive money amount")
+    .nullable(),
+  expectedDayOfMonth: z.number().int().min(1).max(31).nullable(),
+  name: z.string().trim().min(1),
+  nextExpectedDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+});
+
 export const recurringActionResponseSchema = z.object({ ok: z.boolean() });
 export const ruleActiveUpdateRequestSchema = z.object({ isActive: z.boolean() });
 export type CategoryBudgetResponse = z.infer<typeof categoryBudgetResponseSchema>;
@@ -241,6 +258,7 @@ export type RuleDraftFromTransactionResponse = z.infer<
 export type RuleEditorRequest = z.infer<typeof ruleEditorRequestSchema>;
 export type RulesResponse = z.infer<typeof rulesResponseSchema>;
 export type RecurringResponse = z.infer<typeof recurringResponseSchema>;
+export type RecurringUpdateRequest = z.infer<typeof recurringUpdateRequestSchema>;
 export type TransactionFilters = z.infer<typeof transactionFiltersSchema>;
 export type TransactionUpdateRequest = z.infer<typeof transactionUpdateRequestSchema>;
 export type TransactionRawDetails = z.infer<typeof transactionRawDetailsSchema>;

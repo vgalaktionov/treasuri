@@ -30,7 +30,7 @@ test("rules workspace previews, creates, edits, and toggles rules", async ({ pag
   await expect(page.getByText("inactive")).toBeVisible();
 });
 
-test("recurring workspace confirms and disables detected commitments", async ({ page }) => {
+test("recurring workspace edits assumptions and disables detected commitments", async ({ page }) => {
   await page.goto("/recurring");
 
   await expect(page.getByRole("heading", { name: "Recurring" })).toBeVisible();
@@ -38,8 +38,13 @@ test("recurring workspace confirms and disables detected commitments", async ({ 
   await page.getByRole("button", { name: /Sample Streaming/ }).click();
   await expect(page.getByRole("heading", { name: "Linked transactions" })).toBeVisible();
   await expect(page.getByText("Monthly streaming sample")).toBeVisible();
-  await page.getByRole("button", { exact: true, name: "Confirm" }).click();
-  await expect(page.getByText("Recurring series confirmed.")).toBeVisible();
+  await page.getByLabel("Expected amount").fill("19.99");
+  await page.getByLabel("Expected day").fill("16");
+  await page.getByLabel("Next expected").fill("2026-06-16");
+  await page.getByRole("button", { exact: true, name: "Save assumptions" }).click();
+  await expect(page.getByText("Recurring assumptions saved.")).toBeVisible();
+  await expect(page.getByText("EUR 19.99").first()).toBeVisible();
+  await expect(page.getByText("Next expected 2026-06-16")).toBeVisible();
   await expect(page.getByRole("button", { exact: true, name: "Confirm" })).toHaveCount(0);
   await page.getByRole("button", { exact: true, name: "Disable" }).click();
   await expect(page.getByText("Recurring series disabled.")).toBeVisible();

@@ -250,7 +250,7 @@ describe("management API", () => {
     }
   }, 120_000);
 
-  it("confirms and disables recurring series", async () => {
+  it("edits, confirms, and disables recurring series", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {
       const { agent, csrf } = await csrfAgent(app);
@@ -258,8 +258,12 @@ describe("management API", () => {
       const detected = recurring.body.series.find(
         (series: { isConfirmed: boolean }) => !series.isConfirmed,
       );
+      const subscriptions = recurring.body.categories.find(
+        (category: { name: string }) => category.name === "Subscriptions",
+      );
 
       expect(recurring.body.series[0].confidence).toBeDefined();
+      expect(subscriptions).toBeDefined();
       expect(recurring.body.series[0].linkedTransactions).toBeInstanceOf(Array);
       expect(
         recurring.body.series.some(
@@ -267,6 +271,32 @@ describe("management API", () => {
             series.name === "Sample Rent" && series.linkedTransactions.length > 0,
         ),
       ).toBe(true);
+      await agent
+        .put(`/api/recurring/${detected.id}`)
+        .set("x-csrf-token", csrf)
+        .send({
+          categoryId: subscriptions.id,
+          expectedAmount: "19.99",
+          expectedDayOfMonth: 16,
+          name: "Edited Streaming",
+          nextExpectedDate: "2026-06-16",
+        })
+        .expect(200);
+      const edited = await agent.get("/api/recurring").expect(200);
+      const editedSeries = edited.body.series.find(
+        (series: { id: number }) => series.id === detected.id,
+      );
+
+      expect(editedSeries).toMatchObject({
+        amount: "19.99",
+        categoryId: subscriptions.id,
+        categoryName: "Subscriptions",
+        expectedDayOfMonth: 16,
+        isConfirmed: true,
+        name: "Edited Streaming",
+        nextExpectedDate: "2026-06-16",
+      });
+      expect(editedSeries.warnings).not.toContain("New recurring payment detected");
       await agent
         .post(`/api/recurring/${detected.id}/confirm`)
         .set("x-csrf-token", csrf)

@@ -1,12 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, EyeOff } from "lucide-react";
+import { Check, EyeOff, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { RecurringResponse } from "../../shared/management.ts";
-import { confirmRecurring, disableRecurring, fetchRecurring } from "../lib/api.ts";
+import type { RecurringResponse, RecurringUpdateRequest } from "../../shared/management.ts";
+import { confirmRecurring, disableRecurring, fetchRecurring, updateRecurring } from "../lib/api.ts";
 import { invalidateFinanceWorkspaces } from "../lib/invalidation.ts";
 
 type RecurringSeries = RecurringResponse["series"][number];
+type RecurringCategory = RecurringResponse["categories"][number];
+type RecurringFormState = {
+  categoryId: string;
+  expectedAmount: string;
+  expectedDayOfMonth: string;
+  name: string;
+  nextExpectedDate: string;
+};
 
 export function RecurringWorkspace() {
   const queryClient = useQueryClient();
@@ -24,6 +32,19 @@ export function RecurringWorkspace() {
     mutationFn: disableRecurring,
     onSuccess: () => {
       setMessage("Recurring series disabled.");
+      invalidateFinanceWorkspaces(queryClient);
+    },
+  });
+  const update = useMutation({
+    mutationFn: ({
+      input,
+      seriesId,
+    }: {
+      input: Parameters<typeof updateRecurring>[1];
+      seriesId: number;
+    }) => updateRecurring(seriesId, input),
+    onSuccess: () => {
+      setMessage("Recurring assumptions saved.");
       invalidateFinanceWorkspaces(queryClient);
     },
   });
@@ -81,10 +102,12 @@ export function RecurringWorkspace() {
           series={series}
         />
         <RecurringInspector
+          categories={recurring.data.categories}
           className="order-1 xl:order-2"
-          disabled={confirm.isPending || disable.isPending}
+          disabled={confirm.isPending || disable.isPending || update.isPending}
           onConfirm={(item) => confirm.mutate(item.id)}
           onDisable={(item) => disable.mutate(item.id)}
+          onSave={(item, input) => update.mutate({ input, seriesId: item.id })}
           series={activeSeries}
         />
       </div>
@@ -157,18 +180,28 @@ function RecurringList({
 }
 
 function RecurringInspector({
+  categories,
   className,
   disabled,
   onConfirm,
   onDisable,
+  onSave,
   series,
 }: {
+  categories: RecurringCategory[];
   className: string;
   disabled: boolean;
   onConfirm: (series: RecurringSeries) => void;
   onDisable: (series: RecurringSeries) => void;
+  onSave: (series: RecurringSeries, input: RecurringUpdateRequest) => void;
   series: RecurringSeries | null;
 }) {
+  const [form, setForm] = useState<RecurringFormState>(() => formFromSeries(series));
+
+  useEffect(() => {
+    setForm(formFromSeries(series));
+  }, [series]);
+
   if (!series) {
     return (
       <aside
@@ -211,6 +244,99 @@ function RecurringInspector({
         <Fact label="max" value={`EUR ${series.maxAmount ?? "0.00"}`} />
         <Fact label="tolerance" value={`EUR ${series.amountTolerance ?? "0.00"}`} />
       </dl>
+
+      <form
+        className="mt-4 border-t border-treasuri-line pt-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(series, inputFromFormData(new FormData(event.currentTarget)));
+        }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-semibold text-sm">Planning assumptions</h3>
+          <p className="text-treasuri-muted text-xs">used for upcoming fixed costs</p>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1.4fr)_minmax(9rem,1fr)_7rem_7rem_9rem]">
+          <label className="grid gap-1 text-xs">
+            <span className="font-medium text-treasuri-muted">Series name</span>
+            <input
+              autoComplete="off"
+              className="min-h-9 rounded-md border border-treasuri-line px-2 text-sm"
+              name="name"
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              required
+              value={form.name}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            <span className="font-medium text-treasuri-muted">Category</span>
+            <select
+              className="min-h-9 rounded-md border border-treasuri-line bg-white px-2 text-sm"
+              name="categoryId"
+              onChange={(event) =>
+                setForm((current) => ({ ...current, categoryId: event.target.value }))
+              }
+              value={form.categoryId}
+            >
+              <option value="">Uncategorized</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs">
+            <span className="font-medium text-treasuri-muted">Expected amount</span>
+            <input
+              autoComplete="off"
+              className="min-h-9 rounded-md border border-treasuri-line px-2 text-sm"
+              inputMode="decimal"
+              name="expectedAmount"
+              onChange={(event) =>
+                setForm((current) => ({ ...current, expectedAmount: event.target.value }))
+              }
+              pattern="\d+(\.\d{1,2})?"
+              placeholder="0.00"
+              value={form.expectedAmount}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            <span className="font-medium text-treasuri-muted">Expected day</span>
+            <input
+              className="min-h-9 rounded-md border border-treasuri-line px-2 text-sm"
+              max={31}
+              min={1}
+              name="expectedDayOfMonth"
+              onChange={(event) =>
+                setForm((current) => ({ ...current, expectedDayOfMonth: event.target.value }))
+              }
+              type="number"
+              value={form.expectedDayOfMonth}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            <span className="font-medium text-treasuri-muted">Next expected</span>
+            <input
+              className="min-h-9 rounded-md border border-treasuri-line px-2 text-sm"
+              name="nextExpectedDate"
+              onChange={(event) =>
+                setForm((current) => ({ ...current, nextExpectedDate: event.target.value }))
+              }
+              type="date"
+              value={form.nextExpectedDate}
+            />
+          </label>
+        </div>
+        <button
+          className="mt-3 inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-xs text-white disabled:opacity-60 sm:text-sm"
+          disabled={disabled}
+          type="submit"
+        >
+          <Save aria-hidden="true" className="size-4" />
+          Save assumptions
+        </button>
+      </form>
 
       {series.warnings.length > 0 ? (
         <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-2">
@@ -322,6 +448,36 @@ function Fact({ label, value }: { label: string; value: string }) {
       <dd className="mt-0.5 font-semibold text-sm">{value}</dd>
     </span>
   );
+}
+
+function formFromSeries(series: RecurringSeries | null): RecurringFormState {
+  return {
+    categoryId: series?.categoryId ? String(series.categoryId) : "",
+    expectedAmount: series?.amount ?? "",
+    expectedDayOfMonth: series?.expectedDayOfMonth ? String(series.expectedDayOfMonth) : "",
+    name: series?.name ?? "",
+    nextExpectedDate: series?.nextExpectedDate ?? "",
+  };
+}
+
+function inputFromForm(form: RecurringFormState): RecurringUpdateRequest {
+  return {
+    categoryId: form.categoryId ? Number(form.categoryId) : null,
+    expectedAmount: form.expectedAmount.trim() ? form.expectedAmount.trim() : null,
+    expectedDayOfMonth: form.expectedDayOfMonth ? Number(form.expectedDayOfMonth) : null,
+    name: form.name.trim(),
+    nextExpectedDate: form.nextExpectedDate || null,
+  };
+}
+
+function inputFromFormData(data: FormData): RecurringUpdateRequest {
+  return inputFromForm({
+    categoryId: String(data.get("categoryId") ?? ""),
+    expectedAmount: String(data.get("expectedAmount") ?? ""),
+    expectedDayOfMonth: String(data.get("expectedDayOfMonth") ?? ""),
+    name: String(data.get("name") ?? ""),
+    nextExpectedDate: String(data.get("nextExpectedDate") ?? ""),
+  });
 }
 
 function recurringSummary(series: RecurringSeries[]) {

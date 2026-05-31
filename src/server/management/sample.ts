@@ -14,6 +14,8 @@ export const sampleCategories = [
   { id: 2, name: "Groceries" },
   { id: 3, name: "Unknown" },
   { id: 4, name: "Savings" },
+  { id: 5, name: "Rent / Mortgage" },
+  { id: 6, name: "Subscriptions" },
 ];
 
 export function sampleCategoryBudgets(): CategoryBudgetResponse {
@@ -343,10 +345,12 @@ function sampleRules(): RulesResponse {
 
 function sampleRecurring(): RecurringResponse {
   return {
+    categories: sampleCategories,
     series: [
       {
         amount: "1450.00",
         amountTolerance: "0.00",
+        categoryId: 5,
         categoryName: "Rent / Mortgage",
         cadence: "monthly",
         confidence: "1.00",
@@ -373,6 +377,7 @@ function sampleRecurring(): RecurringResponse {
       {
         amount: "14.99",
         amountTolerance: "2.50",
+        categoryId: 6,
         categoryName: "Subscriptions",
         cadence: "monthly",
         confidence: "0.80",

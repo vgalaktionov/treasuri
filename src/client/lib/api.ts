@@ -3,11 +3,13 @@ import {
   type CategoryBudgetResponse,
   categoryBudgetResponseSchema,
   managementCategorySchema,
+  type RecurringUpdateRequest,
   type RuleDraftFromTransactionResponse,
   type RuleEditorRequest,
   type RulePreviewRequest,
   recurringActionResponseSchema,
   recurringResponseSchema,
+  recurringUpdateRequestSchema,
   ruleActiveUpdateRequestSchema,
   ruleApplyResponseSchema,
   ruleCreateResponseSchema,
@@ -218,6 +220,18 @@ export async function confirmRecurring(seriesId: number) {
   });
   if (!response.ok) {
     throw new Error("Failed to confirm recurring series");
+  }
+  return recurringActionResponseSchema.parse(await response.json());
+}
+
+export async function updateRecurring(seriesId: number, input: RecurringUpdateRequest) {
+  const response = await fetch(`/api/recurring/${seriesId}`, {
+    body: JSON.stringify(recurringUpdateRequestSchema.parse(input)),
+    headers: await jsonMutationHeaders(),
+    method: "PUT",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to update recurring series");
   }
   return recurringActionResponseSchema.parse(await response.json());
 }
