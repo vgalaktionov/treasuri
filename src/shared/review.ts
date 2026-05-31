@@ -10,10 +10,14 @@ export const reviewTransactionSchema = z.object({
   bookingDate: z.string(),
   categoryId: z.number().nullable(),
   categoryName: z.string().nullable(),
+  classificationMethod: z.string().nullable(),
   counterpartyName: z.string().nullable(),
   currency: z.string(),
   description: z.string(),
+  flags: z.array(z.string()).default([]),
   id: z.number(),
+  merchantName: z.string(),
+  similarCount: z.number().default(0),
 });
 
 export const reviewInboxResponseSchema = z.object({
@@ -24,12 +28,60 @@ export const reviewInboxResponseSchema = z.object({
 
 export const reviewActionRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("accept") }),
-  z.object({ action: z.literal("change"), categoryId: z.number() }),
-  z.object({ action: z.literal("exclude"), categoryId: z.number().optional() }),
+  z.object({
+    action: z.literal("change"),
+    applySimilar: z.boolean().default(false),
+    categoryId: z.number(),
+    createAlias: z.boolean().default(false),
+    flags: z
+      .object({
+        isExcludedFromBudget: z.boolean().default(false),
+        isOneOff: z.boolean().default(false),
+        isSavings: z.boolean().default(false),
+        isTransfer: z.boolean().default(false),
+      })
+      .default({
+        isExcludedFromBudget: false,
+        isOneOff: false,
+        isSavings: false,
+        isTransfer: false,
+      }),
+    merchantName: z.string().optional(),
+    next: z.enum(["rule-preview", "stay"]).default("stay"),
+  }),
+  z.object({
+    action: z.literal("exclude"),
+    applySimilar: z.boolean().default(false),
+    categoryId: z.number().optional(),
+    createAlias: z.boolean().default(false),
+    merchantName: z.string().optional(),
+  }),
 ]);
 
 export const reviewActionResponseSchema = z.object({
+  correctedCount: z.number().default(1),
   reviewCount: z.number(),
+  ruleDraft: z
+    .object({
+      categoryId: z.number(),
+      field: z.literal("counterparty_name"),
+      flags: z.object({
+        setIsExcludedFromBudget: z.boolean(),
+        setIsFixedCost: z.boolean(),
+        setIsIncome: z.boolean(),
+        setIsSavings: z.boolean(),
+        setIsTransfer: z.boolean(),
+      }),
+      isActive: z.literal(true),
+      merchantName: z.string().optional(),
+      name: z.string(),
+      operator: z.literal("contains"),
+      pattern: z.string(),
+      priority: z.number(),
+    })
+    .nullable()
+    .default(null),
+  similarCount: z.number().default(0),
   transactionId: z.number(),
 });
 

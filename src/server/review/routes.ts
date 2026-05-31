@@ -41,7 +41,32 @@ export function registerReviewRoutes(app: express.Express, databaseUrl: string |
           action,
         );
         sampleInboxes.set(request.sessionID, sampleInbox);
-        response.json({ reviewCount: sampleInbox.reviewCount, transactionId });
+        response.json({
+          correctedCount: action.action === "accept" ? 1 : action.applySimilar ? 2 : 1,
+          reviewCount: sampleInbox.reviewCount,
+          ruleDraft:
+            action.action === "change" && action.next === "rule-preview"
+              ? {
+                  categoryId: action.categoryId,
+                  field: "counterparty_name",
+                  flags: {
+                    setIsExcludedFromBudget: false,
+                    setIsFixedCost: false,
+                    setIsIncome: false,
+                    setIsSavings: false,
+                    setIsTransfer: false,
+                  },
+                  isActive: true,
+                  merchantName: action.merchantName,
+                  name: "Review: Unknown Sample Merchant",
+                  operator: "contains",
+                  pattern: "Unknown Sample Merchant",
+                  priority: 50,
+                }
+              : null,
+          similarCount: action.action === "accept" ? 0 : action.applySimilar ? 1 : 0,
+          transactionId,
+        });
         return;
       }
 
@@ -84,10 +109,14 @@ function createSampleInbox(): ReviewInboxResponse {
         bookingDate: "2026-05-27",
         categoryId: 3,
         categoryName: "Unknown",
+        classificationMethod: "uncategorized",
         counterpartyName: "Unknown Sample Merchant",
         currency: "EUR",
         description: "Needs review sample",
+        flags: [],
         id: 1,
+        merchantName: "Unknown Sample Merchant",
+        similarCount: 1,
       },
     ],
   };
