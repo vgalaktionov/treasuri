@@ -123,7 +123,10 @@ export function registerOperationsRoutes(
                 exportType: "budget_averages",
                 fileId: 1,
                 filename: "budget-averages-2026-05.xlsx",
+                finishedAt: "2026-05-28 08:00:00+00",
                 id: 1,
+                periodEnd: "2026-05-31",
+                periodStart: "2026-05-01",
                 sha256: "sample-export-sha256",
                 sheetNames: [
                   "Summary",

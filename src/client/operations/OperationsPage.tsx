@@ -687,7 +687,9 @@ function ExportInspector({ exportRun }: { exportRun: ExportRun | null }) {
             <InlineMetric label="Run" value={`#${exportRun.id}`} />
             <InlineMetric label="Type" value={exportRun.exportType} />
             <InlineMetric label="Status" value={exportRun.status} />
+            <InlineMetric label="Period" value={exportPeriod(exportRun)} />
             <InlineMetric label="Created" value={exportRun.createdAt} />
+            <InlineMetric label="Finished" value={exportRun.finishedAt ?? "not finished"} />
             <InlineMetric label="Size" value={formatBytes(exportRun.sizeBytes)} />
             <InlineMetric label="Sheets" value={String(exportRun.sheetNames.length)} />
             <InlineMetric label="SHA-256" value={shortHash(exportRun.sha256)} />
@@ -970,6 +972,13 @@ function formatBytes(value: number | null): string {
     return `${value} B`;
   }
   return `${(value / 1024).toFixed(1)} KB`;
+}
+
+function exportPeriod(exportRun: ExportRun): string {
+  if (exportRun.periodStart && exportRun.periodEnd) {
+    return `${exportRun.periodStart} to ${exportRun.periodEnd}`;
+  }
+  return "unknown";
 }
 
 function shortHash(value: string | null): string {

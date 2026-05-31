@@ -78,6 +78,9 @@ describe("operations API", () => {
       expect(created.body.fileId).toBeGreaterThan(0);
       expect(listed.body.exports[0].exportType).toBe("budget_averages");
       expect(listed.body.exports[0].filename).toBe("budget-averages-2026-05.xlsx");
+      expect(listed.body.exports[0].periodStart).toBe("2026-05-01");
+      expect(listed.body.exports[0].periodEnd).toBe("2026-05-31");
+      expect(listed.body.exports[0].finishedAt).toBeTruthy();
       expect(listed.body.exports[0].sha256).toHaveLength(64);
       expect(listed.body.exports[0].sheetNames).toEqual([
         "Summary",

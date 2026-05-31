@@ -64,14 +64,18 @@ export async function listExports(pool: pg.Pool) {
     export_type: string;
     file_id: string | null;
     filename: string | null;
+    finished_at: string | null;
     id: string;
     metadata_json: unknown;
+    period_end: string | null;
+    period_start: string | null;
     sha256: string | null;
     size_bytes: number | null;
     status: string;
   }>(`
     SELECT export_runs.id, export_runs.export_type, export_runs.status, export_runs.error_message,
-      export_runs.metadata_json,
+      export_runs.metadata_json, export_runs.period_start::text, export_runs.period_end::text,
+      export_runs.finished_at::text,
       COALESCE(export_runs.finished_at, export_runs.started_at)::text AS created_at,
       max(export_files.id)::text AS file_id,
       max(export_files.filename) AS filename,
@@ -91,7 +95,10 @@ export async function listExports(pool: pg.Pool) {
       exportType: row.export_type,
       fileId: row.file_id ? Number(row.file_id) : null,
       filename: row.filename,
+      finishedAt: row.finished_at,
       id: Number(row.id),
+      periodEnd: row.period_end,
+      periodStart: row.period_start,
       sha256: row.sha256,
       sheetNames: sheetNamesFromMetadata(row.metadata_json),
       sizeBytes: row.size_bytes,

@@ -48,6 +48,7 @@ test("operations workspace covers settings, status, and exports", async ({ page 
   await expect(page.getByRole("button", { name: /budget-averages-2026-05\.xlsx/ })).toBeVisible();
   await expect(page.getByText("budget_averages", { exact: true })).toBeVisible();
   await expect(page.getByText("Selected export")).toBeVisible();
+  await expect(page.getByText("2026-05-01 to 2026-05-31")).toBeVisible();
   await expect(page.getByText("Workbook sheets")).toBeVisible();
   await expect(page.getByText("Raw transactions")).toBeVisible();
   await expect(page.getByText("Forecast assumptions")).toBeVisible();
