@@ -80,7 +80,6 @@ export async function listReviewInbox(pool: pg.Pool): Promise<ReviewInboxRespons
           LEFT JOIN manual_overrides
             ON manual_overrides.enriched_transaction_id = similar_txn.id
           WHERE similar_txn.id <> review_rows.id
-            AND similar_txn.needs_review = true
             AND manual_overrides.id IS NULL
             AND lower(COALESCE(NULLIF(similar_raw.counterparty_name, ''), similar_raw.description)) =
               lower(COALESCE(NULLIF(review_rows.counterparty_name, ''), review_rows.description))
@@ -344,7 +343,6 @@ async function similarTransactionIds(
       LEFT JOIN manual_overrides
         ON manual_overrides.enriched_transaction_id = enriched_transactions.id
       WHERE enriched_transactions.id <> $1
-        AND enriched_transactions.needs_review = true
         AND manual_overrides.id IS NULL
         AND source.match_text IS NOT NULL
         AND lower(COALESCE(NULLIF(trim(raw_transactions.counterparty_name), ''), NULLIF(trim(raw_transactions.description), ''))) =

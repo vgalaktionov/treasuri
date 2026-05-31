@@ -115,7 +115,16 @@ describe("review API", () => {
       await withPool(container.getConnectionUri(), async (pool) => {
         await runMigrations(pool);
         await loadSampleData(pool);
-        await insertSimilarReviewTransaction(pool);
+        await insertSimilarReviewTransaction(pool, {
+          description: "Similar needs review sample",
+          needsReview: true,
+          sourceHash: "similar-review-2026-05",
+        });
+        await insertSimilarReviewTransaction(pool, {
+          description: "Already classified similar sample",
+          needsReview: false,
+          sourceHash: "similar-classified-2026-05",
+        });
       });
 
       const app = createApp();
@@ -129,7 +138,7 @@ describe("review API", () => {
       );
 
       expect(inbox.body.reviewCount).toBe(2);
-      expect(transaction.similarCount).toBe(1);
+      expect(transaction.similarCount).toBe(2);
       const action = await agent
         .post(`/api/review/${transaction.id}/action`)
         .set("x-csrf-token", csrf)
@@ -147,11 +156,11 @@ describe("review API", () => {
         ),
       );
 
-      expect(action.body.correctedCount).toBe(2);
-      expect(action.body.similarCount).toBe(1);
+      expect(action.body.correctedCount).toBe(3);
+      expect(action.body.similarCount).toBe(2);
       expect(action.body.reviewCount).toBe(0);
       expect(updated.body.transactions).toEqual([]);
-      expect(reviewed.rows[0]?.count).toBe("2");
+      expect(reviewed.rows[0]?.count).toBe("3");
     } finally {
       if (previousDatabaseUrl === undefined) {
         delete process.env.DATABASE_URL;
@@ -169,17 +178,20 @@ async function csrfAgent(app: ReturnType<typeof createApp>) {
   return { agent, csrf: response.body.csrfToken as string };
 }
 
-async function insertSimilarReviewTransaction(pool: pg.Pool) {
-  await pool.query(`
+async function insertSimilarReviewTransaction(
+  pool: pg.Pool,
+  input: { description: string; needsReview: boolean; sourceHash: string },
+) {
+  await pool.query(
+    `
     WITH raw AS (
       INSERT INTO raw_transactions (
         account_id, provider, provider_transaction_id, source_hash, booking_date, value_date,
         amount, currency, counterparty_name, description, raw_payload_json
       )
       SELECT
-        accounts.id, 'fake', 'similar-review-2026-05', 'similar-review-2026-05',
-        '2026-05-22', '2026-05-22', -35.00, 'EUR', 'Unknown Sample Merchant',
-        'Similar needs review sample', '{"source":"test"}'::jsonb
+        accounts.id, 'fake', $1, $1, '2026-05-22', '2026-05-22', -35.00, 'EUR',
+        'Unknown Sample Merchant', $2, '{"source":"test"}'::jsonb
       FROM accounts
       WHERE accounts.provider = 'fake'
       LIMIT 1
@@ -189,8 +201,10 @@ async function insertSimilarReviewTransaction(pool: pg.Pool) {
       raw_transaction_id, category_id, needs_review, classification_method,
       classification_confidence, classification_reason
     )
-    SELECT raw.id, categories.id, true, 'uncategorized', 0, 'Similar test transaction.'
+    SELECT raw.id, categories.id, $3, 'uncategorized', 0, 'Similar test transaction.'
     FROM raw
     JOIN categories ON categories.name = 'Unknown'
-  `);
+  `,
+    [input.sourceHash, input.description, input.needsReview],
+  );
 }
