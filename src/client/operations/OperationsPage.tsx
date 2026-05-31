@@ -606,7 +606,24 @@ function ExportInspector({ exportRun }: { exportRun: ExportRun | null }) {
             <InlineMetric label="Status" value={exportRun.status} />
             <InlineMetric label="Created" value={exportRun.createdAt} />
             <InlineMetric label="Size" value={formatBytes(exportRun.sizeBytes)} />
+            <InlineMetric label="Sheets" value={String(exportRun.sheetNames.length)} />
+            <InlineMetric label="SHA-256" value={shortHash(exportRun.sha256)} />
           </dl>
+          {exportRun.sheetNames.length > 0 ? (
+            <div className="mt-3 border-t border-treasuri-line pt-3">
+              <p className="font-semibold text-sm">Workbook sheets</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {exportRun.sheetNames.map((sheetName) => (
+                  <span
+                    className="rounded border border-treasuri-line px-1.5 py-0.5 font-medium text-treasuri-muted text-[0.68rem]"
+                    key={sheetName}
+                  >
+                    {sheetName}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {exportRun.fileId ? (
             <a
               className="mt-3 inline-flex min-h-8 w-full items-center justify-center gap-2 rounded-md border border-treasuri-line px-3 font-semibold text-sm"
@@ -785,6 +802,10 @@ function formatBytes(value: number | null): string {
     return `${value} B`;
   }
   return `${(value / 1024).toFixed(1)} KB`;
+}
+
+function shortHash(value: string | null): string {
+  return value ? value.slice(0, 12) : "-";
 }
 
 function settingsUpdateFromResponse(response: SettingsResponse): SettingsUpdate {

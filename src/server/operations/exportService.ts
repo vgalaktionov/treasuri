@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type pg from "pg";
 
-import { workbookBuffer } from "./exportWorkbook.ts";
+import { workbookBuffer, workbookSheetNames } from "./exportWorkbook.ts";
 
 const xlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 export async function createXlsxExport(pool: pg.Pool, createdBy: string | null = null) {
@@ -26,8 +26,22 @@ export async function createXlsxExport(pool: pg.Pool, createdBy: string | null =
       [runId, filename, xlsxContentType, content, content.length, sha256],
     );
     await client.query(
-      "UPDATE export_runs SET status = 'completed', finished_at = now() WHERE id = $1",
-      [runId],
+      `
+        UPDATE export_runs
+        SET status = 'completed',
+            finished_at = now(),
+            metadata_json = $2::jsonb
+        WHERE id = $1
+      `,
+      [
+        runId,
+        JSON.stringify({
+          periodEnd,
+          periodStart,
+          sha256,
+          sheetNames: workbookSheetNames,
+        }),
+      ],
     );
     await client.query("COMMIT");
     return { exportRunId: runId, fileId: Number(file.rows[0]?.id) };
@@ -51,13 +65,17 @@ export async function listExports(pool: pg.Pool) {
     file_id: string | null;
     filename: string | null;
     id: string;
+    metadata_json: unknown;
+    sha256: string | null;
     size_bytes: number | null;
     status: string;
   }>(`
     SELECT export_runs.id, export_runs.export_type, export_runs.status, export_runs.error_message,
+      export_runs.metadata_json,
       COALESCE(export_runs.finished_at, export_runs.started_at)::text AS created_at,
       max(export_files.id)::text AS file_id,
       max(export_files.filename) AS filename,
+      max(export_files.sha256) AS sha256,
       max(export_files.size_bytes)::int AS size_bytes
     FROM export_runs
     LEFT JOIN export_files ON export_files.export_run_id = export_runs.id
@@ -74,6 +92,8 @@ export async function listExports(pool: pg.Pool) {
       fileId: row.file_id ? Number(row.file_id) : null,
       filename: row.filename,
       id: Number(row.id),
+      sha256: row.sha256,
+      sheetNames: sheetNamesFromMetadata(row.metadata_json),
       sizeBytes: row.size_bytes,
       status: row.status,
     })),
@@ -125,4 +145,14 @@ function periodEndDate(periodStart: string): string {
 function sanitizeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message.replace(/(token|secret|password|authorization|credential)=\S+/gi, "$1=[redacted]");
+}
+
+function sheetNamesFromMetadata(value: unknown): string[] {
+  if (!value || typeof value !== "object" || !("sheetNames" in value)) {
+    return [];
+  }
+  const sheetNames = (value as { sheetNames?: unknown }).sheetNames;
+  return Array.isArray(sheetNames)
+    ? sheetNames.filter((sheetName): sheetName is string => typeof sheetName === "string")
+    : [];
 }

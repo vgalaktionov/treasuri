@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import type pg from "pg";
 
-const requiredSheets = [
+export const workbookSheetNames = [
   "Summary",
   "Category averages",
   "Monthly history",
@@ -17,14 +17,14 @@ export async function workbookBuffer(client: pg.PoolClient, yearMonth: string): 
   workbook.creator = "treasuri";
   workbook.created = new Date();
 
-  await writeSummarySheet(client, workbook.addWorksheet(requiredSheets[0]), yearMonth);
-  await writeCategoryAveragesSheet(client, workbook.addWorksheet(requiredSheets[1]), yearMonth);
-  await writeMonthlyHistorySheet(client, workbook.addWorksheet(requiredSheets[2]));
-  await writeRecurringSheet(client, workbook.addWorksheet(requiredSheets[3]));
-  await writeExcludedOneOffsSheet(client, workbook.addWorksheet(requiredSheets[4]));
-  await writeRawTransactionsSheet(client, workbook.addWorksheet(requiredSheets[5]));
-  await writeRulesSheet(client, workbook.addWorksheet(requiredSheets[6]));
-  await writeAssumptionsSheet(client, workbook.addWorksheet(requiredSheets[7]));
+  await writeSummarySheet(client, workbook.addWorksheet(workbookSheetNames[0]), yearMonth);
+  await writeCategoryAveragesSheet(client, workbook.addWorksheet(workbookSheetNames[1]), yearMonth);
+  await writeMonthlyHistorySheet(client, workbook.addWorksheet(workbookSheetNames[2]));
+  await writeRecurringSheet(client, workbook.addWorksheet(workbookSheetNames[3]));
+  await writeExcludedOneOffsSheet(client, workbook.addWorksheet(workbookSheetNames[4]));
+  await writeRawTransactionsSheet(client, workbook.addWorksheet(workbookSheetNames[5]));
+  await writeRulesSheet(client, workbook.addWorksheet(workbookSheetNames[6]));
+  await writeAssumptionsSheet(client, workbook.addWorksheet(workbookSheetNames[7]));
 
   for (const sheet of workbook.worksheets) {
     sheet.views = [{ state: "frozen", ySplit: 1 }];

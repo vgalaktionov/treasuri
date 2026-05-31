@@ -42,6 +42,8 @@ export const exportRunSchema = z.object({
   fileId: z.number().nullable(),
   filename: z.string().nullable(),
   id: z.number(),
+  sha256: z.string().nullable().default(null),
+  sheetNames: z.array(z.string()).default([]),
   sizeBytes: z.number().nullable(),
   status: z.string(),
 });

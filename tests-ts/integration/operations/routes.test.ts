@@ -78,11 +78,8 @@ describe("operations API", () => {
       expect(created.body.fileId).toBeGreaterThan(0);
       expect(listed.body.exports[0].exportType).toBe("budget_averages");
       expect(listed.body.exports[0].filename).toBe("budget-averages-2026-05.xlsx");
-      expect(listed.body.exports[0].status).toBe("completed");
-      expect(listed.body.exports[0].sizeBytes).toBeGreaterThan(1000);
-      expect(downloaded.headers["content-type"]).toContain("spreadsheetml.sheet");
-      expect(stored?.bytes).toBeGreaterThan(1000);
-      expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+      expect(listed.body.exports[0].sha256).toHaveLength(64);
+      expect(listed.body.exports[0].sheetNames).toEqual([
         "Summary",
         "Category averages",
         "Monthly history",
@@ -92,6 +89,13 @@ describe("operations API", () => {
         "Rules",
         "Forecast assumptions",
       ]);
+      expect(listed.body.exports[0].status).toBe("completed");
+      expect(listed.body.exports[0].sizeBytes).toBeGreaterThan(1000);
+      expect(downloaded.headers["content-type"]).toContain("spreadsheetml.sheet");
+      expect(stored?.bytes).toBeGreaterThan(1000);
+      expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(
+        listed.body.exports[0].sheetNames,
+      );
       expect(workbook.getWorksheet("Summary")?.getCell("B2").value).toBe("2026-05");
       expect(workbook.getWorksheet("Raw transactions")?.rowCount).toBeGreaterThan(1);
       expect(workbook.getWorksheet("Excluded one-offs")?.rowCount).toBeGreaterThan(1);
