@@ -9,6 +9,7 @@ export const jobPayloadSchemas = {
     runId: z.number().optional(),
   }),
   normalize_transactions: z.object({}),
+  sync_now: z.object({}),
   sync_abn_transactions: z.object({}),
   update_monthly_forecast: z.object({}),
 } as const;

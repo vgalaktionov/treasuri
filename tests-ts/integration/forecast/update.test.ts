@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { runMigrations } from "../../../src/server/db/migrations.ts";
 import { withPool } from "../../../src/server/db/pool.ts";
-import { updateMonthlyForecast } from "../../../src/server/jobs/handlers.ts";
+import { updateMonthlyForecast } from "../../../src/server/forecast/service.ts";
 import { loadSampleData } from "../../../src/server/sample/load.ts";
 
 describe("monthly forecast update", () => {

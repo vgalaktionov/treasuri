@@ -9,6 +9,7 @@ describe("job payload definitions", () => {
     });
     expect(parseJobPayload("backfill_rule", { ruleId: 7 })).toEqual({ ruleId: 7 });
     expect(parseJobPayload("sync_abn_transactions", {})).toEqual({});
+    expect(parseJobPayload("sync_now", {})).toEqual({});
   });
 
   it("rejects malformed payloads before jobs run", () => {

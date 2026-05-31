@@ -3,7 +3,7 @@ import type pg from "pg";
 import { createDefaultBankProvider } from "../bank/fake.ts";
 import { syncBankTransactions } from "../bank/sync.ts";
 import { classifyPendingTransactions } from "../classify/service.ts";
-import { updateMonthlyForecast } from "../jobs/handlers.ts";
+import { updateMonthlyForecast } from "../forecast/service.ts";
 import { detectRecurringCandidates } from "../management/recurring.ts";
 
 export async function runSyncNow(pool: pg.Pool) {
