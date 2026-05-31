@@ -21,10 +21,10 @@ type EditorMode = { kind: "new" } | { id: number; kind: "edit" };
 export function RulesWorkspace() {
   const queryClient = useQueryClient();
   const rules = useQuery({ queryFn: fetchRules, queryKey: ["rules"] });
+  const [message, setMessage] = useState<string | null>(null);
   const [mode, setMode] = useState<EditorMode>({ kind: "new" });
   const [draft, setDraft] = useState<RuleEditorRequest>(() => emptyRule(1));
   const [preview, setPreview] = useState<RulePreviewResponse | null>(null);
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["rules"] });
   const data = rules.data;
   const categories = data?.categories ?? [];
   const firstCategoryId = categories[0]?.id ?? 1;
@@ -43,23 +43,36 @@ export function RulesWorkspace() {
     mutationFn: async () => {
       if (mode.kind === "edit") {
         await updateRule(mode.id, normalizedDraft);
-        return;
+        return { kind: "updated" as const };
       }
-      await createRule(normalizedDraft);
+      const created = await createRule(normalizedDraft);
+      return { kind: "created" as const, ruleId: created.ruleId };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       setPreview(null);
-      invalidate();
+      setMessage(result.kind === "created" ? "Rule created." : "Rule updated.");
+      if (result.kind === "created") {
+        setMode({ id: result.ruleId, kind: "edit" });
+      }
+      invalidateFinanceWorkspaces(queryClient);
     },
   });
   const toggle = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
       setRuleActive(id, isActive),
-    onSuccess: invalidate,
+    onSuccess: (_result, variables) => {
+      setMessage(variables.isActive ? "Rule enabled." : "Rule disabled.");
+      invalidateFinanceWorkspaces(queryClient);
+    },
   });
   const apply = useMutation({
     mutationFn: (id: number) => applyRule(id),
-    onSuccess: invalidate,
+    onSuccess: (result) => {
+      setMessage(
+        `Applied ${result.updatedCount} ${result.updatedCount === 1 ? "transaction" : "transactions"}; ${result.skippedManualCount} manual skipped.`,
+      );
+      invalidateFinanceWorkspaces(queryClient);
+    },
   });
 
   useEffect(() => {
@@ -120,6 +133,15 @@ export function RulesWorkspace() {
         </button>
       </header>
 
+      {message ? (
+        <p
+          aria-live="polite"
+          className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-emerald-800 text-sm"
+        >
+          {message}
+        </p>
+      ) : null}
+
       <div className="grid gap-3 xl:grid-cols-[minmax(17rem,0.7fr)_minmax(0,1fr)]">
         <RuleList
           activeId={mode.kind === "edit" ? mode.id : null}
@@ -150,6 +172,19 @@ export function RulesWorkspace() {
       </div>
     </section>
   );
+}
+
+function invalidateFinanceWorkspaces(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const queryKey of [
+    ["category-budgets"],
+    ["dashboard"],
+    ["recurring"],
+    ["review-inbox"],
+    ["rules"],
+    ["transactions"],
+  ]) {
+    queryClient.invalidateQueries({ queryKey });
+  }
 }
 
 function RuleList({
@@ -344,7 +379,9 @@ function RuleForm({
           <span className="font-medium text-treasuri-muted">Name</span>
           <input
             aria-label="Rule name"
+            autoComplete="off"
             className="min-h-9 w-full min-w-0 rounded-md border border-treasuri-line px-2 text-sm"
+            name="name"
             onChange={(event) => patch({ name: event.target.value })}
             placeholder="Rule name"
             value={rule.name}
@@ -356,6 +393,7 @@ function RuleForm({
             aria-label="Priority"
             className="min-h-9 w-full min-w-0 rounded-md border border-treasuri-line px-2 text-sm"
             min="0"
+            name="priority"
             onChange={(event) => patch({ priority: Number(event.target.value) })}
             type="number"
             value={rule.priority}
@@ -368,6 +406,7 @@ function RuleForm({
           <select
             aria-label="Rule field"
             className="min-h-9 w-full min-w-0 rounded-md border border-treasuri-line px-2 text-sm"
+            name="field"
             onChange={(event) => patch({ field: event.target.value as RuleEditorRequest["field"] })}
             value={rule.field}
           >
@@ -383,6 +422,7 @@ function RuleForm({
           <select
             aria-label="Rule operator"
             className="min-h-9 w-full min-w-0 rounded-md border border-treasuri-line px-2 text-sm"
+            name="operator"
             onChange={(event) =>
               patch({ operator: event.target.value as RuleEditorRequest["operator"] })
             }
@@ -400,6 +440,7 @@ function RuleForm({
           <select
             aria-label="Rule category"
             className="min-h-9 w-full min-w-0 rounded-md border border-treasuri-line px-2 text-sm"
+            name="categoryId"
             onChange={(event) => patch({ categoryId: Number(event.target.value) })}
             value={rule.categoryId}
           >
@@ -414,7 +455,9 @@ function RuleForm({
           <span className="font-medium text-treasuri-muted">Pattern</span>
           <input
             aria-label="Rule pattern"
+            autoComplete="off"
             className="min-h-9 w-full min-w-0 rounded-md border border-treasuri-line px-2 text-sm"
+            name="pattern"
             onChange={(event) => patch({ pattern: event.target.value })}
             placeholder="Pattern"
             value={rule.pattern}
@@ -425,7 +468,9 @@ function RuleForm({
         <span className="font-medium text-treasuri-muted">Merchant</span>
         <input
           aria-label="Rule merchant"
+          autoComplete="off"
           className="min-h-9 w-full min-w-0 rounded-md border border-treasuri-line px-2 text-sm"
+          name="merchantName"
           onChange={(event) => patch({ merchantName: event.target.value || undefined })}
           placeholder="Merchant"
           value={rule.merchantName ?? ""}
@@ -436,26 +481,31 @@ function RuleForm({
         <Flag
           checked={rule.flags.setIsIncome}
           label="Income"
+          name="setIsIncome"
           onChange={(value) => patchFlags({ setIsIncome: value })}
         />
         <Flag
           checked={rule.flags.setIsTransfer}
           label="Transfer"
+          name="setIsTransfer"
           onChange={(value) => patchFlags({ setIsTransfer: value })}
         />
         <Flag
           checked={rule.flags.setIsSavings}
           label="Savings"
+          name="setIsSavings"
           onChange={(value) => patchFlags({ setIsSavings: value })}
         />
         <Flag
           checked={rule.flags.setIsFixedCost}
           label="Fixed"
+          name="setIsFixedCost"
           onChange={(value) => patchFlags({ setIsFixedCost: value })}
         />
         <Flag
           checked={rule.flags.setIsExcludedFromBudget}
           label="Exclude"
+          name="setIsExcludedFromBudget"
           onChange={(value) => patchFlags({ setIsExcludedFromBudget: value })}
         />
       </fieldset>
@@ -528,16 +578,19 @@ function RulePreviewPanel({ preview }: { preview: RulePreviewResponse }) {
 function Flag({
   checked,
   label,
+  name,
   onChange,
 }: {
   checked: boolean;
   label: string;
+  name: string;
   onChange: (checked: boolean) => void;
 }) {
   return (
     <label className="flex min-h-8 items-center gap-2 text-xs sm:text-sm">
       <input
         checked={checked}
+        name={name}
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />

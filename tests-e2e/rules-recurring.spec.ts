@@ -16,12 +16,17 @@ test("rules workspace previews, creates, edits, and toggles rules", async ({ pag
   await expect(page.getByText("Preview matches")).toBeVisible();
   await expect(page.getByText("Groceries sample")).toBeVisible();
   await page.getByRole("button", { name: "Save rule" }).first().click();
+  await expect(page.getByText("Rule created.")).toBeVisible();
 
   await expect(page.getByText("Groceries rule")).toBeVisible();
   await page.getByRole("button", { name: /Groceries rule/ }).click();
+  await page.getByRole("button", { name: "Apply history" }).click();
+  await expect(page.getByText(/Applied \d+ transaction/)).toBeVisible();
   await page.getByLabel("Rule operator").selectOption("starts_with");
   await page.getByRole("button", { name: "Save rule" }).click();
+  await expect(page.getByText("Rule updated.")).toBeVisible();
   await page.getByRole("button", { name: "Disable" }).click();
+  await expect(page.getByText("Rule disabled.")).toBeVisible();
   await expect(page.getByText("inactive")).toBeVisible();
 });
 
