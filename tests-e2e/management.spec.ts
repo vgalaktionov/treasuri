@@ -16,7 +16,8 @@ test("transaction filters preserve context and edits stay in place", async ({ pa
   ).toBeVisible();
   await page.getByRole("button", { name: "Preview rule" }).click();
   await expect(page.getByText("Classify Sample Pet Care")).toBeVisible();
-  await expect(page.getByText("matches")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Preview matches" })).toBeVisible();
+  await expect(page.getByText("Sample Pet Care").last()).toBeVisible();
   await page.getByRole("button", { name: "Create rule" }).click();
   await expect(page.getByText(/Rule \d+ created/)).toBeVisible();
   await page.getByLabel("Category for Dog food sample").selectOption({ label: "Groceries" });

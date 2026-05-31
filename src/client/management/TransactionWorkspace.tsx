@@ -184,6 +184,7 @@ function TransactionFiltersBar({
           <input
             aria-label="Search transactions"
             className="min-h-8 w-full rounded-md border border-treasuri-line bg-white pr-3 pl-9 text-xs sm:text-sm"
+            name="query"
             onChange={(event) => update({ query: event.target.value || undefined })}
             placeholder="Merchant or description"
             value={filters.query ?? ""}
@@ -192,6 +193,7 @@ function TransactionFiltersBar({
         <input
           aria-label="Month"
           className="min-h-8 min-w-0 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
+          name="month"
           onChange={(event) => update({ month: event.target.value || undefined })}
           type="month"
           value={filters.month ?? ""}
@@ -199,6 +201,7 @@ function TransactionFiltersBar({
         <select
           aria-label="Category filter"
           className="min-h-8 min-w-0 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
+          name="category"
           onChange={(event) => update({ category: event.target.value || undefined })}
           value={filters.category ?? ""}
         >
@@ -212,6 +215,7 @@ function TransactionFiltersBar({
         <select
           aria-label="Merchant filter"
           className="min-h-8 min-w-0 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
+          name="merchant"
           onChange={(event) => update({ merchant: event.target.value || undefined })}
           value={filters.merchant ?? ""}
         >
@@ -225,6 +229,7 @@ function TransactionFiltersBar({
         <select
           aria-label="Type filter"
           className="min-h-8 min-w-0 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
+          name="kind"
           onChange={(event) => update({ kind: event.target.value || undefined })}
           value={filters.kind ?? ""}
         >
@@ -263,6 +268,7 @@ function TransactionFiltersBar({
             aria-label="Amount at least"
             className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
             min="0"
+            name="minAmount"
             onChange={(event) => update({ minAmount: event.target.value || undefined })}
             placeholder="Min amount"
             step="0.01"
@@ -273,6 +279,7 @@ function TransactionFiltersBar({
             aria-label="Amount at most"
             className="min-h-8 rounded-md border border-treasuri-line bg-white px-2 text-xs sm:text-sm"
             min="0"
+            name="maxAmount"
             onChange={(event) => update({ maxAmount: event.target.value || undefined })}
             placeholder="Max amount"
             step="0.01"
@@ -282,6 +289,7 @@ function TransactionFiltersBar({
           <label className="flex min-h-8 items-center gap-2 rounded-md border border-treasuri-line px-2 text-xs sm:text-sm">
             <input
               checked={filters.needsReview ?? false}
+              name="needsReview"
               onChange={(event) => update({ needsReview: event.target.checked || undefined })}
               type="checkbox"
             />
@@ -463,6 +471,7 @@ function TransactionInspector({
           <select
             aria-label={`Category for ${transaction.description}`}
             className="min-h-9 rounded-md border border-treasuri-line bg-white px-2 text-sm"
+            name="categoryId"
             onChange={(event) => setCategoryId(Number(event.target.value))}
             value={categoryId}
           >
@@ -478,6 +487,7 @@ function TransactionInspector({
           <input
             aria-label={`Merchant for ${transaction.description}`}
             className="min-h-9 rounded-md border border-treasuri-line px-2 text-sm"
+            name="merchantName"
             onChange={(event) => setMerchantName(event.target.value)}
             value={merchantName}
           />
@@ -485,6 +495,7 @@ function TransactionInspector({
         <label className="flex min-h-8 items-center gap-2 text-xs">
           <input
             checked={createAlias}
+            name="createAlias"
             onChange={(event) => setCreateAlias(event.target.checked)}
             type="checkbox"
           />
@@ -495,21 +506,25 @@ function TransactionInspector({
           <FlagCheckbox
             checked={flags.isTransfer}
             label="Transfer"
+            name="isTransfer"
             onChange={(isTransfer) => setFlags((current) => ({ ...current, isTransfer }))}
           />
           <FlagCheckbox
             checked={flags.isSavings}
             label="Savings"
+            name="isSavings"
             onChange={(isSavings) => setFlags((current) => ({ ...current, isSavings }))}
           />
           <FlagCheckbox
             checked={flags.isOneOff}
             label="One-off"
+            name="isOneOff"
             onChange={(isOneOff) => setFlags((current) => ({ ...current, isOneOff }))}
           />
           <FlagCheckbox
             checked={flags.isExcludedFromBudget}
             label="Exclude"
+            name="isExcludedFromBudget"
             onChange={(isExcludedFromBudget) =>
               setFlags((current) => ({ ...current, isExcludedFromBudget }))
             }
@@ -570,6 +585,7 @@ function TransactionInspector({
             <RulePreviewFact label="correct" value={ruleDraft.data.preview.alreadyCorrectCount} />
             <RulePreviewFact label="manual" value={ruleDraft.data.preview.skippedManualCount} />
           </dl>
+          <PreviewMatches matches={ruleDraft.data.preview.matches} />
           {createDraftRule.data ? (
             <p className="mt-2 text-emerald-700 text-xs">
               Rule {createDraftRule.data.ruleId} created.
@@ -617,6 +633,47 @@ function RulePreviewFact({ label, value }: { label: string; value: number }) {
   );
 }
 
+function PreviewMatches({ matches }: { matches: TransactionsResponse["transactions"] }) {
+  if (matches.length === 0) {
+    return (
+      <p className="mt-3 rounded-md border border-treasuri-line bg-white p-2 text-treasuri-muted text-xs">
+        No current transactions match this rule.
+      </p>
+    );
+  }
+
+  return (
+    <section className="mt-3 border-t border-treasuri-line pt-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold text-sm">Preview matches</h3>
+        <span className="text-treasuri-muted text-xs">{matches.length}</span>
+      </div>
+      <div className="mt-2 divide-y divide-treasuri-line overflow-hidden rounded-md border border-treasuri-line bg-white">
+        {matches.slice(0, 5).map((match) => (
+          <div
+            className="grid gap-1 px-2 py-2 text-xs sm:grid-cols-[5.5rem_minmax(0,1fr)_7rem_6rem] sm:gap-2"
+            key={match.id}
+          >
+            <time className="font-medium text-treasuri-muted" dateTime={match.bookingDate}>
+              {match.bookingDate}
+            </time>
+            <p className="min-w-0">
+              <span className="block truncate font-semibold text-sm">{match.merchant}</span>
+              <span className="block truncate text-treasuri-muted">{match.description}</span>
+            </p>
+            <span className="truncate text-treasuri-muted">
+              {match.categoryName ?? "Uncategorized"}
+            </span>
+            <span className={`font-semibold sm:text-right ${amountClass(match)}`}>
+              EUR {match.amount}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Badge({ label, tone = "default" }: { label: string; tone?: "default" | "warn" }) {
   return (
     <span
@@ -634,16 +691,19 @@ function Badge({ label, tone = "default" }: { label: string; tone?: "default" | 
 function FlagCheckbox({
   checked,
   label,
+  name,
   onChange,
 }: {
   checked: boolean;
   label: string;
+  name: string;
   onChange: (checked: boolean) => void;
 }) {
   return (
     <label className="flex min-h-8 items-center gap-2 text-xs sm:text-sm">
       <input
         checked={checked}
+        name={name}
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />

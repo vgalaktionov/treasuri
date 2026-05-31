@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ListPlus, Save, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { RuleEditorRequest } from "../../shared/management.ts";
+import type { RuleEditorRequest, RulePreviewResponse } from "../../shared/management.ts";
 import type { ReviewInboxResponse } from "../../shared/review.ts";
 import { applyReviewAction, createRule, fetchReviewInbox, previewRule } from "../lib/api.ts";
 
@@ -249,6 +249,7 @@ function ActiveReviewPanel({
           <select
             aria-label={`Category for ${transaction.description}`}
             className="min-h-9 rounded-md border border-treasuri-line bg-white px-2 text-sm"
+            name="categoryId"
             onChange={(event) => setDraft({ ...draft, categoryId: Number(event.target.value) })}
             value={draft.categoryId}
           >
@@ -264,6 +265,7 @@ function ActiveReviewPanel({
           <input
             aria-label={`Merchant for ${transaction.description}`}
             className="min-h-9 rounded-md border border-treasuri-line px-2 text-sm"
+            name="merchantName"
             onChange={(event) => setDraft({ ...draft, merchantName: event.target.value })}
             value={draft.merchantName}
           />
@@ -271,6 +273,7 @@ function ActiveReviewPanel({
         <label className="flex min-h-9 items-end gap-2 pb-2 text-xs">
           <input
             checked={draft.createAlias}
+            name="createAlias"
             onChange={(event) => setDraft({ ...draft, createAlias: event.target.checked })}
             type="checkbox"
           />
@@ -283,21 +286,25 @@ function ActiveReviewPanel({
         <Flag
           checked={draft.flags.isTransfer}
           label="Transfer"
+          name="isTransfer"
           onChange={(checked) => patchFlags({ isTransfer: checked })}
         />
         <Flag
           checked={draft.flags.isSavings}
           label="Savings"
+          name="isSavings"
           onChange={(checked) => patchFlags({ isSavings: checked })}
         />
         <Flag
           checked={draft.flags.isOneOff}
           label="One-off"
+          name="isOneOff"
           onChange={(checked) => patchFlags({ isOneOff: checked })}
         />
         <Flag
           checked={draft.flags.isExcludedFromBudget}
           label="Exclude"
+          name="isExcludedFromBudget"
           onChange={(checked) => patchFlags({ isExcludedFromBudget: checked })}
         />
       </fieldset>
@@ -413,12 +420,15 @@ function RuleDraftPanel({
         </div>
       </div>
       {previewMutation.data ? (
-        <dl className="mt-3 grid grid-cols-4 gap-2 border-t border-treasuri-line pt-3 text-xs">
-          <RulePreviewFact label="matches" value={previewMutation.data.matchCount} />
-          <RulePreviewFact label="changes" value={previewMutation.data.wouldChangeCount} />
-          <RulePreviewFact label="correct" value={previewMutation.data.alreadyCorrectCount} />
-          <RulePreviewFact label="manual" value={previewMutation.data.skippedManualCount} />
-        </dl>
+        <>
+          <dl className="mt-3 grid grid-cols-4 gap-2 border-t border-treasuri-line pt-3 text-xs">
+            <RulePreviewFact label="matches" value={previewMutation.data.matchCount} />
+            <RulePreviewFact label="changes" value={previewMutation.data.wouldChangeCount} />
+            <RulePreviewFact label="correct" value={previewMutation.data.alreadyCorrectCount} />
+            <RulePreviewFact label="manual" value={previewMutation.data.skippedManualCount} />
+          </dl>
+          <PreviewMatches matches={previewMutation.data.matches} />
+        </>
       ) : null}
     </aside>
   );
@@ -433,19 +443,61 @@ function RulePreviewFact({ label, value }: { label: string; value: number }) {
   );
 }
 
+function PreviewMatches({ matches }: { matches: RulePreviewResponse["matches"] }) {
+  if (matches.length === 0) {
+    return (
+      <p className="mt-3 rounded-md border border-treasuri-line bg-treasuri-panel p-2 text-treasuri-muted text-xs">
+        No current transactions match this rule.
+      </p>
+    );
+  }
+
+  return (
+    <section className="mt-3 border-t border-treasuri-line pt-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold text-sm">Preview matches</h3>
+        <span className="text-treasuri-muted text-xs">{matches.length}</span>
+      </div>
+      <div className="mt-2 divide-y divide-treasuri-line overflow-hidden rounded-md border border-treasuri-line bg-white">
+        {matches.slice(0, 5).map((match) => (
+          <div
+            className="grid gap-1 px-2 py-2 text-xs sm:grid-cols-[5.5rem_minmax(0,1fr)_7rem_6rem] sm:gap-2"
+            key={match.id}
+          >
+            <time className="font-medium text-treasuri-muted" dateTime={match.bookingDate}>
+              {match.bookingDate}
+            </time>
+            <p className="min-w-0">
+              <span className="block truncate font-semibold text-sm">{match.merchant}</span>
+              <span className="block truncate text-treasuri-muted">{match.description}</span>
+            </p>
+            <span className="truncate text-treasuri-muted">
+              {match.categoryName ?? "Uncategorized"}
+            </span>
+            <span className="font-semibold sm:text-right">EUR {match.amount}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Flag({
   checked,
   label,
+  name,
   onChange,
 }: {
   checked: boolean;
   label: string;
+  name: string;
   onChange: (checked: boolean) => void;
 }) {
   return (
     <label className="flex min-h-8 items-center gap-1 text-xs">
       <input
         checked={checked}
+        name={name}
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />
