@@ -121,6 +121,11 @@ describe("operations API", () => {
       expect(status.body.failedJobs[0].error).not.toContain("secret-value");
       expect(JSON.stringify(status.body.sections)).toContain("Secrets");
       expect(JSON.stringify(status.body.sections)).toContain("redacted");
+      expect(JSON.stringify(status.body.sections)).toContain("Runtime");
+      expect(JSON.stringify(status.body.sections)).toContain("Allowed emails");
+      expect(JSON.stringify(status.body.sections)).toContain("Classification methods");
+      expect(JSON.stringify(status.body.sections)).toContain("Queued jobs");
+      expect(JSON.stringify(status.body.sections)).toContain("Latest worker result");
     } finally {
       await boss.stop();
       await restore();

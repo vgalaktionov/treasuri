@@ -37,7 +37,7 @@ export function createApp(config: AppConfig = loadConfig()) {
 
   registerDashboardRoutes(app, process.env.DATABASE_URL);
   registerManagementRoutes(app, process.env.DATABASE_URL);
-  registerOperationsRoutes(app, process.env.DATABASE_URL);
+  registerOperationsRoutes(app, process.env.DATABASE_URL, config);
   registerReviewRoutes(app, process.env.DATABASE_URL);
 
   app.get(/.*/, (_request, response) => {

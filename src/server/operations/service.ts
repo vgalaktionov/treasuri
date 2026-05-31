@@ -1,6 +1,8 @@
 import type pg from "pg";
 
 import type { SettingsResponse, SettingsUpdate, StatusResponse } from "../../shared/operations.ts";
+import { describeRuntime } from "../../shared/version.ts";
+import type { AppConfig } from "../config/env.ts";
 
 export async function loadSettings(pool: pg.Pool): Promise<SettingsResponse> {
   const result = await pool.query<{ key: string; value_json: unknown }>(
@@ -68,8 +70,18 @@ export async function saveSettings(pool: pg.Pool, settings: SettingsUpdate): Pro
   );
 }
 
-export async function loadStatus(pool: pg.Pool): Promise<StatusResponse> {
-  const [database, sync, transactions, forecast, exportRun, failedJobs] = await Promise.all([
+export async function loadStatus(pool: pg.Pool, config: AppConfig): Promise<StatusResponse> {
+  const [
+    database,
+    sync,
+    transactions,
+    classificationMethods,
+    forecast,
+    exportRun,
+    jobCounts,
+    latestJob,
+    failedJobs,
+  ] = await Promise.all([
     pool.query<{ version: string }>(
       "SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1",
     ),
@@ -95,6 +107,14 @@ export async function loadStatus(pool: pg.Pool): Promise<StatusResponse> {
           count(*) FILTER (WHERE needs_review = false)::text AS classified,
           count(*) FILTER (WHERE needs_review = true)::text AS needs_review
         FROM enriched_transactions
+      `,
+    ),
+    pool.query<{ count: string; method: string }>(
+      `
+        SELECT COALESCE(NULLIF(classification_method, ''), 'none') AS method, count(*)::text
+        FROM enriched_transactions
+        GROUP BY 1
+        ORDER BY 1
       `,
     ),
     pool.query<{
@@ -126,6 +146,24 @@ export async function loadStatus(pool: pg.Pool): Promise<StatusResponse> {
       `,
     ),
     pool
+      .query<{ count: string; state: string }>(`
+        SELECT state::text, count(*)::text
+        FROM pgboss.job
+        GROUP BY state
+        ORDER BY state::text
+      `)
+      .catch(() => ({ rows: [] })),
+    pool
+      .query<{ at: string | null; error: string | null; name: string; state: string }>(`
+        SELECT name, state::text,
+          COALESCE(completed_on, started_on, created_on)::text AS at,
+          output::text AS error
+        FROM pgboss.job
+        ORDER BY COALESCE(completed_on, started_on, created_on) DESC NULLS LAST, id DESC
+        LIMIT 1
+      `)
+      .catch(() => ({ rows: [] })),
+    pool
       .query<{ error: string | null; name: string; started_at: string }>(`
         SELECT name, started_on::text AS started_at, output::text AS error
         FROM pgboss.job
@@ -144,20 +182,22 @@ export async function loadStatus(pool: pg.Pool): Promise<StatusResponse> {
     failedJobs: failedJobRows,
     sections: [
       {
-        rows: [{ label: "Migration version", value: database.rows[0]?.version ?? "none" }],
+        rows: [
+          { label: "Connection", value: "configured" },
+          { label: "Migration version", value: database.rows[0]?.version ?? "none" },
+        ],
         title: "Database",
       },
       { rows: syncRows(sync.rows[0]), title: "Sync" },
-      { rows: transactionRows(transactions.rows[0]), title: "Transactions" },
+      {
+        rows: transactionRows(transactions.rows[0], classificationMethods.rows),
+        title: "Transactions",
+      },
       { rows: forecastRows(forecast.rows[0]), title: "Forecast" },
-      { rows: workerRows(failedJobRows), title: "Worker" },
+      { rows: workerRows(failedJobRows, jobCounts.rows, latestJob.rows[0]), title: "Worker" },
       { rows: exportRows(exportRun.rows[0]), title: "Exports" },
       {
-        rows: [
-          { label: "Secrets", value: "redacted" },
-          { label: "OIDC", value: process.env.OIDC_ENABLED === "true" ? "enabled" : "disabled" },
-          { label: "Bank provider", value: process.env.BANK_PROVIDER ?? "fake" },
-        ],
+        rows: runtimeRows(config),
         title: "Runtime",
       },
     ],
@@ -253,11 +293,13 @@ function syncRows(
 
 function transactionRows(
   row: { classified: string; needs_review: string; total: string } | undefined,
+  methodRows: { count: string; method: string }[],
 ) {
   return [
     { label: "Known transactions", value: `${row?.total ?? "0"} total` },
     { label: "Classified transactions", value: row?.classified ?? "0" },
     { label: "Needs review", value: row?.needs_review ?? "0" },
+    { label: "Classification methods", value: classificationMethodCounts(methodRows) },
   ];
 }
 
@@ -278,12 +320,22 @@ function forecastRows(
   ];
 }
 
-function workerRows(failedJobs: { error: string | null; name: string; startedAt: string }[]) {
+function workerRows(
+  failedJobs: { error: string | null; name: string; startedAt: string }[],
+  countRows: { count: string; state: string }[],
+  latest: { at: string | null; error: string | null; name: string; state: string } | undefined,
+) {
   return [
+    {
+      detail: jobStateCounts(countRows),
+      label: "Queued jobs",
+      value: jobStateValue(countRows, "created"),
+    },
     { label: "Failed jobs", value: String(failedJobs.length) },
     ...(failedJobs[0]
       ? [{ detail: failedJobs[0].error, label: "Latest failed job", value: failedJobs[0].name }]
       : []),
+    latestJobRow(latest),
   ];
 }
 
@@ -313,4 +365,58 @@ function exportRows(
       value: row.status,
     },
   ];
+}
+
+function runtimeRows(config: AppConfig) {
+  return [
+    { label: "Runtime", value: describeRuntime() },
+    { label: "Environment", value: config.appEnv },
+    { label: "Secrets", value: "redacted" },
+    { label: "OIDC", value: config.oidc.enabled ? "enabled" : "disabled" },
+    { label: "OIDC issuer", value: configured(config.oidc.issuerUrl) },
+    { label: "OIDC client secret", value: configured(config.oidc.clientSecret) },
+    { label: "Allowed emails", value: `${config.allowedEmails.size} configured` },
+    { label: "Bank provider", value: process.env.BANK_PROVIDER ?? "fake" },
+    { label: "ABN account", value: configured(process.env.ABN_ACCOUNT_IBAN) },
+    { label: "ABN card", value: configured(process.env.ABN_CARD_NUMBER) },
+    { label: "ABN token", value: configured(process.env.ABN_SOFT_TOKEN) },
+    { label: "ABN sync pages", value: process.env.ABN_SYNC_PAGES ?? "1" },
+    { label: "LLM endpoint", value: configured(process.env.LLM_BASE_URL) },
+    { label: "LLM model", value: process.env.LLM_MODEL ?? "missing" },
+  ];
+}
+
+function classificationMethodCounts(rows: { count: string; method: string }[]): string {
+  if (rows.length === 0) {
+    return "none";
+  }
+  return rows.map((row) => `${row.method} ${row.count}`).join(", ");
+}
+
+function jobStateCounts(rows: { count: string; state: string }[]): string | null {
+  if (rows.length === 0) {
+    return null;
+  }
+  return rows.map((row) => `${row.state} ${row.count}`).join(", ");
+}
+
+function jobStateValue(rows: { count: string; state: string }[], state: string): string {
+  return rows.find((row) => row.state === state)?.count ?? "0";
+}
+
+function latestJobRow(
+  row: { at: string | null; error: string | null; name: string; state: string } | undefined,
+) {
+  if (!row) {
+    return { label: "Latest worker result", value: "none" };
+  }
+  return {
+    detail: [row.name, row.at, redact(row.error)].filter(Boolean).join(", "),
+    label: "Latest worker result",
+    value: row.state,
+  };
+}
+
+function configured(value: string | undefined): string {
+  return value ? "configured" : "missing";
 }

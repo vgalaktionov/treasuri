@@ -8,6 +8,7 @@ import {
   statusResponseSchema,
   syncCreateResponseSchema,
 } from "../../shared/operations.ts";
+import type { AppConfig } from "../config/env.ts";
 import { createPool } from "../db/pool.ts";
 import { createXlsxExport, getExportFile, listExports } from "./exportService.ts";
 import { loadSettings, loadStatus, saveSettings } from "./service.ts";
@@ -16,6 +17,7 @@ import { runSyncNow } from "./syncService.ts";
 export function registerOperationsRoutes(
   app: express.Express,
   databaseUrl: string | undefined,
+  config: AppConfig,
 ): void {
   app.get("/api/settings", async (_request, response, next) => {
     try {
@@ -64,7 +66,7 @@ export function registerOperationsRoutes(
         response.json(
           statusResponseSchema.parse({
             failedJobs: [],
-            sections: sampleStatusSections(),
+            sections: sampleStatusSections(config),
             secrets: "redacted",
           }),
         );
@@ -72,7 +74,7 @@ export function registerOperationsRoutes(
       }
       const pool = createPool(databaseUrl);
       try {
-        response.json(statusResponseSchema.parse(await loadStatus(pool)));
+        response.json(statusResponseSchema.parse(await loadStatus(pool, config)));
       } finally {
         await pool.end();
       }
@@ -211,7 +213,7 @@ function sampleSettings() {
   };
 }
 
-function sampleStatusSections() {
+function sampleStatusSections(config: AppConfig) {
   return [
     { rows: [{ label: "Migration version", value: "sample" }], title: "Database" },
     { rows: [{ label: "Last sync", value: "none" }], title: "Sync" },
@@ -220,19 +222,42 @@ function sampleStatusSections() {
         { label: "Known transactions", value: "6 total" },
         { label: "Classified transactions", value: "4" },
         { label: "Needs review", value: "2" },
+        { label: "Classification methods", value: "manual 2, rule 2, none 2" },
       ],
       title: "Transactions",
     },
     { rows: [{ label: "Last forecast update", value: "sample" }], title: "Forecast" },
-    { rows: [{ label: "Failed jobs", value: "0" }], title: "Worker" },
+    {
+      rows: [
+        { label: "Queued jobs", value: "0" },
+        { label: "Failed jobs", value: "0" },
+        { label: "Latest worker result", value: "none" },
+      ],
+      title: "Worker",
+    },
     { rows: [{ label: "Latest export", value: "completed" }], title: "Exports" },
     {
       rows: [
+        { label: "Runtime", value: `treasuri node/${process.versions.node}` },
+        { label: "Environment", value: config.appEnv },
         { label: "Secrets", value: "redacted" },
-        { label: "OIDC", value: "disabled" },
+        { label: "OIDC", value: config.oidc.enabled ? "enabled" : "disabled" },
+        { label: "OIDC issuer", value: configured(config.oidc.issuerUrl) },
+        { label: "OIDC client secret", value: configured(config.oidc.clientSecret) },
+        { label: "Allowed emails", value: `${config.allowedEmails.size} configured` },
         { label: "Bank provider", value: "fake" },
+        { label: "ABN account", value: configured(process.env.ABN_ACCOUNT_IBAN) },
+        { label: "ABN card", value: configured(process.env.ABN_CARD_NUMBER) },
+        { label: "ABN token", value: configured(process.env.ABN_SOFT_TOKEN) },
+        { label: "ABN sync pages", value: process.env.ABN_SYNC_PAGES ?? "1" },
+        { label: "LLM endpoint", value: configured(process.env.LLM_BASE_URL) },
+        { label: "LLM model", value: process.env.LLM_MODEL ?? "missing" },
       ],
       title: "Runtime",
     },
   ];
+}
+
+function configured(value: string | undefined): string {
+  return value ? "configured" : "missing";
 }
