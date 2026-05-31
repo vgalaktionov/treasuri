@@ -1,5 +1,7 @@
 import { type DashboardResponse, dashboardResponseSchema } from "../../shared/dashboard.ts";
 import {
+  type CategoryBudgetResponse,
+  categoryBudgetResponseSchema,
   managementCategorySchema,
   type RuleEditorRequest,
   type RulePreviewRequest,
@@ -104,6 +106,14 @@ export async function fetchCategories() {
     throw new Error("Failed to load categories");
   }
   return managementCategorySchema.array().parse(await response.json());
+}
+
+export async function fetchCategoryBudgets(): Promise<CategoryBudgetResponse> {
+  const response = await fetch("/api/category-budgets");
+  if (!response.ok) {
+    throw new Error("Failed to load category budgets");
+  }
+  return categoryBudgetResponseSchema.parse(await response.json());
 }
 
 export async function fetchRecurring() {

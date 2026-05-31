@@ -75,6 +75,32 @@ describe("management API", () => {
     }
   }, 60_000);
 
+  it("reports category budget averages and forecast exclusions", async () => {
+    const { app, container, restore } = await appWithSampleData();
+    try {
+      const budgets = await request(app).get("/api/category-budgets").expect(200);
+      const dog = budgets.body.categories.find(
+        (category: { name: string }) => category.name === "Dog",
+      );
+      const savings = budgets.body.categories.find(
+        (category: { name: string }) => category.name === "Savings",
+      );
+
+      expect(budgets.body.yearMonth).toBe("2026-05");
+      expect(budgets.body.totals.currentMonth).toBe("1604.30");
+      expect(budgets.body.totals.suggestedBudget).toBe("1610.00");
+      expect(dog.currentMonth).toBe("89.95");
+      expect(dog.suggestedBudget).toBe("90.00");
+      expect(dog.includedInForecast).toBe(true);
+      expect(dog.status).toBe("watch");
+      expect(savings.includedInForecast).toBe(false);
+      expect(savings.excludedFromForecast).toBe("500.00");
+    } finally {
+      await restore();
+      await container.stop();
+    }
+  }, 60_000);
+
   it("previews rules and does not overwrite manual overrides when applying", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {

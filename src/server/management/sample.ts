@@ -1,6 +1,7 @@
 import type express from "express";
 
 import type {
+  CategoryBudgetResponse,
   RecurringResponse,
   RuleEditorRequest,
   RulesResponse,
@@ -14,6 +15,87 @@ export const sampleCategories = [
   { id: 3, name: "Unknown" },
   { id: 4, name: "Savings" },
 ];
+
+export function sampleCategoryBudgets(): CategoryBudgetResponse {
+  return {
+    categories: [
+      {
+        average12m: "0.00",
+        average3m: "0.00",
+        average6m: "0.00",
+        currentMonth: "89.95",
+        excludedFromForecast: "0.00",
+        id: 1,
+        includedInForecast: true,
+        name: "Dog",
+        paceLabel: "EUR 0.05 left",
+        status: "watch",
+        suggestedBudget: "90.00",
+      },
+      {
+        average12m: "0.00",
+        average3m: "0.00",
+        average6m: "0.00",
+        currentMonth: "64.35",
+        excludedFromForecast: "0.00",
+        id: 2,
+        includedInForecast: true,
+        name: "Groceries",
+        paceLabel: "EUR 5.65 left",
+        status: "watch",
+        suggestedBudget: "70.00",
+      },
+      {
+        average12m: "0.00",
+        average3m: "0.00",
+        average6m: "0.00",
+        currentMonth: "1450.00",
+        excludedFromForecast: "0.00",
+        id: 5,
+        includedInForecast: true,
+        name: "Rent / Mortgage",
+        paceLabel: "on budget",
+        status: "watch",
+        suggestedBudget: "1450.00",
+      },
+      {
+        average12m: "0.00",
+        average3m: "0.00",
+        average6m: "0.00",
+        currentMonth: "0.00",
+        excludedFromForecast: "42.10",
+        id: 3,
+        includedInForecast: false,
+        name: "Unknown",
+        paceLabel: "no budget yet",
+        status: "empty",
+        suggestedBudget: "0.00",
+      },
+      {
+        average12m: "0.00",
+        average3m: "0.00",
+        average6m: "0.00",
+        currentMonth: "0.00",
+        excludedFromForecast: "500.00",
+        id: 4,
+        includedInForecast: false,
+        name: "Savings",
+        paceLabel: "no budget yet",
+        status: "empty",
+        suggestedBudget: "0.00",
+      },
+    ],
+    totals: {
+      currentMonth: "1604.30",
+      excludedFromForecast: "542.10",
+      includedCount: 3,
+      overCount: 0,
+      suggestedBudget: "1610.00",
+      watchCount: 3,
+    },
+    yearMonth: "2026-05",
+  };
+}
 
 export function sampleRulesFor(
   stores: Map<string, RulesResponse>,

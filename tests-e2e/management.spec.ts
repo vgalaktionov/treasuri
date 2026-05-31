@@ -30,3 +30,23 @@ test("transaction workspace exposes advanced filters and raw details", async ({ 
   await expect(page.getByText("Sample current account")).toBeVisible();
   await expect(page.getByText('"source": "sample"')).toBeVisible();
 });
+
+test("category workspace shows budget averages and filters", async ({ page }) => {
+  await page.goto("/categories");
+
+  await expect(page.getByRole("heading", { name: "Categories" })).toBeVisible();
+  await expect(page.getByText("Current spend")).toBeVisible();
+  await expect(page.getByText("Suggested budget")).toBeVisible();
+  await expect(page.getByText("Dog")).toBeVisible();
+  await expect(page.getByText("Groceries")).toBeVisible();
+  await expect(page.getByText("EUR 0.05 left")).toBeVisible();
+
+  await page.getByRole("button", { name: "Excluded" }).click();
+  await expect(page.getByText("Savings")).toBeVisible();
+  await expect(page.getByText("Unknown")).toBeVisible();
+  await expect(page.getByText("Dog")).toHaveCount(0);
+
+  await page.getByLabel("Search categories").fill("savi");
+  await expect(page.getByText("Savings")).toBeVisible();
+  await expect(page.getByText("Unknown")).toHaveCount(0);
+});

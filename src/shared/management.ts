@@ -2,6 +2,35 @@ import { z } from "zod";
 
 export const managementCategorySchema = z.object({ id: z.number(), name: z.string() });
 
+export const categoryBudgetStatusSchema = z.enum(["empty", "ok", "over", "watch"]);
+
+export const categoryBudgetSchema = z.object({
+  average12m: z.string(),
+  average3m: z.string(),
+  average6m: z.string(),
+  currentMonth: z.string(),
+  excludedFromForecast: z.string(),
+  id: z.number(),
+  includedInForecast: z.boolean(),
+  name: z.string(),
+  paceLabel: z.string(),
+  status: categoryBudgetStatusSchema,
+  suggestedBudget: z.string(),
+});
+
+export const categoryBudgetResponseSchema = z.object({
+  categories: z.array(categoryBudgetSchema),
+  totals: z.object({
+    currentMonth: z.string(),
+    excludedFromForecast: z.string(),
+    includedCount: z.number(),
+    overCount: z.number(),
+    suggestedBudget: z.string(),
+    watchCount: z.number(),
+  }),
+  yearMonth: z.string(),
+});
+
 export const transactionListItemSchema = z.object({
   amount: z.string(),
   bookingDate: z.string(),
@@ -168,6 +197,7 @@ export const recurringResponseSchema = z.object({
 
 export const recurringActionResponseSchema = z.object({ ok: z.boolean() });
 export const ruleActiveUpdateRequestSchema = z.object({ isActive: z.boolean() });
+export type CategoryBudgetResponse = z.infer<typeof categoryBudgetResponseSchema>;
 export type RulePreviewRequest = z.infer<typeof rulePreviewRequestSchema>;
 export type RuleEditorRequest = z.infer<typeof ruleEditorRequestSchema>;
 export type RulesResponse = z.infer<typeof rulesResponseSchema>;

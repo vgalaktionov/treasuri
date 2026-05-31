@@ -1,6 +1,7 @@
 import type express from "express";
 
 import {
+  categoryBudgetResponseSchema,
   recurringActionResponseSchema,
   recurringResponseSchema,
   ruleActiveUpdateRequestSchema,
@@ -16,6 +17,7 @@ import {
   transactionUpdateRequestSchema,
 } from "../../shared/management.ts";
 import { createPool } from "../db/pool.ts";
+import { listCategories, listCategoryBudgets } from "./categories.ts";
 import { confirmRecurring, disableRecurring, listRecurring } from "./recurring.ts";
 import {
   applyRule,
@@ -27,6 +29,7 @@ import {
 } from "./rules.ts";
 import {
   sampleCategories,
+  sampleCategoryBudgets,
   sampleRawDetails,
   sampleRecurringFor,
   sampleRuleFromInput,
@@ -110,6 +113,23 @@ export function registerManagementRoutes(
   app.get("/api/categories", async (_request, response, next) => {
     try {
       response.json((await managementData(databaseUrl)).categories);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/category-budgets", async (_request, response, next) => {
+    try {
+      if (!databaseUrl) {
+        response.json(categoryBudgetResponseSchema.parse(sampleCategoryBudgets()));
+        return;
+      }
+      const pool = createPool(databaseUrl);
+      try {
+        response.json(categoryBudgetResponseSchema.parse(await listCategoryBudgets(pool)));
+      } finally {
+        await pool.end();
+      }
     } catch (error) {
       next(error);
     }
@@ -326,7 +346,7 @@ async function managementData(databaseUrl: string | undefined) {
   }
   const pool = createPool(databaseUrl);
   try {
-    return { categories: (await listTransactions(pool)).categories };
+    return { categories: await listCategories(pool) };
   } finally {
     await pool.end();
   }
