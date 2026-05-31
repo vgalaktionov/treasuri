@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ListPlus, Save, Search } from "lucide-react";
+import { Check, EyeOff, ListPlus, Save, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { RuleEditorRequest, RulePreviewResponse } from "../../shared/management.ts";
@@ -21,6 +21,21 @@ type ReviewDraft = {
   merchantName: string;
 };
 
+type ReviewMutationInput =
+  | {
+      applySimilar?: boolean;
+      draft: ReviewDraft;
+      id: number;
+      kind: "change";
+      next?: "rule-preview" | "stay";
+    }
+  | {
+      applySimilar?: boolean;
+      draft: ReviewDraft;
+      id: number;
+      kind: "exclude";
+    };
+
 export function ReviewPage() {
   const queryClient = useQueryClient();
   const inbox = useQuery({ queryFn: fetchReviewInbox, queryKey: ["review-inbox"] });
@@ -28,26 +43,26 @@ export function ReviewPage() {
   const [ruleDraft, setRuleDraft] = useState<RuleEditorRequest | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const action = useMutation({
-    mutationFn: ({
-      applySimilar = false,
-      draft,
-      id,
-      next = "stay",
-    }: {
-      applySimilar?: boolean;
-      draft: ReviewDraft;
-      id: number;
-      next?: "rule-preview" | "stay";
-    }) =>
-      applyReviewAction(id, {
+    mutationFn: (input: ReviewMutationInput) => {
+      if (input.kind === "exclude") {
+        return applyReviewAction(input.id, {
+          action: "exclude",
+          applySimilar: input.applySimilar ?? false,
+          categoryId: input.draft.categoryId,
+          createAlias: input.draft.createAlias,
+          merchantName: input.draft.merchantName,
+        });
+      }
+      return applyReviewAction(input.id, {
         action: "change",
-        applySimilar,
-        categoryId: draft.categoryId,
-        createAlias: draft.createAlias,
-        flags: draft.flags,
-        merchantName: draft.merchantName,
-        next,
-      }),
+        applySimilar: input.applySimilar ?? false,
+        categoryId: input.draft.categoryId,
+        createAlias: input.draft.createAlias,
+        flags: input.draft.flags,
+        merchantName: input.draft.merchantName,
+        next: input.next ?? "stay",
+      });
+    },
     onSuccess: (result) => {
       setMessage(`${result.correctedCount} corrected, ${result.reviewCount} left`);
       setRuleDraft(result.ruleDraft);
@@ -132,8 +147,11 @@ export function ReviewPage() {
             disabled={action.isPending || accept.isPending}
             key={activeTransaction.id}
             onAccept={() => accept.mutate(activeTransaction.id)}
+            onExclude={(draft, applySimilar) =>
+              action.mutate({ applySimilar, draft, id: activeTransaction.id, kind: "exclude" })
+            }
             onSave={(draft, next, applySimilar) =>
-              action.mutate({ applySimilar, draft, id: activeTransaction.id, next })
+              action.mutate({ applySimilar, draft, id: activeTransaction.id, kind: "change", next })
             }
             transaction={activeTransaction}
           />
@@ -200,12 +218,14 @@ function ActiveReviewPanel({
   categories,
   disabled,
   onAccept,
+  onExclude,
   onSave,
   transaction,
 }: {
   categories: ReviewInboxResponse["categories"];
   disabled: boolean;
   onAccept: () => void;
+  onExclude: (draft: ReviewDraft, applySimilar: boolean) => void;
   onSave: (draft: ReviewDraft, next: "rule-preview" | "stay", applySimilar: boolean) => void;
   transaction: ReviewTransaction;
 }) {
@@ -328,6 +348,15 @@ function ActiveReviewPanel({
         >
           <Save aria-hidden="true" className="size-4" />
           Save
+        </button>
+        <button
+          className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-treasuri-line px-2 font-medium text-xs disabled:opacity-60 sm:text-sm"
+          disabled={disabled || draft.categoryId === 0}
+          onClick={() => onExclude(draft, false)}
+          type="button"
+        >
+          <EyeOff aria-hidden="true" className="size-4" />
+          Exclude
         </button>
         <button
           className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-treasuri-line px-2 font-medium text-xs disabled:opacity-60 sm:text-sm"

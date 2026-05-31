@@ -37,3 +37,14 @@ test("review correction supports merchant flags and rule preview", async ({ page
   await page.getByRole("button", { name: "Create rule" }).click();
   await expect(page.getByText(/Rule \d+ created/)).toBeVisible();
 });
+
+test("review inbox can quickly exclude a forecast blocker", async ({ page }) => {
+  await page.goto("/review");
+
+  await expect(page.getByRole("heading", { name: "Review inbox" })).toBeVisible();
+  await page.getByRole("button", { name: "Exclude" }).click();
+
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(page.getByText("0 to review")).toBeVisible();
+  await expect(page.getByText("Review inbox is clear.")).toBeVisible();
+});

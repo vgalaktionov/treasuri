@@ -170,6 +170,74 @@ describe("review API", () => {
       await container.stop();
     }
   }, 120_000);
+
+  it("quick-excludes a review transaction from the forecast", async () => {
+    const container = await new PostgreSqlContainer("postgres:16-alpine").start();
+    const previousDatabaseUrl = process.env.DATABASE_URL;
+
+    try {
+      process.env.DATABASE_URL = container.getConnectionUri();
+      await withPool(container.getConnectionUri(), async (pool) => {
+        await runMigrations(pool);
+        await loadSampleData(pool);
+      });
+
+      const app = createApp();
+      const { agent, csrf } = await csrfAgent(app);
+      const inbox = await agent.get("/api/review").expect(200);
+      const transaction = inbox.body.transactions[0];
+      const unknown = inbox.body.categories.find(
+        (category: { name: string }) => category.name === "Unknown",
+      );
+
+      const action = await agent
+        .post(`/api/review/${transaction.id}/action`)
+        .set("x-csrf-token", csrf)
+        .send({
+          action: "exclude",
+          categoryId: unknown.id,
+          createAlias: true,
+          merchantName: "Unknown Sample Merchant",
+        })
+        .expect(200);
+      const excluded = await withPool(container.getConnectionUri(), (pool) =>
+        pool.query<{
+          is_excluded_from_budget: boolean;
+          needs_review: boolean;
+          override_count: string;
+        }>(
+          `
+            SELECT
+              enriched_transactions.needs_review,
+              enriched_transactions.is_excluded_from_budget,
+              count(manual_overrides.id)::text AS override_count
+            FROM enriched_transactions
+            LEFT JOIN manual_overrides
+              ON manual_overrides.enriched_transaction_id = enriched_transactions.id
+            WHERE enriched_transactions.id = $1
+            GROUP BY enriched_transactions.needs_review,
+              enriched_transactions.is_excluded_from_budget
+          `,
+          [transaction.id],
+        ),
+      );
+
+      expect(action.body.correctedCount).toBe(1);
+      expect(action.body.reviewCount).toBe(0);
+      expect(excluded.rows[0]).toMatchObject({
+        is_excluded_from_budget: true,
+        needs_review: false,
+        override_count: "1",
+      });
+    } finally {
+      if (previousDatabaseUrl === undefined) {
+        delete process.env.DATABASE_URL;
+      } else {
+        process.env.DATABASE_URL = previousDatabaseUrl;
+      }
+      await container.stop();
+    }
+  }, 120_000);
 });
 
 async function csrfAgent(app: ReturnType<typeof createApp>) {
