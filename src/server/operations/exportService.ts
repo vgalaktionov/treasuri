@@ -4,17 +4,41 @@ import type pg from "pg";
 import { workbookBuffer, workbookSheetNames } from "./exportWorkbook.ts";
 
 const xlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-export async function createXlsxExport(pool: pg.Pool, createdBy: string | null = null) {
-  const client = await pool.connect();
-  const yearMonth = await latestYearMonth(client);
-  const periodStart = `${yearMonth}-01`;
-  const periodEnd = periodEndDate(periodStart);
-  const runId = await createExportRun(client, periodStart, periodEnd, createdBy);
 
+export async function createPendingXlsxExport(
+  pool: pg.Pool,
+  createdBy: string | null = null,
+): Promise<number> {
+  const client = await pool.connect();
   try {
-    const content = await workbookBuffer(client, yearMonth);
+    const yearMonth = await latestYearMonth(client);
+    const periodStart = `${yearMonth}-01`;
+    const periodEnd = periodEndDate(periodStart);
+    return createExportRun(client, {
+      createdBy,
+      periodEnd,
+      periodStart,
+      status: "pending",
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function createXlsxExport(
+  pool: pg.Pool,
+  createdBy: string | null = null,
+  runId?: number,
+) {
+  const client = await pool.connect();
+  let run: Awaited<ReturnType<typeof createRunningExportRun>> | null = null;
+  try {
+    run = runId
+      ? await startPendingExportRun(client, runId)
+      : await createRunningExportRun(client, createdBy);
+    const content = await workbookBuffer(client, run.yearMonth);
     const sha256 = crypto.createHash("sha256").update(content).digest("hex");
-    const filename = `budget-averages-${yearMonth}.xlsx`;
+    const filename = `budget-averages-${run.yearMonth}.xlsx`;
 
     await client.query("BEGIN");
     const file = await client.query<{ id: string }>(
@@ -23,7 +47,7 @@ export async function createXlsxExport(pool: pg.Pool, createdBy: string | null =
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
       `,
-      [runId, filename, xlsxContentType, content, content.length, sha256],
+      [run.id, filename, xlsxContentType, content, content.length, sha256],
     );
     await client.query(
       `
@@ -34,23 +58,25 @@ export async function createXlsxExport(pool: pg.Pool, createdBy: string | null =
         WHERE id = $1
       `,
       [
-        runId,
+        run.id,
         JSON.stringify({
-          periodEnd,
-          periodStart,
+          periodEnd: run.periodEnd,
+          periodStart: run.periodStart,
           sha256,
           sheetNames: workbookSheetNames,
         }),
       ],
     );
     await client.query("COMMIT");
-    return { exportRunId: runId, fileId: Number(file.rows[0]?.id) };
+    return { exportRunId: run.id, fileId: Number(file.rows[0]?.id) };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
-    await client.query(
-      "UPDATE export_runs SET status = 'failed', finished_at = now(), error_message = $2 WHERE id = $1",
-      [runId, sanitizeError(error)],
-    );
+    if (run) {
+      await client.query(
+        "UPDATE export_runs SET status = 'failed', finished_at = now(), error_message = $2 WHERE id = $1",
+        [run.id, sanitizeError(error)],
+      );
+    }
     throw error;
   } finally {
     client.release();
@@ -118,21 +144,72 @@ export async function getExportFile(pool: pg.Pool, fileId: number) {
 
 async function createExportRun(
   client: pg.PoolClient,
-  periodStart: string,
-  periodEnd: string,
-  createdBy: string | null,
+  input: {
+    createdBy: string | null;
+    periodEnd: string;
+    periodStart: string;
+    status: "pending" | "running";
+  },
 ): Promise<number> {
   const run = await client.query<{ id: string }>(
     `
       INSERT INTO export_runs (
         export_type, period_start, period_end, status, started_at, created_by, metadata_json
       )
-      VALUES ('budget_averages', $1, $2, 'running', now(), $3, '{}'::jsonb)
+      VALUES ('budget_averages', $1, $2, $3, now(), $4, '{}'::jsonb)
       RETURNING id
     `,
-    [periodStart, periodEnd, createdBy],
+    [input.periodStart, input.periodEnd, input.status, input.createdBy],
   );
   return Number(run.rows[0]?.id);
+}
+
+async function createRunningExportRun(client: pg.PoolClient, createdBy: string | null) {
+  const yearMonth = await latestYearMonth(client);
+  const periodStart = `${yearMonth}-01`;
+  const periodEnd = periodEndDate(periodStart);
+  const id = await createExportRun(client, {
+    createdBy,
+    periodEnd,
+    periodStart,
+    status: "running",
+  });
+  return { id, periodEnd, periodStart, yearMonth };
+}
+
+async function startPendingExportRun(client: pg.PoolClient, runId: number) {
+  const result = await client.query<{
+    id: string;
+    period_end: string;
+    period_start: string;
+    year_month: string;
+  }>(
+    `
+      UPDATE export_runs
+      SET status = 'running',
+          started_at = COALESCE(started_at, now()),
+          error_message = NULL,
+          metadata_json = COALESCE(metadata_json, '{}'::jsonb)
+      WHERE id = $1
+        AND status IN ('pending', 'running', 'failed')
+      RETURNING
+        id::text,
+        period_start::text,
+        period_end::text,
+        to_char(period_start, 'YYYY-MM') AS year_month
+    `,
+    [runId],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw new Error(`Export run ${runId} was not found or is already completed`);
+  }
+  return {
+    id: Number(row.id),
+    periodEnd: row.period_end,
+    periodStart: row.period_start,
+    yearMonth: row.year_month,
+  };
 }
 
 async function latestYearMonth(client: pg.PoolClient): Promise<string> {

@@ -55,7 +55,9 @@ export const exportsResponseSchema = z.object({ exports: z.array(exportRunSchema
 
 export const exportCreateResponseSchema = z.object({
   exportRunId: z.number(),
-  fileId: z.number(),
+  fileId: z.number().nullable().default(null),
+  jobId: z.string().nullable().default(null),
+  queued: z.boolean().default(false),
 });
 
 export const syncCreateResponseSchema = z.object({

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { runMigrations } from "../../../src/server/db/migrations.ts";
 import { withPool } from "../../../src/server/db/pool.ts";
 import { createApp } from "../../../src/server/http/app.ts";
+import { runJob } from "../../../src/server/jobs/handlers.ts";
 import { loadSampleData } from "../../../src/server/sample/load.ts";
 
 describe("operations API", () => {
@@ -61,21 +62,48 @@ describe("operations API", () => {
     try {
       const { agent, csrf } = await csrfAgent(app);
       const created = await agent.post("/api/exports").set("x-csrf-token", csrf).expect(200);
+      const queued = await withPool(databaseUrl, async (pool) => {
+        const result = await pool.query<{
+          job_count: string;
+          status: string;
+        }>(
+          `
+            SELECT
+              export_runs.status,
+              (SELECT count(*)::text FROM pgboss.job WHERE name = 'generate_xlsx_export')
+                AS job_count
+            FROM export_runs
+            WHERE export_runs.id = $1
+          `,
+          [created.body.exportRunId],
+        );
+        await runJob(pool, "generate_xlsx_export", {
+          createdBy: "dev-user",
+          runId: created.body.exportRunId,
+        });
+        return result.rows[0];
+      });
       const listed = await agent.get("/api/exports").expect(200);
       const downloaded = await agent
-        .get(`/api/exports/${created.body.fileId}/download`)
+        .get(`/api/exports/${listed.body.exports[0].fileId}/download`)
         .expect(200);
       const stored = await withPool(databaseUrl, async (pool) => {
         const result = await pool.query<{ bytes: number; content: Buffer }>(
           "SELECT octet_length(content) AS bytes, content FROM export_files WHERE id = $1",
-          [created.body.fileId],
+          [listed.body.exports[0].fileId],
         );
         return result.rows[0];
       });
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(Uint8Array.from(stored?.content ?? Buffer.alloc(0)).buffer);
 
-      expect(created.body.fileId).toBeGreaterThan(0);
+      expect(created.body).toMatchObject({
+        exportRunId: expect.any(Number),
+        fileId: null,
+        jobId: expect.any(String),
+        queued: true,
+      });
+      expect(queued).toMatchObject({ job_count: "1", status: "pending" });
       expect(listed.body.exports[0].exportType).toBe("budget_averages");
       expect(listed.body.exports[0].filename).toBe("budget-averages-2026-05.xlsx");
       expect(listed.body.exports[0].periodStart).toBe("2026-05-01");

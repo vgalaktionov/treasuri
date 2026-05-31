@@ -10,7 +10,8 @@ import {
 } from "../../shared/operations.ts";
 import type { AppConfig } from "../config/env.ts";
 import { createPool } from "../db/pool.ts";
-import { createXlsxExport, getExportFile, listExports } from "./exportService.ts";
+import { enqueueJob } from "../jobs/queue.ts";
+import { createPendingXlsxExport, getExportFile, listExports } from "./exportService.ts";
 import { loadSettings, loadStatus, saveSettings } from "./service.ts";
 import { runSyncNow } from "./syncService.ts";
 
@@ -160,12 +161,31 @@ export function registerOperationsRoutes(
   app.post("/api/exports", async (_request, response, next) => {
     try {
       if (!databaseUrl) {
-        response.json(exportCreateResponseSchema.parse({ exportRunId: 1, fileId: 1 }));
+        response.json(
+          exportCreateResponseSchema.parse({
+            exportRunId: 1,
+            fileId: 1,
+            jobId: "sample-export-job",
+            queued: false,
+          }),
+        );
         return;
       }
       const pool = createPool(databaseUrl);
       try {
-        response.json(exportCreateResponseSchema.parse(await createXlsxExport(pool, "dev-user")));
+        const exportRunId = await createPendingXlsxExport(pool, "dev-user");
+        const jobId = await enqueueJob(databaseUrl, "generate_xlsx_export", {
+          createdBy: "dev-user",
+          runId: exportRunId,
+        });
+        response.json(
+          exportCreateResponseSchema.parse({
+            exportRunId,
+            fileId: null,
+            jobId,
+            queued: true,
+          }),
+        );
       } finally {
         await pool.end();
       }

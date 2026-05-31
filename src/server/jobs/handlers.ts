@@ -35,7 +35,7 @@ export async function runJob(pool: pg.Pool, name: JobName, payload: unknown) {
       return updateMonthlyForecast(pool);
     case "generate_xlsx_export": {
       const parsed = jobPayloadSchemas.generate_xlsx_export.parse(payload);
-      return createXlsxExport(pool, parsed.createdBy ?? null);
+      return createXlsxExport(pool, parsed.createdBy ?? null, parsed.runId);
     }
     case "backfill_rule": {
       const parsed = jobPayloadSchemas.backfill_rule.parse(payload);

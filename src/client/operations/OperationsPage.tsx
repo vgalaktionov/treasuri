@@ -540,13 +540,17 @@ function ExportPanel({
 
         {create.data ? (
           <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-emerald-800 text-sm">
-            Export {create.data.exportRunId} generated.{" "}
-            <a
-              className="font-semibold text-treasuri-action"
-              href={`/api/exports/${create.data.fileId}/download`}
-            >
-              Download file
-            </a>
+            {create.data.queued
+              ? `Export ${create.data.exportRunId} queued. Worker will generate the workbook.`
+              : `Export ${create.data.exportRunId} generated.`}{" "}
+            {create.data.fileId ? (
+              <a
+                className="font-semibold text-treasuri-action"
+                href={`/api/exports/${create.data.fileId}/download`}
+              >
+                Download file
+              </a>
+            ) : null}
           </p>
         ) : null}
         {create.isError ? (

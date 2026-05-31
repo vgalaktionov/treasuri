@@ -5,6 +5,7 @@ import { runMigrations } from "../../../src/server/db/migrations.ts";
 import { withPool } from "../../../src/server/db/pool.ts";
 import { runJob } from "../../../src/server/jobs/handlers.ts";
 import { createRule } from "../../../src/server/management/rules.ts";
+import { createPendingXlsxExport } from "../../../src/server/operations/exportService.ts";
 import { loadSampleData } from "../../../src/server/sample/load.ts";
 
 describe("job handlers", () => {
@@ -42,6 +43,49 @@ describe("job handlers", () => {
         });
         expect(Number(database.rows[0]?.balance_snapshots ?? 0)).toBeGreaterThan(1);
         expect(Number(database.rows[0]?.sync_runs ?? 0)).toBeGreaterThan(0);
+      });
+    } finally {
+      await container.stop();
+    }
+  }, 120_000);
+
+  it("generates an XLSX export for an existing queued run", async () => {
+    const container = await new PostgreSqlContainer("postgres:16-alpine").start();
+
+    try {
+      await withPool(container.getConnectionUri(), async (pool) => {
+        await runMigrations(pool);
+        await loadSampleData(pool);
+
+        const runId = await createPendingXlsxExport(pool, "dev-user");
+        const result = await runJob(pool, "generate_xlsx_export", {
+          createdBy: "dev-user",
+          runId,
+        });
+        const database = await pool.query<{
+          file_count: string;
+          filename: string | null;
+          status: string;
+        }>(
+          `
+            SELECT
+              export_runs.status,
+              count(export_files.id)::text AS file_count,
+              max(export_files.filename) AS filename
+            FROM export_runs
+            LEFT JOIN export_files ON export_files.export_run_id = export_runs.id
+            WHERE export_runs.id = $1
+            GROUP BY export_runs.status
+          `,
+          [runId],
+        );
+
+        expect(result).toMatchObject({ exportRunId: runId, fileId: expect.any(Number) });
+        expect(database.rows[0]).toMatchObject({
+          file_count: "1",
+          filename: "budget-averages-2026-05.xlsx",
+          status: "completed",
+        });
       });
     } finally {
       await container.stop();
