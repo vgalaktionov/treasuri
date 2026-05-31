@@ -2,16 +2,47 @@ import { z } from "zod";
 
 export const settingsResponseSchema = z.object({
   baselineMonths: z.number(),
+  fixedCostsUpcoming: z.string(),
+  llmConfidenceThreshold: z.string(),
+  llmEnabled: z.boolean(),
+  overview: z.object({
+    accounts: z.array(
+      z.object({
+        currency: z.string(),
+        iban: z.string(),
+        name: z.string(),
+        provider: z.string(),
+        status: z.string(),
+      }),
+    ),
+    sync: z.object({
+      lastSync: z.string(),
+      lookbackDays: z.number(),
+      schedule: z.string(),
+    }),
+    taxonomy: z.object({
+      categoryCount: z.number(),
+      sampleCategories: z.array(z.string()),
+    }),
+  }),
   safetyBuffer: z.string(),
+  salaryDay: z.number(),
+  syncLookbackDays: z.number(),
   targetMonthlySavings: z.string(),
+  variableBaseline3m: z.string(),
+  variableBaseline6m: z.string(),
 });
 
-export const settingsUpdateSchema = settingsResponseSchema;
+export const settingsUpdateSchema = settingsResponseSchema.omit({ overview: true });
 
 export const exportRunSchema = z.object({
   createdAt: z.string(),
+  errorMessage: z.string().nullable(),
+  exportType: z.string(),
   fileId: z.number().nullable(),
+  filename: z.string().nullable(),
   id: z.number(),
+  sizeBytes: z.number().nullable(),
   status: z.string(),
 });
 
@@ -23,15 +54,26 @@ export const exportCreateResponseSchema = z.object({
 });
 
 export const statusResponseSchema = z.object({
-  database: z.string(),
   failedJobs: z.array(
     z.object({ error: z.string().nullable(), name: z.string(), startedAt: z.string() }),
   ),
-  latestSync: z.object({ provider: z.string(), status: z.string() }).nullable(),
+  sections: z.array(
+    z.object({
+      rows: z.array(
+        z.object({
+          detail: z.string().nullable().optional(),
+          label: z.string(),
+          value: z.string(),
+        }),
+      ),
+      title: z.string(),
+    }),
+  ),
   secrets: z.literal("redacted"),
 });
 
 export type SettingsResponse = z.infer<typeof settingsResponseSchema>;
+export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
 export type ExportCreateResponse = z.infer<typeof exportCreateResponseSchema>;
 export type ExportsResponse = z.infer<typeof exportsResponseSchema>;
 export type StatusResponse = z.infer<typeof statusResponseSchema>;

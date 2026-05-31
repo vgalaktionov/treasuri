@@ -45,24 +45,35 @@ export async function createXlsxExport(pool: pg.Pool, createdBy: string | null =
 export async function listExports(pool: pg.Pool) {
   const result = await pool.query<{
     created_at: string;
+    error_message: string | null;
+    export_type: string;
     file_id: string | null;
+    filename: string | null;
     id: string;
+    size_bytes: number | null;
     status: string;
   }>(`
-    SELECT export_runs.id, export_runs.status,
+    SELECT export_runs.id, export_runs.export_type, export_runs.status, export_runs.error_message,
       COALESCE(export_runs.finished_at, export_runs.started_at)::text AS created_at,
-      max(export_files.id)::text AS file_id
+      max(export_files.id)::text AS file_id,
+      max(export_files.filename) AS filename,
+      max(export_files.size_bytes)::int AS size_bytes
     FROM export_runs
     LEFT JOIN export_files ON export_files.export_run_id = export_runs.id
-    GROUP BY export_runs.id, export_runs.status, export_runs.started_at, export_runs.finished_at
+    GROUP BY export_runs.id, export_runs.export_type, export_runs.status, export_runs.error_message,
+      export_runs.started_at, export_runs.finished_at
     ORDER BY COALESCE(export_runs.finished_at, export_runs.started_at) DESC
     LIMIT 20
   `);
   return {
     exports: result.rows.map((row) => ({
       createdAt: row.created_at,
+      errorMessage: row.error_message,
+      exportType: row.export_type,
       fileId: row.file_id ? Number(row.file_id) : null,
+      filename: row.filename,
       id: Number(row.id),
+      sizeBytes: row.size_bytes,
       status: row.status,
     })),
   };

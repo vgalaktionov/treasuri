@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, RefreshCw, Save } from "lucide-react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import type { SettingsResponse, SettingsUpdate } from "../../shared/operations.ts";
 import {
   createExport,
   fetchExports,
@@ -70,8 +71,15 @@ function ExportPage() {
               <div>
                 <p className="font-semibold">Export {exportRun.id}</p>
                 <p className="text-sm text-treasuri-muted">
-                  {exportRun.status} - {exportRun.createdAt}
+                  {exportRun.filename ?? "No file"} - {exportRun.exportType} - {exportRun.status} -{" "}
+                  {exportRun.createdAt}
                 </p>
+                {exportRun.sizeBytes ? (
+                  <p className="text-xs text-treasuri-muted">{exportRun.sizeBytes} bytes</p>
+                ) : null}
+                {exportRun.errorMessage ? (
+                  <p className="mt-1 text-sm text-red-700">{exportRun.errorMessage}</p>
+                ) : null}
               </div>
               {exportRun.fileId ? (
                 <a
@@ -93,10 +101,17 @@ function ExportPage() {
 function SettingsPage() {
   const queryClient = useQueryClient();
   const settings = useQuery({ queryFn: fetchSettings, queryKey: ["settings"] });
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<SettingsUpdate>({
     baselineMonths: 6,
+    fixedCostsUpcoming: "0.00",
+    llmConfidenceThreshold: "0.70",
+    llmEnabled: false,
     safetyBuffer: "1000.00",
+    salaryDay: 24,
+    syncLookbackDays: 90,
     targetMonthlySavings: "1000.00",
+    variableBaseline3m: "0.00",
+    variableBaseline6m: "0.00",
   });
   const save = useMutation({
     mutationFn: () => saveSettings(form),
@@ -108,7 +123,7 @@ function SettingsPage() {
 
   useEffect(() => {
     if (settings.data) {
-      setForm(settings.data);
+      setForm(settingsUpdateFromResponse(settings.data));
     }
   }, [settings.data]);
 
@@ -124,49 +139,99 @@ function SettingsPage() {
         <h1 className="mt-1 font-semibold text-xl">Settings</h1>
       </header>
       <form
-        className="grid gap-3 rounded-md border border-treasuri-line bg-white p-3"
+        className="grid gap-2 rounded-md border border-treasuri-line bg-white p-2 sm:grid-cols-3 sm:p-3"
         onSubmit={submit}
       >
-        <label className="grid gap-2 font-medium text-sm">
+        <label className="grid gap-1 font-medium text-sm">
           Target monthly savings
           <input
-            className="min-h-9 rounded-md border border-treasuri-line px-3 font-normal"
+            className="min-h-8 rounded-md border border-treasuri-line px-2 font-normal text-sm"
             inputMode="decimal"
             onChange={(event) => setForm({ ...form, targetMonthlySavings: event.target.value })}
             value={form.targetMonthlySavings}
           />
         </label>
-        <label className="grid gap-2 font-medium text-sm">
+        <label className="grid gap-1 font-medium text-sm">
           Safety buffer
           <input
-            className="min-h-9 rounded-md border border-treasuri-line px-3 font-normal"
+            className="min-h-8 rounded-md border border-treasuri-line px-2 font-normal text-sm"
             inputMode="decimal"
             onChange={(event) => setForm({ ...form, safetyBuffer: event.target.value })}
             value={form.safetyBuffer}
           />
         </label>
-        <label className="grid gap-2 font-medium text-sm">
+        <label className="grid gap-1 font-medium text-sm">
           Baseline months
           <input
-            className="min-h-9 rounded-md border border-treasuri-line px-3 font-normal"
+            className="min-h-8 rounded-md border border-treasuri-line px-2 font-normal text-sm"
             min="1"
             onChange={(event) => setForm({ ...form, baselineMonths: Number(event.target.value) })}
             type="number"
             value={form.baselineMonths}
           />
         </label>
+        <label className="grid gap-1 font-medium text-sm">
+          Salary day
+          <input
+            className="min-h-8 rounded-md border border-treasuri-line px-2 font-normal text-sm"
+            max="31"
+            min="1"
+            onChange={(event) => setForm({ ...form, salaryDay: Number(event.target.value) })}
+            type="number"
+            value={form.salaryDay}
+          />
+        </label>
+        <label className="grid gap-1 font-medium text-sm">
+          Sync lookback days
+          <input
+            className="min-h-8 rounded-md border border-treasuri-line px-2 font-normal text-sm"
+            min="1"
+            onChange={(event) => setForm({ ...form, syncLookbackDays: Number(event.target.value) })}
+            type="number"
+            value={form.syncLookbackDays}
+          />
+        </label>
+        <MoneyInput
+          label="Fixed costs upcoming"
+          onChange={(fixedCostsUpcoming) => setForm({ ...form, fixedCostsUpcoming })}
+          value={form.fixedCostsUpcoming}
+        />
+        <MoneyInput
+          label="3M variable baseline"
+          onChange={(variableBaseline3m) => setForm({ ...form, variableBaseline3m })}
+          value={form.variableBaseline3m}
+        />
+        <MoneyInput
+          label="6M variable baseline"
+          onChange={(variableBaseline6m) => setForm({ ...form, variableBaseline6m })}
+          value={form.variableBaseline6m}
+        />
+        <MoneyInput
+          label="LLM confidence threshold"
+          onChange={(llmConfidenceThreshold) => setForm({ ...form, llmConfidenceThreshold })}
+          value={form.llmConfidenceThreshold}
+        />
+        <label className="flex min-h-8 items-center gap-2 font-medium text-sm">
+          <input
+            checked={form.llmEnabled}
+            onChange={(event) => setForm({ ...form, llmEnabled: event.target.checked })}
+            type="checkbox"
+          />
+          LLM fallback
+        </label>
         <button
-          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white disabled:opacity-60 sm:w-fit"
+          className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white disabled:opacity-60 sm:w-fit"
           disabled={save.isPending}
           type="submit"
         >
           <Save aria-hidden="true" className="size-4" />
           Save
         </button>
-        <p aria-live="polite" className="min-h-5 text-sm text-treasuri-muted">
+        <p aria-live="polite" className="min-h-5 text-sm text-treasuri-muted sm:col-span-3">
           {save.isSuccess ? "Settings saved." : null}
         </p>
       </form>
+      {settings.data ? <SettingsOverview data={settings.data.overview} /> : null}
     </section>
   );
 }
@@ -180,41 +245,93 @@ function StatusPage() {
         <p className="font-medium text-sm text-treasuri-muted">Runtime</p>
         <h1 className="mt-1 font-semibold text-xl">Status</h1>
       </header>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatusTile label="Database" value={status.data?.database ?? "loading"} />
-        <StatusTile label="Latest sync" value={status.data?.latestSync?.status ?? "none"} />
-        <StatusTile label="Secrets" value={status.data?.secrets ?? "redacted"} />
+      <div className="grid gap-2 lg:grid-cols-2">
+        {status.data?.sections.map((section) => (
+          <section
+            className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3"
+            key={section.title}
+          >
+            <h2 className="font-semibold text-sm sm:text-base">{section.title}</h2>
+            <dl className="mt-2 grid gap-2">
+              {section.rows.map((row) => (
+                <div key={`${section.title}-${row.label}`}>
+                  <dt className="text-treasuri-muted text-xs">{row.label}</dt>
+                  <dd className="font-semibold text-sm">{row.value}</dd>
+                  {row.detail ? (
+                    <dd className="text-treasuri-muted text-xs">{row.detail}</dd>
+                  ) : null}
+                </div>
+              ))}
+            </dl>
+          </section>
+        ))}
       </div>
-      <section className="mt-4">
-        <h2 className="font-semibold">Failed jobs</h2>
-        <div className="mt-3 space-y-2">
-          {status.data?.failedJobs.length ? (
-            status.data.failedJobs.map((job) => (
-              <article
-                className="rounded-md border border-treasuri-line bg-white p-3"
-                key={`${job.name}-${job.startedAt}`}
-              >
-                <p className="font-semibold">{job.name}</p>
-                <p className="text-sm text-treasuri-muted">{job.startedAt}</p>
-                <p className="mt-1 text-sm">{job.error ?? "No error payload"}</p>
-              </article>
-            ))
-          ) : (
-            <p className="rounded-md border border-treasuri-line bg-white p-3 text-sm text-treasuri-muted">
-              No failed jobs.
-            </p>
-          )}
-        </div>
-      </section>
     </section>
   );
 }
 
-function StatusTile({ label, value }: { label: string; value: string }) {
+function MoneyInput({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
   return (
-    <article className="rounded-md border border-treasuri-line bg-white p-3">
-      <p className="text-sm text-treasuri-muted">{label}</p>
-      <p className="mt-1 font-semibold text-base">{value}</p>
+    <label className="grid gap-1 font-medium text-sm">
+      {label}
+      <input
+        className="min-h-8 rounded-md border border-treasuri-line px-2 font-normal text-sm"
+        inputMode="decimal"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      />
+    </label>
+  );
+}
+
+function SettingsOverview({ data }: { data: SettingsResponse["overview"] }) {
+  return (
+    <div className="mt-3 grid gap-2 lg:grid-cols-3">
+      <OverviewCard title="Accounts">
+        {data.accounts.length ? (
+          data.accounts.map((account) => (
+            <p className="text-xs" key={account.iban}>
+              <strong>{account.name}</strong> - {account.provider} - {account.currency} -{" "}
+              {account.status}
+            </p>
+          ))
+        ) : (
+          <p className="text-treasuri-muted text-xs">No accounts configured.</p>
+        )}
+      </OverviewCard>
+      <OverviewCard title="Category taxonomy">
+        <p className="text-xs">{data.taxonomy.categoryCount} categories</p>
+        <p className="text-treasuri-muted text-xs">
+          {data.taxonomy.sampleCategories.join(", ") || "No categories yet"}
+        </p>
+      </OverviewCard>
+      <OverviewCard title="Sync schedule">
+        <p className="text-xs">{data.sync.schedule}</p>
+        <p className="text-treasuri-muted text-xs">{data.sync.lookbackDays} day lookback</p>
+        <p className="text-treasuri-muted text-xs">{data.sync.lastSync}</p>
+      </OverviewCard>
+    </div>
+  );
+}
+
+function OverviewCard({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <article className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3">
+      <h2 className="mb-2 font-semibold text-sm">{title}</h2>
+      {children}
     </article>
   );
+}
+
+function settingsUpdateFromResponse(response: SettingsResponse): SettingsUpdate {
+  const { overview: _overview, ...settings } = response;
+  return settings;
 }

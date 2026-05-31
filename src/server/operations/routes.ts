@@ -36,7 +36,12 @@ export function registerOperationsRoutes(
     try {
       const settings = settingsUpdateSchema.parse(request.body);
       if (!databaseUrl) {
-        response.json(settings);
+        response.json(
+          settingsResponseSchema.parse({
+            ...settings,
+            overview: sampleSettings().overview,
+          }),
+        );
         return;
       }
       const pool = createPool(databaseUrl);
@@ -56,9 +61,8 @@ export function registerOperationsRoutes(
       if (!databaseUrl) {
         response.json(
           statusResponseSchema.parse({
-            database: "sample",
             failedJobs: [],
-            latestSync: null,
+            sections: sampleStatusSections(),
             secrets: "redacted",
           }),
         );
@@ -78,7 +82,22 @@ export function registerOperationsRoutes(
   app.get("/api/exports", async (_request, response, next) => {
     try {
       if (!databaseUrl) {
-        response.json(exportsResponseSchema.parse({ exports: [] }));
+        response.json(
+          exportsResponseSchema.parse({
+            exports: [
+              {
+                createdAt: "2026-05-28 08:00:00+00",
+                errorMessage: null,
+                exportType: "budget",
+                fileId: 1,
+                filename: "treasuri-export.xlsx",
+                id: 1,
+                sizeBytes: 2048,
+                status: "completed",
+              },
+            ],
+          }),
+        );
         return;
       }
       const pool = createPool(databaseUrl);
@@ -135,5 +154,59 @@ export function registerOperationsRoutes(
 }
 
 function sampleSettings() {
-  return { baselineMonths: 6, safetyBuffer: "1000.00", targetMonthlySavings: "1000.00" };
+  return {
+    baselineMonths: 6,
+    fixedCostsUpcoming: "620.00",
+    llmConfidenceThreshold: "0.70",
+    llmEnabled: false,
+    overview: {
+      accounts: [
+        {
+          currency: "EUR",
+          iban: "NL00FAKE0123456789",
+          name: "Sample current account",
+          provider: "fake",
+          status: "Active",
+        },
+      ],
+      sync: {
+        lastSync: "fake completed at 2026-05-28 08:00:00+00",
+        lookbackDays: 90,
+        schedule: "Manual sync",
+      },
+      taxonomy: { categoryCount: 4, sampleCategories: ["Housing", "Groceries", "Unknown"] },
+    },
+    safetyBuffer: "1000.00",
+    salaryDay: 24,
+    syncLookbackDays: 90,
+    targetMonthlySavings: "1000.00",
+    variableBaseline3m: "0.00",
+    variableBaseline6m: "0.00",
+  };
+}
+
+function sampleStatusSections() {
+  return [
+    { rows: [{ label: "Migration version", value: "sample" }], title: "Database" },
+    { rows: [{ label: "Last sync", value: "none" }], title: "Sync" },
+    {
+      rows: [
+        { label: "Known transactions", value: "6 total" },
+        { label: "Classified transactions", value: "4" },
+        { label: "Needs review", value: "2" },
+      ],
+      title: "Transactions",
+    },
+    { rows: [{ label: "Last forecast update", value: "sample" }], title: "Forecast" },
+    { rows: [{ label: "Failed jobs", value: "0" }], title: "Worker" },
+    { rows: [{ label: "Latest export", value: "completed" }], title: "Exports" },
+    {
+      rows: [
+        { label: "Secrets", value: "redacted" },
+        { label: "OIDC", value: "disabled" },
+        { label: "Bank provider", value: "fake" },
+      ],
+      title: "Runtime",
+    },
+  ];
 }

@@ -23,6 +23,7 @@ import {
   exportCreateResponseSchema,
   exportsResponseSchema,
   type SettingsResponse,
+  type SettingsUpdate,
   type StatusResponse,
   settingsResponseSchema,
   settingsUpdateSchema,
@@ -206,7 +207,7 @@ export async function fetchSettings(): Promise<SettingsResponse> {
   return settingsResponseSchema.parse(await response.json());
 }
 
-export async function saveSettings(input: SettingsResponse): Promise<SettingsResponse> {
+export async function saveSettings(input: SettingsUpdate): Promise<SettingsResponse> {
   const response = await fetch("/api/settings", {
     body: JSON.stringify(settingsUpdateSchema.parse(input)),
     headers: { "content-type": "application/json" },

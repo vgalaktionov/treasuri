@@ -15,18 +15,38 @@ describe("operations API", () => {
       const initial = await request(app).get("/api/settings").expect(200);
 
       expect(JSON.stringify(initial.body)).not.toContain("currentBalance");
+      expect(JSON.stringify(initial.body)).not.toContain("currentLiquidBalance");
       await request(app)
         .put("/api/settings")
-        .send({ baselineMonths: 9, safetyBuffer: "1500.00", targetMonthlySavings: "1200.00" })
+        .send({
+          baselineMonths: 9,
+          fixedCostsUpcoming: "640.00",
+          llmConfidenceThreshold: "0.82",
+          llmEnabled: true,
+          safetyBuffer: "1500.00",
+          salaryDay: 24,
+          syncLookbackDays: 120,
+          targetMonthlySavings: "1200.00",
+          variableBaseline3m: "700.00",
+          variableBaseline6m: "650.00",
+        })
         .expect(200);
 
       const saved = await request(app).get("/api/settings").expect(200);
 
-      expect(saved.body).toEqual({
-        baselineMonths: 9,
-        safetyBuffer: "1500.00",
-        targetMonthlySavings: "1200.00",
-      });
+      expect(saved.body.baselineMonths).toBe(9);
+      expect(saved.body.fixedCostsUpcoming).toBe("640.00");
+      expect(saved.body.llmConfidenceThreshold).toBe("0.82");
+      expect(saved.body.llmEnabled).toBe(true);
+      expect(saved.body.safetyBuffer).toBe("1500.00");
+      expect(saved.body.salaryDay).toBe(24);
+      expect(saved.body.syncLookbackDays).toBe(120);
+      expect(saved.body.targetMonthlySavings).toBe("1200.00");
+      expect(saved.body.variableBaseline3m).toBe("700.00");
+      expect(saved.body.variableBaseline6m).toBe("650.00");
+      expect(saved.body.overview.accounts.length).toBeGreaterThan(0);
+      expect(saved.body.overview.sync.lookbackDays).toBe(120);
+      expect(saved.body.overview.taxonomy.categoryCount).toBeGreaterThan(0);
     } finally {
       await restore();
       await container.stop();
@@ -50,7 +70,10 @@ describe("operations API", () => {
       });
 
       expect(created.body.fileId).toBeGreaterThan(0);
+      expect(listed.body.exports[0].exportType).toBe("budget");
+      expect(listed.body.exports[0].filename).toBe("treasuri-export.xlsx");
       expect(listed.body.exports[0].status).toBe("completed");
+      expect(listed.body.exports[0].sizeBytes).toBeGreaterThan(1000);
       expect(downloaded.headers["content-type"]).toContain("spreadsheetml.sheet");
       expect(storedBytes).toBeGreaterThan(1000);
     } finally {
@@ -78,11 +101,23 @@ describe("operations API", () => {
       });
 
       const status = await request(app).get("/api/status").expect(200);
+      const sectionTitles = status.body.sections.map((section: { title: string }) => section.title);
 
       expect(status.body.secrets).toBe("redacted");
+      expect(sectionTitles).toEqual([
+        "Database",
+        "Sync",
+        "Transactions",
+        "Forecast",
+        "Worker",
+        "Exports",
+        "Runtime",
+      ]);
       expect(status.body.failedJobs[0].name).toBe("sync_abn_transactions");
       expect(status.body.failedJobs[0].error).toContain("token=[redacted]");
       expect(status.body.failedJobs[0].error).not.toContain("secret-value");
+      expect(JSON.stringify(status.body.sections)).toContain("Secrets");
+      expect(JSON.stringify(status.body.sections)).toContain("redacted");
     } finally {
       await boss.stop();
       await restore();
