@@ -28,6 +28,15 @@ describe("dashboard API", () => {
       });
       expect(response.body.explanation.formula).toContain("synced_current_liquid_balance");
       expect(response.body.reviewCount).toBe(1);
+      expect(response.body.monthFacts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: "Fixed costs" }),
+          expect.objectContaining({ label: "Income status", value: "Income received" }),
+          expect.objectContaining({ label: "Uncategorized impact" }),
+        ]),
+      );
+      expect(response.body.categoryPace.length).toBeGreaterThan(0);
+      expect(response.body.paceSummary).toContain("Variable pace");
     } finally {
       if (previousDatabaseUrl === undefined) {
         delete process.env.DATABASE_URL;
