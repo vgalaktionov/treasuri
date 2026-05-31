@@ -27,8 +27,10 @@ test("recurring workspace confirms and disables detected commitments", async ({ 
   await page.goto("/recurring");
 
   await expect(page.getByRole("heading", { name: "Recurring" })).toBeVisible();
-  await expect(page.getByText("Sample Streaming")).toBeVisible();
-  await page.getByRole("button", { name: "Confirm" }).click();
-  await page.getByRole("button", { name: "Disable" }).last().click();
+  await expect(page.getByRole("heading", { name: "Sample Streaming" })).toBeVisible();
+  await page.getByRole("button", { name: /Sample Streaming/ }).click();
+  await page.getByRole("button", { exact: true, name: "Confirm" }).click();
+  await expect(page.getByRole("button", { exact: true, name: "Confirm" })).toHaveCount(0);
+  await page.getByRole("button", { exact: true, name: "Disable" }).click();
   await expect(page.getByText("Sample Streaming")).toHaveCount(0);
 });

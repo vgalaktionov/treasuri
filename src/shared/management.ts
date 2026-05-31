@@ -183,11 +183,16 @@ export const recurringResponseSchema = z.object({
   series: z.array(
     z.object({
       amount: z.string().nullable(),
+      amountTolerance: z.string().nullable().default(null),
       categoryName: z.string().nullable(),
       cadence: z.string(),
       confidence: z.string().nullable().default(null),
+      expectedDayOfMonth: z.number().nullable().default(null),
       id: z.number(),
       isConfirmed: z.boolean(),
+      lastBookingDate: z.string().nullable().default(null),
+      maxAmount: z.string().nullable().default(null),
+      minAmount: z.string().nullable().default(null),
       name: z.string(),
       nextExpectedDate: z.string().nullable(),
       warnings: z.array(z.string()).default([]),

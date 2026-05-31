@@ -47,11 +47,16 @@ export async function listRecurring(pool: pg.Pool) {
   return {
     series: result.rows.map((row) => ({
       amount: row.expected_amount,
+      amountTolerance: row.amount_tolerance,
       categoryName: row.category_name,
       cadence: row.cadence,
       confidence: Number(row.confidence).toFixed(2),
+      expectedDayOfMonth: row.expected_day_of_month,
       id: Number(row.id),
       isConfirmed: row.is_confirmed,
+      lastBookingDate: row.last_booking_date,
+      maxAmount: row.max_amount,
+      minAmount: row.min_amount,
       name: row.name,
       nextExpectedDate: row.next_expected_date,
       warnings: recurringWarnings(row),
