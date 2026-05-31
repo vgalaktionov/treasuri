@@ -59,7 +59,10 @@ export function OperationsPage({ section }: { section: OperationsSection }) {
   });
   const create = useMutation({
     mutationFn: createExport,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["exports"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exports"] });
+      queryClient.invalidateQueries({ queryKey: ["status"] });
+    },
   });
 
   return (
@@ -324,6 +327,18 @@ function SettingsPanel({ settings }: { settings: SettingsResponse | undefined })
     parseMoney(form.safetyBuffer) +
     parseMoney(form.fixedCostsUpcoming);
   const baselineGap = parseMoney(form.variableBaseline3m) - parseMoney(form.variableBaseline6m);
+  const savedForm = settings ? settingsUpdateFromResponse(settings) : null;
+  const savedGuardrail = savedForm
+    ? parseMoney(savedForm.targetMonthlySavings) +
+      parseMoney(savedForm.safetyBuffer) +
+      parseMoney(savedForm.fixedCostsUpcoming)
+    : monthlyGuardrail;
+  const savedBaselineGap = savedForm
+    ? parseMoney(savedForm.variableBaseline3m) - parseMoney(savedForm.variableBaseline6m)
+    : baselineGap;
+  const availableSpendDelta = savedGuardrail - monthlyGuardrail;
+  const baselineGapDelta = baselineGap - savedBaselineGap;
+  const hasUnsavedChanges = savedForm ? settingsChanged(form, savedForm) : false;
 
   useEffect(() => {
     if (settings) {
@@ -436,6 +451,14 @@ function SettingsPanel({ settings }: { settings: SettingsResponse | undefined })
           </Fieldset>
         </div>
 
+        <ForecastImpactPreview
+          availableSpendDelta={availableSpendDelta}
+          baselineGapDelta={baselineGapDelta}
+          currentGuardrail={monthlyGuardrail}
+          hasUnsavedChanges={hasUnsavedChanges}
+          savedGuardrail={savedGuardrail}
+        />
+
         <p aria-live="polite" className="mt-2 min-h-5 text-sm text-treasuri-muted">
           {save.isSuccess ? "Settings saved." : null}
           {save.isError ? "Settings could not be saved." : null}
@@ -484,6 +507,12 @@ function ExportPanel({
       setSelectedId(latest.id);
     }
   }, [latest, selectedId]);
+
+  useEffect(() => {
+    if (create.data) {
+      setSelectedId(create.data.exportRunId);
+    }
+  }, [create.data]);
 
   return (
     <section className="grid gap-3">
@@ -696,6 +725,80 @@ function ExportInspector({ exportRun }: { exportRun: ExportRun | null }) {
   );
 }
 
+function ForecastImpactPreview({
+  availableSpendDelta,
+  baselineGapDelta,
+  currentGuardrail,
+  hasUnsavedChanges,
+  savedGuardrail,
+}: {
+  availableSpendDelta: number;
+  baselineGapDelta: number;
+  currentGuardrail: number;
+  hasUnsavedChanges: boolean;
+  savedGuardrail: number;
+}) {
+  return (
+    <section className="mt-3 rounded-md border border-treasuri-line bg-treasuri-panel p-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-semibold text-sm">Forecast impact</h3>
+          <p className="mt-1 text-treasuri-muted text-xs">
+            Preview only; the forecast recalculates from bank-derived balance after saving or sync.
+          </p>
+        </div>
+        <span
+          className={`font-semibold text-xs ${
+            hasUnsavedChanges ? "text-amber-700" : "text-emerald-700"
+          }`}
+        >
+          {hasUnsavedChanges ? "Unsaved changes" : "Matches saved settings"}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <ImpactMetric
+          label="Safe-to-spend preview"
+          tone={availableSpendDelta >= 0 ? "positive" : "negative"}
+          value={signedEuro(availableSpendDelta)}
+        />
+        <ImpactMetric
+          label="Guardrail total"
+          tone={currentGuardrail <= savedGuardrail ? "positive" : "negative"}
+          value={`EUR ${currentGuardrail.toFixed(2)}`}
+        />
+        <ImpactMetric
+          label="Variable pace delta"
+          tone={baselineGapDelta <= 0 ? "positive" : "negative"}
+          value={signedEuro(baselineGapDelta)}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ImpactMetric({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: "negative" | "positive";
+  value: string;
+}) {
+  return (
+    <div className="rounded-md border border-treasuri-line bg-white p-2">
+      <p className="font-medium text-treasuri-muted text-xs">{label}</p>
+      <p
+        className={`mt-1 font-semibold text-sm ${
+          tone === "positive" ? "text-emerald-700" : "text-amber-700"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function Fieldset({ children, title }: { children: ReactNode; title: string }) {
   return (
     <fieldset className="grid gap-2 rounded-md border border-treasuri-line p-2">
@@ -855,6 +958,11 @@ function parseMoney(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function signedEuro(value: number): string {
+  const prefix = value >= 0 ? "+" : "-";
+  return `${prefix}EUR ${Math.abs(value).toFixed(2)}`;
+}
+
 function formatBytes(value: number | null): string {
   if (!value) {
     return "-";
@@ -872,4 +980,19 @@ function shortHash(value: string | null): string {
 function settingsUpdateFromResponse(response: SettingsResponse): SettingsUpdate {
   const { overview: _overview, ...settings } = response;
   return settings;
+}
+
+function settingsChanged(left: SettingsUpdate, right: SettingsUpdate): boolean {
+  return (
+    left.baselineMonths !== right.baselineMonths ||
+    left.fixedCostsUpcoming !== right.fixedCostsUpcoming ||
+    left.llmConfidenceThreshold !== right.llmConfidenceThreshold ||
+    left.llmEnabled !== right.llmEnabled ||
+    left.safetyBuffer !== right.safetyBuffer ||
+    left.salaryDay !== right.salaryDay ||
+    left.syncLookbackDays !== right.syncLookbackDays ||
+    left.targetMonthlySavings !== right.targetMonthlySavings ||
+    left.variableBaseline3m !== right.variableBaseline3m ||
+    left.variableBaseline6m !== right.variableBaseline6m
+  );
 }

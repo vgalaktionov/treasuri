@@ -4,6 +4,8 @@ test("operations workspace covers settings, status, and exports", async ({ page 
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.getByText(/current balance/i)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Forecast impact" })).toBeVisible();
+  await expect(page.getByText("Matches saved settings")).toBeVisible();
   await page.getByLabel("Target monthly savings").fill("1250.00");
   await page.getByLabel("Safety buffer").fill("900.00");
   await page.getByLabel("Baseline months").fill("8");
@@ -14,8 +16,12 @@ test("operations workspace covers settings, status, and exports", async ({ page 
   await page.getByLabel("6M variable baseline").fill("650.00");
   await page.getByLabel("LLM confidence threshold").fill("0.82");
   await page.getByLabel("LLM fallback").check();
+  await expect(page.getByText("Unsaved changes")).toBeVisible();
+  await expect(page.getByText("-EUR 170.00")).toBeVisible();
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();
+  await expect(page.getByText("Matches saved settings")).toBeVisible();
+  await expect(page.getByText("+EUR 0.00").first()).toBeVisible();
   await expect(page.getByText("Accounts")).toBeVisible();
   await expect(page.getByText("Category taxonomy")).toBeVisible();
   await expect(page.getByText("Sync schedule")).toBeVisible();
