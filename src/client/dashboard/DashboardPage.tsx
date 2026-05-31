@@ -1,10 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, CalendarDays, ChevronRight, Gauge, Wallet } from "lucide-react";
+import type { ReactNode } from "react";
+import { useState } from "react";
 
 import type { DashboardResponse } from "../../shared/dashboard.ts";
 import { fetchDashboard } from "../lib/api.ts";
 
+type DashboardMode = "explain" | "month" | "now";
+
 export function DashboardPage() {
   const dashboard = useQuery({ queryFn: fetchDashboard, queryKey: ["dashboard"] });
+  const [mode, setMode] = useState<DashboardMode>("now");
 
   if (dashboard.isLoading) {
     return <p className="text-treasuri-muted">Loading dashboard...</p>;
@@ -15,112 +21,207 @@ export function DashboardPage() {
 
   const data = dashboard.data;
   const safeToSpendClass = Number(data.safeToSpend) < 0 ? "text-red-700" : "text-treasuri-ink";
+  const reviewClass = data.reviewCount > 0 ? "text-amber-700" : "text-emerald-700";
 
   return (
-    <>
-      <header className="mb-4">
-        <p className="font-medium text-treasuri-muted text-xs sm:text-sm">
-          {monthLabel(data.yearMonth)} status
-        </p>
-        <h1 className={`mt-1 font-semibold text-lg sm:text-2xl ${safeToSpendClass}`}>
-          EUR {data.safeToSpend}
-        </h1>
-        <p className="mt-1 max-w-3xl text-treasuri-muted text-xs sm:text-sm">
-          Safe to spend this month. {data.paceSummary}
-        </p>
+    <section aria-labelledby="dashboard-heading">
+      <header className="mb-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div>
+          <p className="font-medium text-treasuri-muted text-xs">{monthLabel(data.yearMonth)}</p>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h1
+              className={`font-semibold text-2xl leading-tight ${safeToSpendClass}`}
+              id="dashboard-heading"
+            >
+              EUR {data.safeToSpend}
+            </h1>
+            <p className="font-medium text-treasuri-muted text-sm">safe to spend</p>
+          </div>
+          <p className="mt-1 max-w-3xl text-treasuri-muted text-xs">{data.paceSummary}</p>
+        </div>
+
+        <div
+          aria-label="Dashboard view"
+          className="inline-grid grid-cols-3 rounded-md border border-treasuri-line bg-white p-1 text-xs"
+          role="tablist"
+        >
+          {[
+            ["now", "Now"],
+            ["month", "Month"],
+            ["explain", "Explain"],
+          ].map(([value, label]) => (
+            <button
+              aria-selected={mode === value}
+              className={`min-h-8 rounded px-3 font-semibold ${
+                mode === value
+                  ? "bg-treasuri-action text-white"
+                  : "text-treasuri-muted hover:bg-treasuri-panel"
+              }`}
+              key={value}
+              onClick={() => setMode(value as DashboardMode)}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <section aria-label="Monthly summary" className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-        {data.metrics.map((metric) => (
-          <article
-            className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3"
-            key={metric.label}
-          >
-            <p className="font-medium text-treasuri-muted text-xs sm:text-sm">{metric.label}</p>
-            <p className="mt-1 font-semibold text-xs sm:text-base">{metric.value}</p>
-          </article>
-        ))}
-      </section>
+      <section className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid gap-3">
+          <div className="grid grid-cols-2 items-start gap-2 xl:grid-cols-4">
+            <MetricCard
+              icon={<Wallet className="size-4" />}
+              label="Safe/day"
+              value={`EUR ${data.safePerDay}`}
+            />
+            <MetricCard
+              icon={<Gauge className="size-4" />}
+              label="Projected savings"
+              value={`EUR ${data.projectedSavings}`}
+            />
+            <MetricCard
+              icon={<CalendarDays className="size-4" />}
+              label="Fixed upcoming"
+              value={`EUR ${data.fixedCostsUpcoming}`}
+            />
+            <MetricCard
+              icon={<AlertTriangle className="size-4" />}
+              label="Review impact"
+              value={`EUR ${data.reviewImpact}`}
+              valueClassName={reviewClass}
+            />
+          </div>
 
-      <section className="mt-3 grid gap-2 sm:grid-cols-3">
-        {data.monthFacts.map((fact) => (
-          <article
-            className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3"
-            key={fact.label}
-          >
-            <p className="font-medium text-treasuri-muted text-xs">{fact.label}</p>
-            <p className="mt-1 font-semibold text-xs sm:text-base">{fact.value}</p>
-            <p className="mt-1 text-treasuri-muted text-xs">{fact.detail}</p>
-          </article>
-        ))}
-      </section>
+          <NextActions className="lg:hidden" data={data} />
 
-      <section className="mt-3 grid gap-2 xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3">
-          <h2 className="font-semibold text-sm sm:text-base">Current balance</h2>
-          {data.currentBalance ? (
-            <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-              <Metric label="Amount" value={`EUR ${data.currentBalance.amount}`} />
-              <Metric label="Source" value={data.currentBalance.source} />
-              <Metric label="As of" value={data.currentBalance.asOf} />
-              <Metric label="Confidence" value={titleCase(data.confidence)} />
-            </dl>
-          ) : (
-            <p className="mt-2 text-treasuri-muted text-sm">No synced balance snapshot yet.</p>
-          )}
-        </article>
-
-        <article className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3">
-          <h2 className="font-semibold text-sm sm:text-base">Review impact</h2>
-          <p className="mt-2 text-treasuri-muted text-xs sm:text-sm">
-            {data.reviewCount} transactions need review, covering EUR {data.reviewImpact}.
-          </p>
-          <p className="mt-2 text-treasuri-muted text-xs">{data.confidenceNote}</p>
-        </article>
-      </section>
-
-      <section className="mt-3 grid gap-2 xl:grid-cols-[1fr_1fr]">
-        <CategoryPace rows={data.categoryPace} />
-        <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1">
-          <Panel title="Top category spend" rows={data.topVariances} />
-          <Panel title="Upcoming fixed costs" rows={data.upcomingFixedCosts} />
+          {mode === "now" ? <NowWorkspace data={data} reviewClass={reviewClass} /> : null}
+          {mode === "month" ? <MonthWorkspace data={data} /> : null}
+          {mode === "explain" ? <ExplainWorkspace data={data} /> : null}
         </div>
-      </section>
 
-      <details className="mt-3 rounded-md border border-treasuri-line bg-white p-2 sm:p-3">
-        <summary className="cursor-pointer font-semibold text-sm sm:text-base">
-          Forecast explanation
-        </summary>
-        <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-          {Object.entries(data.explanation).map(([label, value]) => (
-            <Metric key={label} label={label.replaceAll("_", " ")} value={value} />
+        <NextActions className="hidden lg:block" data={data} />
+      </section>
+    </section>
+  );
+}
+
+function NowWorkspace({ data, reviewClass }: { data: DashboardResponse; reviewClass: string }) {
+  return (
+    <div className="grid gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
+      <article className="rounded-md border border-treasuri-line bg-white p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-semibold text-sm">Current answer</p>
+            <p className="mt-1 text-treasuri-muted text-xs">
+              Derived from the latest balance snapshot and current-month forecast.
+            </p>
+          </div>
+          <p className={`font-semibold text-sm ${reviewClass}`}>{data.confidenceNote}</p>
+        </div>
+
+        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+          <InlineMetric
+            label="Synced balance"
+            value={data.currentBalance ? `EUR ${data.currentBalance.amount}` : "Missing"}
+          />
+          <InlineMetric label="Safe per day" value={`EUR ${data.safePerDay}/day`} />
+          <InlineMetric label="Income received" value={`EUR ${data.incomeReceived}`} />
+          <InlineMetric label="Projected savings" value={`EUR ${data.projectedSavings}`} />
+        </dl>
+
+        {data.currentBalance ? (
+          <p className="mt-3 border-t border-treasuri-line pt-2 text-treasuri-muted text-xs">
+            Balance source: {data.currentBalance.source}, as of {data.currentBalance.asOf}.
+          </p>
+        ) : null}
+      </article>
+
+      <article className="rounded-md border border-treasuri-line bg-white p-3">
+        <p className="font-semibold text-sm">Forecast blockers</p>
+        <dl className="mt-2 grid gap-2">
+          <InlineMetric
+            label="Transactions needing review"
+            value={`${data.reviewCount} / EUR ${data.reviewImpact}`}
+          />
+          {data.monthFacts.map((fact) => (
+            <InlineMetric
+              detail={fact.detail}
+              key={fact.label}
+              label={fact.label}
+              value={fact.value}
+            />
           ))}
         </dl>
-      </details>
-    </>
+      </article>
+    </div>
+  );
+}
+
+function MonthWorkspace({ data }: { data: DashboardResponse }) {
+  return (
+    <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <CategoryPace rows={data.categoryPace} />
+      <div className="grid gap-2">
+        <Panel title="Top category spend" rows={data.topVariances} />
+        <Panel title="Upcoming fixed costs" rows={data.upcomingFixedCosts} />
+      </div>
+    </div>
+  );
+}
+
+function ExplainWorkspace({ data }: { data: DashboardResponse }) {
+  return (
+    <article className="rounded-md border border-treasuri-line bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-sm">Forecast explanation</p>
+          <p className="mt-1 text-treasuri-muted text-xs">
+            The safe-to-spend number is arithmetic, not a hidden score.
+          </p>
+        </div>
+        <span className="rounded border border-treasuri-line px-2 py-1 font-semibold text-treasuri-muted text-xs">
+          {titleCase(data.confidence)} confidence
+        </span>
+      </div>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {Object.entries(data.explanation).map(([label, value]) => (
+          <InlineMetric key={label} label={label.replaceAll("_", " ")} value={value} />
+        ))}
+      </dl>
+    </article>
   );
 }
 
 function CategoryPace({ rows }: { rows: DashboardResponse["categoryPace"] }) {
   return (
-    <article className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3">
-      <h2 className="font-semibold text-sm sm:text-base">Category pace</h2>
+    <article className="rounded-md border border-treasuri-line bg-white p-3">
+      <h2 className="font-semibold text-sm">Category pace</h2>
       {rows.length === 0 ? (
         <p className="mt-2 text-treasuri-muted text-sm">No category pace yet.</p>
       ) : (
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 divide-y divide-treasuri-line">
           {rows.map((row) => (
             <div
-              className="grid gap-2 border-t border-treasuri-line pt-2 first:border-t-0 first:pt-0 sm:grid-cols-[minmax(0,1fr)_auto]"
+              className="grid gap-2 py-2 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_11rem]"
               key={row.category}
             >
               <div>
-                <p className="font-medium text-sm">{row.category}</p>
-                <p className={`mt-0.5 text-xs ${paceClass(row.status)}`}>{row.paceLabel}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium text-sm">{row.category}</p>
+                  <p className={`text-xs ${paceClass(row.status)}`}>{row.paceLabel}</p>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded bg-treasuri-panel">
+                  <div
+                    className={`h-full rounded ${paceBarClass(row.status)}`}
+                    style={{ width: paceWidth(row) }}
+                  />
+                </div>
               </div>
-              <dl className="grid grid-cols-2 gap-2 text-xs sm:min-w-40">
-                <Metric label="Spent" value={`EUR ${row.currentMonth}`} />
-                <Metric label="Usual" value={`EUR ${row.suggestedBudget}`} />
+              <dl className="grid grid-cols-2 gap-2 text-xs">
+                <InlineMetric label="Spent" value={`EUR ${row.currentMonth}`} />
+                <InlineMetric label="Usual" value={`EUR ${row.suggestedBudget}`} />
               </dl>
             </div>
           ))}
@@ -138,12 +239,12 @@ function Panel({
   title: string;
 }) {
   return (
-    <article className="rounded-md border border-treasuri-line bg-white p-2 sm:p-3">
-      <h2 className="font-semibold text-sm sm:text-base">{title}</h2>
+    <article className="rounded-md border border-treasuri-line bg-white p-3">
+      <h2 className="font-semibold text-sm">{title}</h2>
       {rows.length === 0 ? (
-        <p className="mt-2 text-treasuri-muted text-sm">Nothing to show yet.</p>
+        <p className="mt-2 text-treasuri-muted text-xs">Nothing to show yet.</p>
       ) : (
-        <dl className="mt-2 space-y-2 text-xs sm:text-sm">
+        <dl className="mt-2 space-y-2 text-xs">
           {rows.map((row) => (
             <div className="flex items-center justify-between gap-4" key={row.label}>
               <dt className="text-treasuri-muted">{row.label}</dt>
@@ -156,11 +257,70 @@ function Panel({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function MetricCard({
+  icon,
+  label,
+  value,
+  valueClassName = "text-treasuri-ink",
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <article className="rounded-md border border-treasuri-line bg-white p-2">
+      <div className="flex items-center gap-2 text-treasuri-muted">
+        {icon}
+        <p className="font-medium text-xs">{label}</p>
+      </div>
+      <p className={`mt-1 font-semibold text-sm ${valueClassName}`}>{value}</p>
+    </article>
+  );
+}
+
+function ActionLink({ detail, href, label }: { detail: string; href: string; label: string }) {
+  return (
+    <a
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1.5 hover:bg-treasuri-panel"
+      href={href}
+    >
+      <span>
+        <span className="block font-medium text-sm">{label}</span>
+        <span className="block text-treasuri-muted text-xs">{detail}</span>
+      </span>
+      <ChevronRight aria-hidden="true" className="size-4 text-treasuri-muted" />
+    </a>
+  );
+}
+
+function NextActions({ className, data }: { className: string; data: DashboardResponse }) {
+  return (
+    <aside className={`${className} rounded-md border border-treasuri-line bg-white p-2`}>
+      <p className="font-semibold text-sm">Next actions</p>
+      <div className="mt-2 grid gap-1">
+        <ActionLink
+          detail={`${data.reviewCount} open / EUR ${data.reviewImpact}`}
+          href="/review"
+          label="Review forecast blockers"
+        />
+        <ActionLink
+          detail="Search, edit, raw payloads"
+          href="/transactions"
+          label="Inspect transactions"
+        />
+        <ActionLink detail="Budgets and pace" href="/categories" label="Tune categories" />
+      </div>
+    </aside>
+  );
+}
+
+function InlineMetric({ detail, label, value }: { detail?: string; label: string; value: string }) {
   return (
     <div>
       <dt className="font-medium text-treasuri-muted text-xs">{label}</dt>
-      <dd className="mt-1 font-semibold text-xs sm:text-base">{value}</dd>
+      <dd className="mt-0.5 font-semibold text-sm">{value}</dd>
+      {detail ? <dd className="mt-0.5 text-treasuri-muted text-xs">{detail}</dd> : null}
     </div>
   );
 }
@@ -173,6 +333,25 @@ function paceClass(status: DashboardResponse["categoryPace"][number]["status"]):
     return "text-amber-700";
   }
   return "text-treasuri-muted";
+}
+
+function paceBarClass(status: DashboardResponse["categoryPace"][number]["status"]): string {
+  if (status === "over") {
+    return "bg-red-700";
+  }
+  if (status === "watch") {
+    return "bg-amber-600";
+  }
+  return "bg-treasuri-action";
+}
+
+function paceWidth(row: DashboardResponse["categoryPace"][number]): string {
+  const current = Number(row.currentMonth);
+  const suggested = Number(row.suggestedBudget);
+  if (!Number.isFinite(current) || !Number.isFinite(suggested) || suggested <= 0) {
+    return "0%";
+  }
+  return `${Math.min(100, Math.round((current / suggested) * 100))}%`;
 }
 
 function monthLabel(yearMonth: string): string {
