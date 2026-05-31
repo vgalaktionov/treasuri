@@ -5,6 +5,7 @@ import { DashboardPage } from "../dashboard/DashboardPage.tsx";
 import { ManagementPage } from "../management/ManagementPage.tsx";
 import { OperationsPage } from "../operations/OperationsPage.tsx";
 import { ReviewPage } from "../review/ReviewPage.tsx";
+import { MorePage } from "./MorePage.tsx";
 
 export function App() {
   const currentPath = window.location.pathname;
@@ -93,6 +94,9 @@ function renderPage(currentPath: string) {
   }
   if (currentPath === "/status") {
     return <OperationsPage section="status" />;
+  }
+  if (currentPath === "/more") {
+    return <MorePage />;
   }
   return <DashboardPage />;
 }
