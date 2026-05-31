@@ -49,16 +49,25 @@ test("category workspace shows budget averages and filters", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Categories" })).toBeVisible();
   await expect(page.getByText("Current spend")).toBeVisible();
   await expect(page.getByText("Suggested budget")).toBeVisible();
-  await expect(page.getByText("Dog")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Inspect Dog" })).toBeVisible();
   await expect(page.getByText("Groceries")).toBeVisible();
-  await expect(page.getByText("EUR 0.05 left")).toBeVisible();
+  await expect(page.getByText("EUR 0.05 left").first()).toBeVisible();
+  await page.getByRole("button", { name: "Inspect Dog" }).click();
+  const inspector = page.getByRole("complementary").filter({ hasText: "Category inspector" });
+  await expect(inspector.getByRole("heading", { name: "Dog" })).toBeVisible();
+  await expect(inspector.getByText("Category inspector")).toBeVisible();
+  await expect(inspector.getByText("3M average")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open month transactions" })).toHaveAttribute(
+    "href",
+    "/transactions?category=Dog&month=2026-05",
+  );
 
   await page.getByRole("button", { name: "Excluded" }).click();
-  await expect(page.getByText("Savings")).toBeVisible();
-  await expect(page.getByText("Unknown")).toBeVisible();
-  await expect(page.getByText("Dog")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Inspect Savings" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Inspect Unknown" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Inspect Dog" })).toHaveCount(0);
 
   await page.getByLabel("Search categories").fill("savi");
-  await expect(page.getByText("Savings")).toBeVisible();
-  await expect(page.getByText("Unknown")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Inspect Savings" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Inspect Unknown" })).toHaveCount(0);
 });

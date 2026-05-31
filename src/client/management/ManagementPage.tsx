@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { CategoryBudgetResponse } from "../../shared/management.ts";
 import { fetchCategoryBudgets } from "../lib/api.ts";
@@ -37,6 +37,7 @@ export function ManagementPage({
 
 function CategoriesPage() {
   const budgets = useQuery({ queryFn: fetchCategoryBudgets, queryKey: ["category-budgets"] });
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "included" | "attention" | "excluded">("included");
   const [query, setQuery] = useState("");
   const rows = useMemo(() => {
@@ -51,6 +52,18 @@ function CategoriesPage() {
       return matchesQuery && matchesFilter;
     });
   }, [budgets.data?.categories, filter, query]);
+  const activeCategory =
+    rows.find((category) => category.id === activeCategoryId) ?? rows[0] ?? null;
+
+  useEffect(() => {
+    if (rows.length === 0) {
+      setActiveCategoryId(null);
+      return;
+    }
+    if (!activeCategoryId || !rows.some((category) => category.id === activeCategoryId)) {
+      setActiveCategoryId(rows[0]?.id ?? null);
+    }
+  }, [activeCategoryId, rows]);
 
   if (budgets.isLoading) {
     return <p className="text-treasuri-muted">Loading category budgets...</p>;
@@ -106,42 +119,63 @@ function CategoriesPage() {
         <input
           aria-label="Search categories"
           className="min-h-8 rounded-md border border-treasuri-line px-2 text-sm sm:w-56"
+          name="categoryQuery"
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search"
           value={query}
         />
       </div>
 
-      {rows.length === 0 ? (
-        <article className="mt-3 rounded-md border border-treasuri-line bg-white p-3">
-          <p className="font-medium text-sm">No categories match this view.</p>
-        </article>
-      ) : (
-        <div className="mt-3 overflow-hidden rounded-md border border-treasuri-line bg-white">
-          <div className="hidden grid-cols-[minmax(10rem,1fr)_repeat(5,minmax(5.5rem,0.55fr))_minmax(7rem,0.8fr)] gap-2 border-treasuri-line border-b bg-treasuri-panel px-3 py-2 font-semibold text-treasuri-muted text-xs lg:grid">
-            <span>Category</span>
-            <span className="text-right">Current</span>
-            <span className="text-right">3M avg</span>
-            <span className="text-right">6M avg</span>
-            <span className="text-right">12M avg</span>
-            <span className="text-right">Suggested</span>
-            <span>Status</span>
+      <div className="mt-3 grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        {rows.length === 0 ? (
+          <article className="rounded-md border border-treasuri-line bg-white p-3">
+            <p className="font-medium text-sm">No categories match this view.</p>
+          </article>
+        ) : (
+          <div className="overflow-hidden rounded-md border border-treasuri-line bg-white">
+            <div className="hidden grid-cols-[minmax(10rem,1fr)_repeat(5,minmax(5.5rem,0.55fr))_minmax(7rem,0.8fr)] gap-2 border-treasuri-line border-b bg-treasuri-panel px-3 py-2 font-semibold text-treasuri-muted text-xs lg:grid">
+              <span>Category</span>
+              <span className="text-right">Current</span>
+              <span className="text-right">3M avg</span>
+              <span className="text-right">6M avg</span>
+              <span className="text-right">12M avg</span>
+              <span className="text-right">Suggested</span>
+              <span>Status</span>
+            </div>
+            <div className="divide-y divide-treasuri-line">
+              {rows.map((category) => (
+                <CategoryRow
+                  category={category}
+                  isActive={category.id === activeCategory?.id}
+                  key={category.id}
+                  onInspect={setActiveCategoryId}
+                />
+              ))}
+            </div>
           </div>
-          <div className="divide-y divide-treasuri-line">
-            {rows.map((category) => (
-              <CategoryRow category={category} key={category.id} />
-            ))}
-          </div>
-        </div>
-      )}
+        )}
+        <CategoryInspector category={activeCategory} yearMonth={data.yearMonth} />
+      </div>
     </section>
   );
 }
 
-function CategoryRow({ category }: { category: CategoryBudgetResponse["categories"][number] }) {
+function CategoryRow({
+  category,
+  isActive,
+  onInspect,
+}: {
+  category: CategoryBudgetResponse["categories"][number];
+  isActive: boolean;
+  onInspect: (id: number) => void;
+}) {
   const percent = budgetPercent(category.currentMonth, category.suggestedBudget);
   return (
-    <article className="grid gap-2 p-3 lg:grid-cols-[minmax(10rem,1fr)_repeat(5,minmax(5.5rem,0.55fr))_minmax(7rem,0.8fr)] lg:items-center">
+    <article
+      className={`grid gap-2 p-3 lg:grid-cols-[minmax(10rem,1fr)_repeat(5,minmax(5.5rem,0.55fr))_minmax(7rem,0.8fr)] lg:items-center ${
+        isActive ? "bg-teal-50" : "bg-white"
+      }`}
+    >
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-semibold text-sm">{category.name}</h2>
@@ -150,6 +184,14 @@ function CategoryRow({ category }: { category: CategoryBudgetResponse["categorie
           >
             {category.includedInForecast ? "forecast" : "excluded"}
           </span>
+          <button
+            aria-label={`Inspect ${category.name}`}
+            className="rounded-sm border border-treasuri-line bg-white px-1.5 py-0.5 font-semibold text-[0.68rem] text-treasuri-action"
+            onClick={() => onInspect(category.id)}
+            type="button"
+          >
+            Inspect
+          </button>
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-treasuri-panel">
           <div
@@ -175,6 +217,90 @@ function CategoryRow({ category }: { category: CategoryBudgetResponse["categorie
         <p className="mt-1 text-treasuri-muted text-xs">{statusLabel(category.status)}</p>
       </div>
     </article>
+  );
+}
+
+function CategoryInspector({
+  category,
+  yearMonth,
+}: {
+  category: CategoryBudgetResponse["categories"][number] | null;
+  yearMonth: string;
+}) {
+  if (!category) {
+    return (
+      <aside className="rounded-md border border-treasuri-line bg-white p-3">
+        <h2 className="font-semibold text-sm">Category inspector</h2>
+        <p className="mt-2 text-treasuri-muted text-xs">Select a category to inspect its pace.</p>
+      </aside>
+    );
+  }
+
+  const delta = Number(category.suggestedBudget) - Number(category.currentMonth);
+  const trend = Number(category.average3m) - Number(category.average6m);
+  const monthTransactionsUrl = transactionsUrl(category.name, yearMonth);
+  const allTransactionsUrl = transactionsUrl(category.name);
+
+  return (
+    <aside className="rounded-md border border-treasuri-line bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-sm">Category inspector</p>
+          <h2 className="mt-1 truncate font-semibold text-base">{category.name}</h2>
+        </div>
+        <span
+          className={`rounded-sm px-1.5 py-0.5 font-semibold text-[0.68rem] ${badgeClass(category)}`}
+        >
+          {statusLabel(category.status)}
+        </span>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-2">
+        <InspectorMetric label="Current" value={`EUR ${category.currentMonth}`} />
+        <InspectorMetric label="Suggested" value={`EUR ${category.suggestedBudget}`} />
+        <InspectorMetric label="3M average" value={`EUR ${category.average3m}`} />
+        <InspectorMetric label="6M average" value={`EUR ${category.average6m}`} />
+        <InspectorMetric label="12M average" value={`EUR ${category.average12m}`} />
+        <InspectorMetric
+          label="Forecast"
+          value={category.includedInForecast ? "Included" : "Excluded"}
+        />
+      </dl>
+
+      <div className="mt-3 rounded-md border border-treasuri-line bg-treasuri-panel p-2">
+        <p className={`font-semibold text-sm ${delta < 0 ? "text-red-700" : "text-treasuri-ink"}`}>
+          {delta >= 0 ? `EUR ${delta.toFixed(2)} left` : `EUR ${Math.abs(delta).toFixed(2)} over`}
+        </p>
+        <p className="mt-1 text-treasuri-muted text-xs">
+          3M baseline is {trend >= 0 ? "up" : "down"} EUR {Math.abs(trend).toFixed(2)} versus 6M.
+          EUR {category.excludedFromForecast} is excluded from the forecast.
+        </p>
+      </div>
+
+      <div className="mt-3 grid gap-2">
+        <a
+          className="inline-flex min-h-8 items-center justify-center rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white"
+          href={monthTransactionsUrl}
+        >
+          Open month transactions
+        </a>
+        <a
+          className="inline-flex min-h-8 items-center justify-center rounded-md border border-treasuri-line px-3 font-semibold text-sm"
+          href={allTransactionsUrl}
+        >
+          Open all history
+        </a>
+      </div>
+    </aside>
+  );
+}
+
+function InspectorMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-medium text-treasuri-muted text-xs">{label}</dt>
+      <dd className="mt-0.5 font-semibold text-sm">{value}</dd>
+    </div>
   );
 }
 
@@ -269,6 +395,14 @@ function statusLabel(status: CategoryBudgetResponse["categories"][number]["statu
     return "Close to suggested monthly budget";
   }
   return "Within suggested monthly budget";
+}
+
+function transactionsUrl(category: string, yearMonth?: string): string {
+  const params = new URLSearchParams({ category });
+  if (yearMonth) {
+    params.set("month", yearMonth);
+  }
+  return `/transactions?${params.toString()}`;
 }
 
 function monthLabel(yearMonth: string): string {
