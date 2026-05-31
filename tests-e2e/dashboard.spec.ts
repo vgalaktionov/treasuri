@@ -10,6 +10,8 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
   await expect(page.locator("dt:visible").filter({ hasText: "Income status" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Uncategorized impact" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Synced balance" })).toBeVisible();
+  await expect(page.getByText("Target savings")).toBeVisible();
+  await expect(page.getByText("EUR 1000.00").first()).toBeVisible();
   await expect(page.getByText("Review blockers")).toBeVisible();
   await expect(page.getByText("Unknown Sample Merchant")).toBeVisible();
   await page.getByRole("tab", { name: "After review" }).click();
@@ -26,7 +28,11 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
   await expect(page.getByText("Sample Supermarket")).toBeVisible();
 
   await page.getByRole("tab", { name: "Explain" }).click();
-  await expect(page.locator("p:visible").filter({ hasText: "Forecast explanation" })).toBeVisible();
+  await expect(page.locator("p:visible").filter({ hasText: "Forecast equation" })).toBeVisible();
+  await expect(page.getByText("Synced current balance")).toBeVisible();
+  await expect(page.getByText("Predicted variable remaining", { exact: true })).toBeVisible();
+  await expect(page.locator("p:visible").filter({ hasText: "EUR 16.41/day" })).toBeVisible();
+  await expect(page.locator("p:visible").filter({ hasText: "Forecast inputs" })).toBeVisible();
   await expect(
     page.locator("dt:visible").filter({ hasText: "synced current liquid balance" }),
   ).toBeVisible();

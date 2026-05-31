@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ChevronRight,
   Gauge,
+  PiggyBank,
   ReceiptText,
   Wallet,
 } from "lucide-react";
@@ -85,7 +86,7 @@ export function DashboardPage() {
 
       <section className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="grid gap-3">
-          <div className="grid grid-cols-2 items-start gap-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 items-start gap-2 xl:grid-cols-5">
             <MetricCard
               icon={<Wallet className="size-4" />}
               label="Safe today"
@@ -96,6 +97,11 @@ export function DashboardPage() {
               icon={<Gauge className="size-4" />}
               label="Projected savings"
               value={`EUR ${data.projectedSavings}`}
+            />
+            <MetricCard
+              icon={<PiggyBank className="size-4" />}
+              label="Target savings"
+              value={`EUR ${explanationValue(data, "target_savings_remaining")}`}
             />
             <MetricCard
               icon={<CalendarDays className="size-4" />}
@@ -439,25 +445,92 @@ function amountClass(amount: string): string {
 
 function ExplainWorkspace({ data }: { data: DashboardResponse }) {
   return (
-    <article className="rounded-md border border-treasuri-line bg-white p-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold text-sm">Forecast explanation</p>
-          <p className="mt-1 text-treasuri-muted text-xs">
-            The safe-to-spend number is arithmetic, not a hidden score.
-          </p>
+    <div className="grid gap-3">
+      <article className="rounded-md border border-treasuri-line bg-white p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-semibold text-sm">Forecast equation</p>
+            <p className="mt-1 text-treasuri-muted text-xs">
+              The safe-to-spend number is arithmetic, not a hidden score.
+            </p>
+          </div>
+          <span className="rounded border border-treasuri-line px-2 py-1 font-semibold text-treasuri-muted text-xs">
+            {titleCase(data.confidence)} confidence
+          </span>
         </div>
-        <span className="rounded border border-treasuri-line px-2 py-1 font-semibold text-treasuri-muted text-xs">
-          {titleCase(data.confidence)} confidence
-        </span>
-      </div>
-      <dl className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {Object.entries(data.explanation).map(([label, value]) => (
-          <ExplanationMetric key={label} label={label.replaceAll("_", " ")} value={value} />
-        ))}
-      </dl>
-    </article>
+
+        <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_12rem]">
+          <div className="grid gap-1 text-sm">
+            {forecastEquationRows(data).map((row) => (
+              <div
+                className="grid grid-cols-[1.5rem_minmax(0,1fr)_8rem] items-center gap-2 rounded border border-treasuri-line bg-treasuri-panel px-2 py-1.5"
+                key={row.label}
+              >
+                <span className="font-semibold text-treasuri-muted text-xs">{row.operator}</span>
+                <span className="min-w-0 truncate font-medium">{row.label}</span>
+                <span className="text-right font-semibold">EUR {row.value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-md border border-treasuri-line p-3">
+            <p className="font-medium text-treasuri-muted text-xs">Equals</p>
+            <p className="mt-1 font-semibold text-lg">EUR {data.safeToSpend}</p>
+            <p className="mt-1 text-treasuri-muted text-xs">
+              EUR {data.safePerDay}/day over {data.monthProgress.remainingDays} remaining days.
+            </p>
+          </div>
+        </div>
+      </article>
+
+      <article className="rounded-md border border-treasuri-line bg-white p-3">
+        <p className="font-semibold text-sm">Forecast inputs</p>
+        <dl className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {Object.entries(data.explanation).map(([label, value]) => (
+            <ExplanationMetric key={label} label={label.replaceAll("_", " ")} value={value} />
+          ))}
+        </dl>
+      </article>
+    </div>
   );
+}
+
+function forecastEquationRows(data: DashboardResponse) {
+  return [
+    {
+      label: "Synced current balance",
+      operator: "+",
+      value: explanationValue(data, "synced_current_liquid_balance"),
+    },
+    {
+      label: "Expected income remaining",
+      operator: "+",
+      value: explanationValue(data, "expected_income_remaining"),
+    },
+    {
+      label: "Upcoming fixed costs",
+      operator: "-",
+      value: explanationValue(data, "fixed_costs_upcoming"),
+    },
+    {
+      label: "Predicted variable remaining",
+      operator: "-",
+      value: explanationValue(data, "predicted_variable_remaining"),
+    },
+    {
+      label: "Target savings",
+      operator: "-",
+      value: explanationValue(data, "target_savings_remaining"),
+    },
+    {
+      label: "Safety buffer",
+      operator: "-",
+      value: explanationValue(data, "safety_buffer"),
+    },
+  ];
+}
+
+function explanationValue(data: DashboardResponse, key: string): string {
+  return data.explanation[key] ?? "0.00";
 }
 
 function CategoryPace({ rows }: { rows: DashboardResponse["categoryPace"] }) {

@@ -123,9 +123,14 @@ export function sampleDashboard(): DashboardResponse {
     },
     explanation: {
       days_left_in_month: "6",
+      expected_income_remaining: "0.00",
+      fixed_costs_upcoming: "620.00",
       formula:
         "synced_current_liquid_balance + expected_income_remaining - fixed_costs_upcoming - predicted_variable_remaining - target_savings_remaining - safety_buffer",
+      predicted_variable_remaining: "760.00",
+      safety_buffer: "1000.00",
       synced_current_liquid_balance: "3478.45",
+      target_savings_remaining: "1000.00",
     },
     fixedCostsUpcoming: "620.00",
     incomeReceived: "5258.00",
