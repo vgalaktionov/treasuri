@@ -24,6 +24,10 @@ export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<D
   const projectedSavings = formatMoney(
     Number(calculated.safeToSpend) + Number(forecast.target_savings),
   );
+  const explanation = {
+    ...normalizeExplanation(forecast.explanation_json),
+    ...calculated.explanation,
+  };
   const fixedCostsTotal = formatMoney(
     Number(forecast.fixed_costs_paid) + Number(forecast.fixed_costs_upcoming),
   );
@@ -33,7 +37,7 @@ export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<D
     confidence: forecast.confidence,
     confidenceNote: confidenceNote(forecast.confidence, review.count),
     currentBalance: balance,
-    explanation: calculated.explanation,
+    explanation,
     fixedCostsUpcoming: formatMoney(forecast.fixed_costs_upcoming),
     incomeReceived: formatMoney(forecast.income_received),
     metrics: [
@@ -59,7 +63,7 @@ export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<D
         value: `EUR ${formatMoney(uncategorized.amount)}`,
       },
     ],
-    paceSummary: paceSummary(calculated.explanation),
+    paceSummary: paceSummary(explanation),
     projectedSavings,
     reviewCount: review.count,
     reviewImpact: formatMoney(review.amount),
@@ -147,6 +151,7 @@ async function readLatestForecast(pool: pg.Pool) {
   const result = await pool.query<{
     confidence: string;
     expected_income_remaining: string;
+    explanation_json: unknown;
     fixed_costs_paid: string;
     fixed_costs_upcoming: string;
     income_received: string;
@@ -164,12 +169,26 @@ async function readLatestForecast(pool: pg.Pool) {
       predicted_variable_remaining::text,
       target_savings::text,
       safety_buffer::text,
-      confidence
+      confidence,
+      explanation_json
     FROM monthly_forecasts
     ORDER BY year_month DESC
     LIMIT 1
   `);
   return result.rows[0] ?? null;
+}
+
+function normalizeExplanation(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter((entry): entry is [string, string | number | boolean] =>
+        ["boolean", "number", "string"].includes(typeof entry[1]),
+      )
+      .map(([key, entryValue]) => [key, String(entryValue)]),
+  );
 }
 
 async function readUncategorizedImpact(

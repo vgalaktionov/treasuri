@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateSafeToSpend,
   daysLeftInMonth,
+  predictVariableSpend,
 } from "../../../../src/server/forecast/calculator.ts";
 
 describe("calculateSafeToSpend", () => {
@@ -42,5 +43,21 @@ describe("daysLeftInMonth", () => {
   it("includes today", () => {
     expect(daysLeftInMonth(new Date("2026-05-26T12:00:00Z"))).toBe(6);
     expect(daysLeftInMonth(new Date("2026-05-31T12:00:00Z"))).toBe(1);
+  });
+});
+
+describe("predictVariableSpend", () => {
+  it("uses the highest of recent baselines and current pace", () => {
+    const result = predictVariableSpend({
+      baseline3m: "700.00",
+      baseline6m: "650.00",
+      currentSpend: "196.40",
+      daysInMonth: 31,
+      elapsedDays: 28,
+    });
+
+    expect(result.paceProjection).toBe("217.44");
+    expect(result.predictedMonthEnd).toBe("700.00");
+    expect(result.predictedRemaining).toBe("503.60");
   });
 });

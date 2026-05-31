@@ -14,6 +14,20 @@ export type ForecastResult = {
   safeToSpend: string;
 };
 
+export type VariableSpendInputs = {
+  baseline3m: string;
+  baseline6m: string;
+  currentSpend: string;
+  daysInMonth: number;
+  elapsedDays: number;
+};
+
+export type VariableSpendPrediction = {
+  paceProjection: string;
+  predictedMonthEnd: string;
+  predictedRemaining: string;
+};
+
 export function calculateSafeToSpend(inputs: ForecastInputs): ForecastResult {
   if (inputs.daysLeftInMonth < 1) {
     throw new Error("daysLeftInMonth must be at least 1");
@@ -46,11 +60,37 @@ export function calculateSafeToSpend(inputs: ForecastInputs): ForecastResult {
   };
 }
 
+export function predictVariableSpend(inputs: VariableSpendInputs): VariableSpendPrediction {
+  if (inputs.elapsedDays < 1) {
+    throw new Error("elapsedDays must be at least 1");
+  }
+  if (inputs.daysInMonth < inputs.elapsedDays) {
+    throw new Error("daysInMonth must be greater than or equal to elapsedDays");
+  }
+
+  const currentSpend = money(inputs.currentSpend);
+  const paceProjection = roundMoney((currentSpend / inputs.elapsedDays) * inputs.daysInMonth);
+  const predictedMonthEnd = roundMoney(
+    Math.max(money(inputs.baseline3m), money(inputs.baseline6m), paceProjection),
+  );
+  const predictedRemaining = roundMoney(Math.max(0, predictedMonthEnd - currentSpend));
+
+  return {
+    paceProjection: formatMoney(paceProjection),
+    predictedMonthEnd: formatMoney(predictedMonthEnd),
+    predictedRemaining: formatMoney(predictedRemaining),
+  };
+}
+
 export function daysLeftInMonth(asOf: Date): number {
   const year = asOf.getUTCFullYear();
   const month = asOf.getUTCMonth();
   const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   return Math.max(1, lastDay - asOf.getUTCDate() + 1);
+}
+
+export function daysInMonth(asOf: Date): number {
+  return new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth() + 1, 0)).getUTCDate();
 }
 
 export function formatMoney(value: string | number): string {
