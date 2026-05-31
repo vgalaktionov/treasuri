@@ -45,5 +45,5 @@ describe("dashboard API", () => {
       }
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 });

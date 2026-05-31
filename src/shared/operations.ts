@@ -54,8 +54,12 @@ export const exportCreateResponseSchema = z.object({
 });
 
 export const syncCreateResponseSchema = z.object({
+  classifiedCount: z.number().default(0),
+  forecastYearMonth: z.string().nullable().default(null),
   newTransactionCount: z.number(),
   provider: z.string(),
+  recurringDetectedCount: z.number().default(0),
+  recurringLinkedTransactionCount: z.number().default(0),
   syncRunId: z.number(),
   updatedTransactionCount: z.number(),
 });

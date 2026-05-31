@@ -120,9 +120,7 @@ function OperationsSnapshot({
   exports: ExportsResponse | undefined;
   settings: SettingsResponse | undefined;
   status: StatusResponse | undefined;
-  syncResult:
-    | { newTransactionCount: number; provider: string; updatedTransactionCount: number }
-    | undefined;
+  syncResult: SyncCreateResponse | undefined;
 }) {
   const lastSync = statusValue(status, "Sync", "Last sync") ?? "No sync";
   const needsReview = statusValue(status, "Transactions", "Needs review") ?? "0";
@@ -197,7 +195,10 @@ function StatusPanel({
         {sync.data ? (
           <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-emerald-800 text-sm">
             Synced {sync.data.provider}: {sync.data.newTransactionCount} new,{" "}
-            {sync.data.updatedTransactionCount} updated.
+            {sync.data.updatedTransactionCount} updated. Classified {sync.data.classifiedCount},{" "}
+            recurring {sync.data.recurringDetectedCount} detected /{" "}
+            {sync.data.recurringLinkedTransactionCount} linked, forecast{" "}
+            {sync.data.forecastYearMonth ?? "not updated"}.
           </p>
         ) : null}
         {sync.isError ? (

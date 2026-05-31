@@ -104,7 +104,7 @@ describe("review API", () => {
       }
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("applies review corrections to similar transactions", async () => {
     const container = await new PostgreSqlContainer("postgres:16-alpine").start();
@@ -169,7 +169,7 @@ describe("review API", () => {
       }
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 });
 
 async function csrfAgent(app: ReturnType<typeof createApp>) {

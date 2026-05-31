@@ -154,6 +154,9 @@ describe("operations API", () => {
     const { app, container, databaseUrl, restore } = await appWithSampleData();
     try {
       const { agent, csrf } = await csrfAgent(app);
+      await withPool(databaseUrl, async (pool) => {
+        await pool.query("DELETE FROM monthly_forecasts");
+      });
       const synced = await agent.post("/api/sync-now").set("x-csrf-token", csrf).expect(200);
       const status = await agent.get("/api/status").expect(200);
       const database = await withPool(databaseUrl, async (pool) => {
@@ -163,17 +166,25 @@ describe("operations API", () => {
         const balanceSnapshots = await pool.query<{ count: string }>(
           "SELECT count(*) FROM account_balance_snapshots WHERE source = 'fake'",
         );
+        const forecasts = await pool.query<{ count: string }>(
+          "SELECT count(*) FROM monthly_forecasts WHERE year_month = '2026-05'",
+        );
         return {
           balanceSnapshots: Number(balanceSnapshots.rows[0]?.count ?? 0),
+          forecasts: Number(forecasts.rows[0]?.count ?? 0),
           syncRuns: Number(syncRuns.rows[0]?.count ?? 0),
         };
       });
 
       expect(synced.body.provider).toBe("fake");
+      expect(synced.body.classifiedCount).toBeGreaterThanOrEqual(0);
+      expect(synced.body.forecastYearMonth).toBe("2026-05");
+      expect(synced.body.recurringDetectedCount).toBeGreaterThanOrEqual(0);
       expect(synced.body.syncRunId).toBeGreaterThan(0);
       expect(synced.body.updatedTransactionCount).toBeGreaterThan(0);
       expect(database.syncRuns).toBeGreaterThan(0);
       expect(database.balanceSnapshots).toBeGreaterThan(1);
+      expect(database.forecasts).toBe(1);
       expect(JSON.stringify(status.body.sections)).toContain("fake completed");
     } finally {
       await restore();

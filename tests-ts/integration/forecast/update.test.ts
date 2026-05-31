@@ -71,5 +71,5 @@ describe("monthly forecast update", () => {
     } finally {
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 });

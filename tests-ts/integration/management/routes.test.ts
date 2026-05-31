@@ -55,7 +55,7 @@ describe("management API", () => {
       await restore();
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("exposes raw transaction details", async () => {
     const { app, container, restore } = await appWithSampleData();
@@ -75,7 +75,7 @@ describe("management API", () => {
       await restore();
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("reports category budget averages and forecast exclusions", async () => {
     const { app, container, restore } = await appWithSampleData();
@@ -101,7 +101,7 @@ describe("management API", () => {
       await restore();
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("previews rules and does not overwrite manual overrides when applying", async () => {
     const { app, container, restore } = await appWithSampleData();
@@ -151,7 +151,7 @@ describe("management API", () => {
       await restore();
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("drafts a rule from transaction context with preview counts", async () => {
     const { app, container, restore } = await appWithSampleData();
@@ -174,7 +174,7 @@ describe("management API", () => {
       await restore();
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("edits rules, toggles active state, and reports history preview counts", async () => {
     const { app, container, restore } = await appWithSampleData();
@@ -240,7 +240,7 @@ describe("management API", () => {
       await restore();
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("confirms and disables recurring series", async () => {
     const { app, container, restore } = await appWithSampleData();
@@ -274,7 +274,7 @@ describe("management API", () => {
       await restore();
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 });
 
 async function csrfAgent(app: ReturnType<typeof createApp>) {

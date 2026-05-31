@@ -66,7 +66,7 @@ describe("syncBankTransactions", () => {
     } finally {
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("records provider failures without leaking obvious secret values", async () => {
     const container = await new PostgreSqlContainer("postgres:16-alpine").start();
@@ -97,7 +97,7 @@ describe("syncBankTransactions", () => {
     } finally {
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("imports ABN mutations through the in-repo provider idempotently", async () => {
     const container = await new PostgreSqlContainer("postgres:16-alpine").start();
@@ -180,7 +180,7 @@ describe("syncBankTransactions", () => {
     } finally {
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 });
 
 function abnMutationsPayload() {

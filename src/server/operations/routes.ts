@@ -90,6 +90,10 @@ export function registerOperationsRoutes(
           syncCreateResponseSchema.parse({
             newTransactionCount: 0,
             provider: "fake",
+            classifiedCount: 0,
+            forecastYearMonth: "2026-05",
+            recurringDetectedCount: 0,
+            recurringLinkedTransactionCount: 0,
             syncRunId: 1,
             updatedTransactionCount: 7,
           }),

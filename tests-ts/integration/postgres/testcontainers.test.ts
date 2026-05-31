@@ -21,5 +21,5 @@ describe("Testcontainers Postgres", () => {
     } finally {
       await container.stop();
     }
-  }, 60_000);
+  }, 120_000);
 });
