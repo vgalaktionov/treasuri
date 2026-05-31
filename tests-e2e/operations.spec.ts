@@ -29,8 +29,10 @@ test("operations workspace covers settings, status, and exports", async ({ page 
   await expect(page.getByRole("heading", { exact: true, name: "Worker" })).toBeVisible();
   await expect(page.getByRole("heading", { exact: true, name: "Exports" })).toBeVisible();
   await expect(page.getByRole("heading", { exact: true, name: "Runtime" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Failed job log" })).toBeVisible();
+  await expect(page.getByText("No failed jobs in the latest worker history.")).toBeVisible();
   await expect(page.getByText("Secrets")).toBeVisible();
-  await expect(page.getByText("redacted")).toBeVisible();
+  await expect(page.getByText("redacted", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Sync now" }).click();
   await expect(page.getByText(/Synced fake:/)).toBeVisible();
   await expect(page.getByText(/forecast 2026-05/)).toBeVisible();

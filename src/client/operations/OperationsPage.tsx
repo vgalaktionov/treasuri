@@ -218,6 +218,8 @@ function StatusPanel({
         </div>
       </article>
 
+      <FailedJobLog failedJobs={status?.failedJobs ?? []} />
+
       <div className="grid gap-2 lg:grid-cols-2">
         {status?.sections.map((section) => (
           <section
@@ -248,6 +250,49 @@ function StatusPanel({
         ))}
       </div>
     </section>
+  );
+}
+
+function FailedJobLog({ failedJobs }: { failedJobs: StatusResponse["failedJobs"] }) {
+  return (
+    <article className="rounded-md border border-treasuri-line bg-white p-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-sm">Failed job log</h2>
+          <p className="mt-1 text-treasuri-muted text-xs">
+            Latest pg-boss failures with redacted output for worker debugging.
+          </p>
+        </div>
+        <span
+          className={`font-semibold text-xs ${
+            failedJobs.length > 0 ? "text-amber-700" : "text-emerald-700"
+          }`}
+        >
+          {failedJobs.length} failed
+        </span>
+      </div>
+
+      {failedJobs.length > 0 ? (
+        <div className="mt-3 divide-y divide-treasuri-line overflow-hidden rounded-md border border-treasuri-line">
+          {failedJobs.map((job) => (
+            <div
+              className="grid gap-1 px-2 py-2 text-xs sm:grid-cols-[minmax(10rem,0.55fr)_minmax(0,1fr)] sm:gap-3"
+              key={`${job.name}-${job.startedAt}`}
+            >
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-sm">{job.name}</p>
+                <p className="text-treasuri-muted">{job.startedAt}</p>
+              </div>
+              <p className="min-w-0 break-words text-red-700">{job.error ?? "No error output"}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-md border border-treasuri-line bg-treasuri-panel p-2 text-treasuri-muted text-xs">
+          No failed jobs in the latest worker history.
+        </p>
+      )}
+    </article>
   );
 }
 
@@ -315,16 +360,19 @@ function SettingsPanel({ settings }: { settings: SettingsResponse | undefined })
           <Fieldset title="Targets">
             <MoneyInput
               label="Target monthly savings"
+              name="targetMonthlySavings"
               onChange={(targetMonthlySavings) => setForm({ ...form, targetMonthlySavings })}
               value={form.targetMonthlySavings}
             />
             <MoneyInput
               label="Safety buffer"
+              name="safetyBuffer"
               onChange={(safetyBuffer) => setForm({ ...form, safetyBuffer })}
               value={form.safetyBuffer}
             />
             <MoneyInput
               label="Fixed costs upcoming"
+              name="fixedCostsUpcoming"
               onChange={(fixedCostsUpcoming) => setForm({ ...form, fixedCostsUpcoming })}
               value={form.fixedCostsUpcoming}
             />
@@ -335,16 +383,19 @@ function SettingsPanel({ settings }: { settings: SettingsResponse | undefined })
               label="Baseline months"
               max={24}
               min={1}
+              name="baselineMonths"
               onChange={(baselineMonths) => setForm({ ...form, baselineMonths })}
               value={form.baselineMonths}
             />
             <MoneyInput
               label="3M variable baseline"
+              name="variableBaseline3m"
               onChange={(variableBaseline3m) => setForm({ ...form, variableBaseline3m })}
               value={form.variableBaseline3m}
             />
             <MoneyInput
               label="6M variable baseline"
+              name="variableBaseline6m"
               onChange={(variableBaseline6m) => setForm({ ...form, variableBaseline6m })}
               value={form.variableBaseline6m}
             />
@@ -355,6 +406,7 @@ function SettingsPanel({ settings }: { settings: SettingsResponse | undefined })
               label="Salary day"
               max={31}
               min={1}
+              name="salaryDay"
               onChange={(salaryDay) => setForm({ ...form, salaryDay })}
               value={form.salaryDay}
             />
@@ -362,17 +414,20 @@ function SettingsPanel({ settings }: { settings: SettingsResponse | undefined })
               label="Sync lookback days"
               max={3650}
               min={1}
+              name="syncLookbackDays"
               onChange={(syncLookbackDays) => setForm({ ...form, syncLookbackDays })}
               value={form.syncLookbackDays}
             />
             <MoneyInput
               label="LLM confidence threshold"
+              name="llmConfidenceThreshold"
               onChange={(llmConfidenceThreshold) => setForm({ ...form, llmConfidenceThreshold })}
               value={form.llmConfidenceThreshold}
             />
             <label className="flex min-h-8 items-center gap-2 font-medium text-sm">
               <input
                 checked={form.llmEnabled}
+                name="llmEnabled"
                 onChange={(event) => setForm({ ...form, llmEnabled: event.target.checked })}
                 type="checkbox"
               />
@@ -652,10 +707,12 @@ function Fieldset({ children, title }: { children: ReactNode; title: string }) {
 
 function MoneyInput({
   label,
+  name,
   onChange,
   value,
 }: {
   label: string;
+  name: string;
   onChange: (value: string) => void;
   value: string;
 }) {
@@ -665,6 +722,7 @@ function MoneyInput({
       <input
         className="min-h-8 rounded-md border border-treasuri-line px-2 font-normal text-sm"
         inputMode="decimal"
+        name={name}
         onChange={(event) => onChange(event.target.value)}
         value={value}
       />
@@ -676,12 +734,14 @@ function NumberInput({
   label,
   max,
   min,
+  name,
   onChange,
   value,
 }: {
   label: string;
   max?: number;
   min?: number;
+  name: string;
   onChange: (value: number) => void;
   value: number;
 }) {
@@ -692,6 +752,7 @@ function NumberInput({
         className="min-h-8 rounded-md border border-treasuri-line px-2 font-normal text-sm"
         max={max}
         min={min}
+        name={name}
         onChange={(event) => onChange(Number(event.target.value))}
         type="number"
         value={value}
