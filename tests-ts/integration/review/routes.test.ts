@@ -21,7 +21,8 @@ describe("review API", () => {
       });
 
       const app = createApp();
-      const inbox = await request(app).get("/api/review").expect(200);
+      const { agent, csrf } = await csrfAgent(app);
+      const inbox = await agent.get("/api/review").expect(200);
       const transaction = inbox.body.transactions[0];
 
       expect(inbox.body.reviewCount).toBe(1);
@@ -33,8 +34,9 @@ describe("review API", () => {
       if (!groceries) {
         throw new Error("Expected Groceries category");
       }
-      const action = await request(app)
+      const action = await agent
         .post(`/api/review/${transaction.id}/action`)
+        .set("x-csrf-token", csrf)
         .send({
           action: "change",
           categoryId: groceries.id,
@@ -49,7 +51,7 @@ describe("review API", () => {
           next: "rule-preview",
         })
         .expect(200);
-      const updated = await request(app).get("/api/review").expect(200);
+      const updated = await agent.get("/api/review").expect(200);
       const rows = await withPool(container.getConnectionUri(), (pool) =>
         pool.query<{
           alias_count: string;
@@ -117,7 +119,8 @@ describe("review API", () => {
       });
 
       const app = createApp();
-      const inbox = await request(app).get("/api/review").expect(200);
+      const { agent, csrf } = await csrfAgent(app);
+      const inbox = await agent.get("/api/review").expect(200);
       const transaction = inbox.body.transactions.find(
         (item: { description: string }) => item.description === "Needs review sample",
       );
@@ -127,8 +130,9 @@ describe("review API", () => {
 
       expect(inbox.body.reviewCount).toBe(2);
       expect(transaction.similarCount).toBe(1);
-      const action = await request(app)
+      const action = await agent
         .post(`/api/review/${transaction.id}/action`)
+        .set("x-csrf-token", csrf)
         .send({
           action: "change",
           applySimilar: true,
@@ -136,7 +140,7 @@ describe("review API", () => {
           merchantName: "Sample Pet Care",
         })
         .expect(200);
-      const updated = await request(app).get("/api/review").expect(200);
+      const updated = await agent.get("/api/review").expect(200);
       const reviewed = await withPool(container.getConnectionUri(), (pool) =>
         pool.query<{ count: string }>(
           "SELECT count(*) FROM enriched_transactions WHERE classification_method = 'manual_override' AND needs_review = false",
@@ -158,6 +162,12 @@ describe("review API", () => {
     }
   }, 60_000);
 });
+
+async function csrfAgent(app: ReturnType<typeof createApp>) {
+  const agent = request.agent(app);
+  const response = await agent.get("/api/me").expect(200);
+  return { agent, csrf: response.body.csrfToken as string };
+}
 
 async function insertSimilarReviewTransaction(pool: pg.Pool) {
   await pool.query(`

@@ -11,7 +11,8 @@ describe("management API", () => {
   it("filters transactions and persists manual transaction edits", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {
-      const filtered = await request(app)
+      const { agent, csrf } = await csrfAgent(app);
+      const filtered = await agent
         .get("/api/transactions?query=dog&month=2026-05&kind=spending&minAmount=80&maxAmount=90")
         .expect(200);
       const transaction = filtered.body.transactions[0];
@@ -21,8 +22,9 @@ describe("management API", () => {
 
       expect(filtered.body.transactions).toHaveLength(1);
       expect(transaction.description).toBe("Dog food sample");
-      await request(app)
+      await agent
         .patch(`/api/transactions/${transaction.id}`)
+        .set("x-csrf-token", csrf)
         .send({
           categoryId: groceries.id,
           createAlias: true,
@@ -36,7 +38,7 @@ describe("management API", () => {
         })
         .expect(200);
 
-      const updated = await request(app).get("/api/transactions?query=dog").expect(200);
+      const updated = await agent.get("/api/transactions?query=dog").expect(200);
       const alias = await withPool(container.getConnectionUri(), async (pool) =>
         pool.query<{ count: string }>(
           "SELECT count(*) FROM merchant_aliases WHERE match_text = 'Sample Pet Care'",
@@ -104,18 +106,21 @@ describe("management API", () => {
   it("previews rules and does not overwrite manual overrides when applying", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {
-      const transactions = await request(app).get("/api/transactions?query=dog").expect(200);
+      const { agent, csrf } = await csrfAgent(app);
+      const transactions = await agent.get("/api/transactions?query=dog").expect(200);
       const transaction = transactions.body.transactions[0];
       const groceries = transactions.body.categories.find(
         (category: { name: string }) => category.name === "Groceries",
       );
 
-      await request(app)
+      await agent
         .patch(`/api/transactions/${transaction.id}`)
+        .set("x-csrf-token", csrf)
         .send({ categoryId: groceries.id, merchantName: transaction.merchant })
         .expect(200);
-      const preview = await request(app)
+      const preview = await agent
         .post("/api/rules/preview")
+        .set("x-csrf-token", csrf)
         .send({
           categoryId: groceries.id,
           field: "description",
@@ -123,8 +128,9 @@ describe("management API", () => {
           pattern: "Dog food",
         })
         .expect(200);
-      const created = await request(app)
+      const created = await agent
         .post("/api/rules")
+        .set("x-csrf-token", csrf)
         .send({
           categoryId: groceries.id,
           field: "description",
@@ -132,8 +138,9 @@ describe("management API", () => {
           pattern: "Dog food",
         })
         .expect(200);
-      const applied = await request(app)
+      const applied = await agent
         .post(`/api/rules/${created.body.ruleId}/apply`)
+        .set("x-csrf-token", csrf)
         .expect(200);
 
       expect(preview.body.matches).toHaveLength(0);
@@ -149,12 +156,14 @@ describe("management API", () => {
   it("edits rules, toggles active state, and reports history preview counts", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {
-      const transactions = await request(app).get("/api/transactions?query=groceries").expect(200);
+      const { agent, csrf } = await csrfAgent(app);
+      const transactions = await agent.get("/api/transactions?query=groceries").expect(200);
       const groceries = transactions.body.categories.find(
         (category: { name: string }) => category.name === "Groceries",
       );
-      const created = await request(app)
+      const created = await agent
         .post("/api/rules")
+        .set("x-csrf-token", csrf)
         .send({
           categoryId: groceries.id,
           field: "merchant",
@@ -168,7 +177,7 @@ describe("management API", () => {
         })
         .expect(200);
 
-      const listed = await request(app).get("/api/rules").expect(200);
+      const listed = await agent.get("/api/rules").expect(200);
       const rule = listed.body.rules.find(
         (item: { id: number }) => item.id === created.body.ruleId,
       );
@@ -178,8 +187,9 @@ describe("management API", () => {
       expect(rule.wouldChangeCount).toBe(1);
       expect(rule.flags).toContain("fixed");
 
-      await request(app)
+      await agent
         .put(`/api/rules/${created.body.ruleId}`)
+        .set("x-csrf-token", csrf)
         .send({
           categoryId: groceries.id,
           field: "description",
@@ -192,12 +202,14 @@ describe("management API", () => {
           priority: 5,
         })
         .expect(200);
-      await request(app)
+      await agent
         .patch(`/api/rules/${created.body.ruleId}/active`)
+        .set("x-csrf-token", csrf)
         .send({ isActive: false })
         .expect(200);
-      const inactiveApply = await request(app)
+      const inactiveApply = await agent
         .post(`/api/rules/${created.body.ruleId}/apply`)
+        .set("x-csrf-token", csrf)
         .expect(200);
 
       expect(inactiveApply.body.updatedCount).toBe(0);
@@ -210,21 +222,28 @@ describe("management API", () => {
   it("confirms and disables recurring series", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {
-      const recurring = await request(app).get("/api/recurring").expect(200);
+      const { agent, csrf } = await csrfAgent(app);
+      const recurring = await agent.get("/api/recurring").expect(200);
       const detected = recurring.body.series.find(
         (series: { isConfirmed: boolean }) => !series.isConfirmed,
       );
 
       expect(recurring.body.series[0].confidence).toBeDefined();
-      await request(app).post(`/api/recurring/${detected.id}/confirm`).expect(200);
-      const confirmed = await request(app).get("/api/recurring").expect(200);
+      await agent
+        .post(`/api/recurring/${detected.id}/confirm`)
+        .set("x-csrf-token", csrf)
+        .expect(200);
+      const confirmed = await agent.get("/api/recurring").expect(200);
       expect(
         confirmed.body.series.find((series: { id: number }) => series.id === detected.id)
           .isConfirmed,
       ).toBe(true);
 
-      await request(app).post(`/api/recurring/${detected.id}/disable`).expect(200);
-      const disabled = await request(app).get("/api/recurring").expect(200);
+      await agent
+        .post(`/api/recurring/${detected.id}/disable`)
+        .set("x-csrf-token", csrf)
+        .expect(200);
+      const disabled = await agent.get("/api/recurring").expect(200);
       expect(disabled.body.series.some((series: { id: number }) => series.id === detected.id)).toBe(
         false,
       );
@@ -234,6 +253,12 @@ describe("management API", () => {
     }
   }, 60_000);
 });
+
+async function csrfAgent(app: ReturnType<typeof createApp>) {
+  const agent = request.agent(app);
+  const response = await agent.get("/api/me").expect(200);
+  return { agent, csrf: response.body.csrfToken as string };
+}
 
 async function appWithSampleData() {
   const container = await new PostgreSqlContainer("postgres:16-alpine").start();

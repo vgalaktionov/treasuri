@@ -8,6 +8,7 @@ export type AuthUser = {
 declare module "express-session" {
   interface SessionData {
     authUser?: AuthUser;
+    csrfToken?: string;
   }
 }
 

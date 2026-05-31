@@ -23,6 +23,7 @@ describe("auth middleware", () => {
       email: "dev-user@example.test",
       sub: "dev-user",
     });
+    expect(response.body.csrfToken).toEqual(expect.any(String));
   });
 
   it("denies a test profile outside the allowed email list", async () => {
@@ -66,5 +67,24 @@ describe("auth middleware", () => {
     });
 
     await request(createApp(config)).get("/api/me").expect(401);
+  });
+
+  it("requires CSRF tokens for state-changing browser requests", async () => {
+    const config = loadConfig({
+      ALLOWED_EMAILS: "dev-user@example.test",
+      OIDC_ENABLED: "false",
+      OIDC_TESTING_PROFILE_JSON: JSON.stringify({
+        email: "dev-user@example.test",
+        groups: ["finance-app"],
+        sub: "dev-user",
+      }),
+      SECRET_KEY: "test-secret-with-length",
+    });
+    const app = createApp(config);
+    const agent = request.agent(app);
+    const session = await agent.get("/api/me").expect(200);
+
+    await agent.post("/api/exports").expect(403);
+    await agent.post("/api/exports").set("x-csrf-token", session.body.csrfToken).expect(200);
   });
 });

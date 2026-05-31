@@ -12,12 +12,14 @@ describe("operations API", () => {
   it("stores only user-controlled settings", async () => {
     const { app, container, restore } = await appWithSampleData();
     try {
-      const initial = await request(app).get("/api/settings").expect(200);
+      const { agent, csrf } = await csrfAgent(app);
+      const initial = await agent.get("/api/settings").expect(200);
 
       expect(JSON.stringify(initial.body)).not.toContain("currentBalance");
       expect(JSON.stringify(initial.body)).not.toContain("currentLiquidBalance");
-      await request(app)
+      await agent
         .put("/api/settings")
+        .set("x-csrf-token", csrf)
         .send({
           baselineMonths: 9,
           fixedCostsUpcoming: "640.00",
@@ -32,7 +34,7 @@ describe("operations API", () => {
         })
         .expect(200);
 
-      const saved = await request(app).get("/api/settings").expect(200);
+      const saved = await agent.get("/api/settings").expect(200);
 
       expect(saved.body.baselineMonths).toBe(9);
       expect(saved.body.fixedCostsUpcoming).toBe("640.00");
@@ -56,9 +58,10 @@ describe("operations API", () => {
   it("stores XLSX exports as Postgres bytea and streams downloads", async () => {
     const { app, container, databaseUrl, restore } = await appWithSampleData();
     try {
-      const created = await request(app).post("/api/exports").expect(200);
-      const listed = await request(app).get("/api/exports").expect(200);
-      const downloaded = await request(app)
+      const { agent, csrf } = await csrfAgent(app);
+      const created = await agent.post("/api/exports").set("x-csrf-token", csrf).expect(200);
+      const listed = await agent.get("/api/exports").expect(200);
+      const downloaded = await agent
         .get(`/api/exports/${created.body.fileId}/download`)
         .expect(200);
       const storedBytes = await withPool(databaseUrl, async (pool) => {
@@ -128,8 +131,9 @@ describe("operations API", () => {
   it("runs a manual bank sync and records status-visible sync data", async () => {
     const { app, container, databaseUrl, restore } = await appWithSampleData();
     try {
-      const synced = await request(app).post("/api/sync-now").expect(200);
-      const status = await request(app).get("/api/status").expect(200);
+      const { agent, csrf } = await csrfAgent(app);
+      const synced = await agent.post("/api/sync-now").set("x-csrf-token", csrf).expect(200);
+      const status = await agent.get("/api/status").expect(200);
       const database = await withPool(databaseUrl, async (pool) => {
         const syncRuns = await pool.query<{ count: string }>(
           "SELECT count(*) FROM sync_runs WHERE status = 'completed' AND metadata_json @> '{\"source\":\"bank-sync\"}'::jsonb",
@@ -155,6 +159,12 @@ describe("operations API", () => {
     }
   }, 120_000);
 });
+
+async function csrfAgent(app: ReturnType<typeof createApp>) {
+  const agent = request.agent(app);
+  const response = await agent.get("/api/me").expect(200);
+  return { agent, csrf: response.body.csrfToken as string };
+}
 
 async function appWithSampleData() {
   const container = await new PostgreSqlContainer("postgres:16-alpine").start();

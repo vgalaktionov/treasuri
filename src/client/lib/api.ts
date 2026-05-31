@@ -41,6 +41,22 @@ import {
   reviewInboxResponseSchema,
 } from "../../shared/review.ts";
 
+const meResponseSchema = {
+  parse(value: unknown): { csrfToken: string } {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "csrfToken" in value &&
+      typeof value.csrfToken === "string"
+    ) {
+      return { csrfToken: value.csrfToken };
+    }
+    throw new Error("Invalid session response");
+  },
+};
+
+let csrfTokenPromise: Promise<string> | null = null;
+
 export async function fetchDashboard(): Promise<DashboardResponse> {
   const response = await fetch("/api/dashboard");
   if (!response.ok) {
@@ -78,7 +94,7 @@ export async function fetchTransactions(
 export async function updateTransaction(transactionId: number, input: TransactionUpdateRequest) {
   const response = await fetch(`/api/transactions/${transactionId}`, {
     body: JSON.stringify(input),
-    headers: { "content-type": "application/json" },
+    headers: await jsonMutationHeaders(),
     method: "PATCH",
   });
   if (!response.ok) {
@@ -129,7 +145,7 @@ export async function fetchRecurring() {
 export async function previewRule(input: RulePreviewRequest) {
   const response = await fetch("/api/rules/preview", {
     body: JSON.stringify(input),
-    headers: { "content-type": "application/json" },
+    headers: await jsonMutationHeaders(),
     method: "POST",
   });
   if (!response.ok) {
@@ -141,7 +157,7 @@ export async function previewRule(input: RulePreviewRequest) {
 export async function createRule(input: RuleEditorRequest) {
   const response = await fetch("/api/rules", {
     body: JSON.stringify(ruleEditorRequestSchema.parse(input)),
-    headers: { "content-type": "application/json" },
+    headers: await jsonMutationHeaders(),
     method: "POST",
   });
   if (!response.ok) {
@@ -153,7 +169,7 @@ export async function createRule(input: RuleEditorRequest) {
 export async function updateRule(ruleId: number, input: RuleEditorRequest) {
   const response = await fetch(`/api/rules/${ruleId}`, {
     body: JSON.stringify(ruleEditorRequestSchema.parse(input)),
-    headers: { "content-type": "application/json" },
+    headers: await jsonMutationHeaders(),
     method: "PUT",
   });
   if (!response.ok) {
@@ -164,7 +180,7 @@ export async function updateRule(ruleId: number, input: RuleEditorRequest) {
 export async function setRuleActive(ruleId: number, isActive: boolean) {
   const response = await fetch(`/api/rules/${ruleId}/active`, {
     body: JSON.stringify(ruleActiveUpdateRequestSchema.parse({ isActive })),
-    headers: { "content-type": "application/json" },
+    headers: await jsonMutationHeaders(),
     method: "PATCH",
   });
   if (!response.ok) {
@@ -173,7 +189,10 @@ export async function setRuleActive(ruleId: number, isActive: boolean) {
 }
 
 export async function applyRule(ruleId: number) {
-  const response = await fetch(`/api/rules/${ruleId}/apply`, { method: "POST" });
+  const response = await fetch(`/api/rules/${ruleId}/apply`, {
+    headers: await mutationHeaders(),
+    method: "POST",
+  });
   if (!response.ok) {
     throw new Error("Failed to apply rule");
   }
@@ -181,7 +200,10 @@ export async function applyRule(ruleId: number) {
 }
 
 export async function confirmRecurring(seriesId: number) {
-  const response = await fetch(`/api/recurring/${seriesId}/confirm`, { method: "POST" });
+  const response = await fetch(`/api/recurring/${seriesId}/confirm`, {
+    headers: await mutationHeaders(),
+    method: "POST",
+  });
   if (!response.ok) {
     throw new Error("Failed to confirm recurring series");
   }
@@ -189,7 +211,10 @@ export async function confirmRecurring(seriesId: number) {
 }
 
 export async function disableRecurring(seriesId: number) {
-  const response = await fetch(`/api/recurring/${seriesId}/disable`, { method: "POST" });
+  const response = await fetch(`/api/recurring/${seriesId}/disable`, {
+    headers: await mutationHeaders(),
+    method: "POST",
+  });
   if (!response.ok) {
     throw new Error("Failed to disable recurring series");
   }
@@ -202,7 +227,7 @@ export async function applyReviewAction(
 ): Promise<ReviewActionResponse> {
   const response = await fetch(`/api/review/${transactionId}/action`, {
     body: JSON.stringify(action),
-    headers: { "content-type": "application/json" },
+    headers: await jsonMutationHeaders(),
     method: "POST",
   });
   if (!response.ok) {
@@ -222,7 +247,7 @@ export async function fetchSettings(): Promise<SettingsResponse> {
 export async function saveSettings(input: SettingsUpdate): Promise<SettingsResponse> {
   const response = await fetch("/api/settings", {
     body: JSON.stringify(settingsUpdateSchema.parse(input)),
-    headers: { "content-type": "application/json" },
+    headers: await jsonMutationHeaders(),
     method: "PUT",
   });
   if (!response.ok) {
@@ -248,7 +273,10 @@ export async function fetchExports(): Promise<ExportsResponse> {
 }
 
 export async function createExport(): Promise<ExportCreateResponse> {
-  const response = await fetch("/api/exports", { method: "POST" });
+  const response = await fetch("/api/exports", {
+    headers: await mutationHeaders(),
+    method: "POST",
+  });
   if (!response.ok) {
     throw new Error("Failed to create export");
   }
@@ -256,9 +284,32 @@ export async function createExport(): Promise<ExportCreateResponse> {
 }
 
 export async function syncNow(): Promise<SyncCreateResponse> {
-  const response = await fetch("/api/sync-now", { method: "POST" });
+  const response = await fetch("/api/sync-now", {
+    headers: await mutationHeaders(),
+    method: "POST",
+  });
   if (!response.ok) {
     throw new Error("Failed to run sync");
   }
   return syncCreateResponseSchema.parse(await response.json());
+}
+
+async function jsonMutationHeaders(): Promise<HeadersInit> {
+  return { "content-type": "application/json", ...(await mutationHeaders()) };
+}
+
+async function mutationHeaders(): Promise<HeadersInit> {
+  return { "x-csrf-token": await csrfToken() };
+}
+
+async function csrfToken(): Promise<string> {
+  csrfTokenPromise ??= fetch("/api/me")
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Failed to load session");
+      }
+      return response.json();
+    })
+    .then((json) => meResponseSchema.parse(json).csrfToken);
+  return csrfTokenPromise;
 }

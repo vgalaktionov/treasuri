@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 
+import { ensureCsrfToken, requireCsrf } from "../auth/csrf.ts";
 import { requireAuth } from "../auth/middleware.ts";
 import { createSessionMiddleware } from "../auth/session.ts";
 import type { AppConfig } from "../config/env.ts";
@@ -27,8 +28,10 @@ export function createApp(config: AppConfig = loadConfig()) {
   app.use(requireAuth(config));
 
   app.get("/api/me", (request, response) => {
-    response.json({ user: request.authUser });
+    response.json({ csrfToken: ensureCsrfToken(request), user: request.authUser });
   });
+
+  app.use(requireCsrf);
 
   registerDashboardRoutes(app, process.env.DATABASE_URL);
   registerManagementRoutes(app, process.env.DATABASE_URL);
