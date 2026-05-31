@@ -9,6 +9,9 @@ declare module "express-session" {
   interface SessionData {
     authUser?: AuthUser;
     csrfToken?: string;
+    oidcCodeVerifier?: string;
+    oidcReturnTo?: string;
+    oidcState?: string;
   }
 }
 

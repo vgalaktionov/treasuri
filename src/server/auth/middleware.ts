@@ -9,6 +9,10 @@ export function requireAuth(config: AppConfig) {
     const user = resolveUser(config, request);
 
     if (!user) {
+      if (config.oidc.enabled && !request.path.startsWith("/api/")) {
+        response.redirect(`/auth/login?returnTo=${encodeURIComponent(request.originalUrl || "/")}`);
+        return;
+      }
       response.status(401).json({ error: "Authentication required" });
       return;
     }

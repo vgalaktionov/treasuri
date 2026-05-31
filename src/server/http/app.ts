@@ -4,6 +4,7 @@ import express from "express";
 
 import { ensureCsrfToken, requireCsrf } from "../auth/csrf.ts";
 import { requireAuth } from "../auth/middleware.ts";
+import { registerOidcRoutes } from "../auth/oidc.ts";
 import { createSessionMiddleware } from "../auth/session.ts";
 import type { AppConfig } from "../config/env.ts";
 import { loadConfig } from "../config/env.ts";
@@ -25,6 +26,7 @@ export function createApp(config: AppConfig = loadConfig()) {
 
   app.use(express.static(clientDist, { index: false }));
   app.use(createSessionMiddleware(config));
+  registerOidcRoutes(app, config);
   app.use(requireAuth(config));
 
   app.get("/api/me", (request, response) => {
