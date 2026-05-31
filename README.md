@@ -1,47 +1,76 @@
 # Treasuri
 
-Treasuri is a private personal-finance PWA for answering one daily question: am I fine, and what can I still spend this month?
+Treasuri is a private personal-finance PWA for one primary user. The product question is: am I fine, and what can I still spend this month?
 
-## Rewrite Status
+`PRD.v2.md` is the implementation source of truth. It replaces the deleted v1 PRD and is written to stand on its own.
 
-`PRD.v2.md` is the current source of truth. The project is being rewritten from the v1 Python/Flask prototype to a Node.js/TypeScript, React, Tailwind, PostgreSQL, `pg-boss`, Zod, Biome, Husky, Vitest, and Playwright stack.
+## Stack
 
-The previous Python implementation remains in the tree only as prototype reference until each PRD v2 slice replaces it. Do not use the old Flask/HTMX code as the architecture target.
+- Node.js 22.12 or newer with TypeScript.
+- Express for the server runtime.
+- React, Tailwind CSS, and TanStack Query on the client.
+- PostgreSQL, explicit SQL, and hand-rolled up-only migrations.
+- `pg-boss` for background jobs.
+- Shared Zod schemas across API, forms, config, and job payloads.
+- In-repo TypeScript ABN AMRO client under `src/server/bank/abn/`.
+- Biome, Husky, Vitest, Playwright, and Testcontainers.
+- One Docker/OCI image published to GHCR for web, worker, migration, and admin commands.
 
-## Current Slice
+## Local Development
 
-Implementation follows the vertical slices in `PRD.v2.md`.
+Install dependencies:
 
-Slice 0 aligns repository guidance:
+```sh
+npm ci
+```
 
-- `AGENTS.md` points agents at the v2 stack.
-- `PRD.v2.md` supersedes the deleted v1 PRD.
-- Future slices must stay runnable, tested, and committed one slice at a time.
+Run the app locally without Compose:
 
-## Target Development Contract
+```sh
+npm run dev
+```
 
-The v2 app must keep the infrastructure boundary from the prototype:
+Run the full local stack:
 
-- Docker Compose for local development.
-- App, worker, Postgres, migration/admin support, and llama runtime in local Compose.
-- Postgres exposed on a non-default host port, currently `127.0.0.1:15432`.
-- No Caddy in local development.
-- One GHCR-published OCI image that supports `web`, `worker`, `migrate`, and admin commands.
+```sh
+docker compose up -d --build
+docker compose run --rm app npm run admin -- load-sample-data
+```
 
-Testing requirements are intentionally strict:
+The app listens on `http://127.0.0.1:5000` in Compose. Postgres is exposed on `127.0.0.1:15432`.
 
-- Vitest unit tests.
-- Vitest integration tests with Testcontainers Postgres.
-- Playwright E2E tests for user-visible flows.
-- Migration tests from a clean database.
-- Job tests for `pg-boss`.
-- Docker image command smoke tests.
-- Real local Docker Compose verification after each vertical slice.
+## Commands
 
-Use deterministic sample data only. Do not use real financial details in fixtures, screenshots, browser sessions, tests, or Chrome DevTools MCP sessions.
+```sh
+npm run check
+npm run build
+npm run test:e2e
+npm run migrate
+npm run worker
+npm run admin -- load-sample-data
+```
 
-## Legacy Prototype
+## Configuration
 
-Until the relevant v2 slices replace it, some legacy Python files, migrations, tests, and Compose services may still exist. They are not the desired final architecture.
+Local development uses deterministic sample data and test-profile auth:
 
-When changing behavior, prefer implementing the next PRD v2 slice instead of extending the legacy stack.
+```text
+OIDC_ENABLED=false
+OIDC_TESTING_PROFILE_JSON={"sub":"dev-user","nickname":"dev-user","email":"dev-user@example.test","groups":["finance-app"]}
+ALLOWED_EMAILS=dev-user@example.test
+BANK_PROVIDER=fake
+```
+
+Use `BANK_PROVIDER=abn` or `BANK_PROVIDER=abn_amro` only with mounted secrets or environment values for the ABN credentials. Do not put real financial data in fixtures, screenshots, logs, or browser automation sessions.
+
+## Verification Bar
+
+Every vertical slice should leave the repo runnable and tested:
+
+- Vitest unit and integration coverage.
+- Testcontainers-backed Postgres coverage.
+- Playwright E2E coverage for user-visible workflows.
+- Real local Docker Compose verification.
+- Docker image command smoke coverage in CI before GHCR publish.
+
+Generated XLSX exports are stored in Postgres `bytea` and streamed from Postgres on download. Durable container filesystem state is not part of the product contract.

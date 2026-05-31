@@ -14,6 +14,12 @@ def test_ci_workflow_runs_checks_before_publishing_image() -> None:
     assert "npx playwright install --with-deps chromium" in workflow
     assert "npm run test:e2e" in workflow
     assert "needs: checks" in workflow
+    assert "postgres:16-alpine" in workflow
+    assert "docker build --build-arg GIT_SHA=${{ github.sha }} -t treasuri:ci ." in workflow
+    assert "treasuri:ci npm run migrate" in workflow
+    assert "treasuri:ci npm run admin -- load-sample-data" in workflow
+    assert "treasuri:ci sh -lc 'npm run start" in workflow
+    assert "treasuri:ci sh -lc 'timeout 12s npm run worker" in workflow
     assert "ghcr.io/${{ github.repository }}" in workflow
     assert "push: ${{ github.event_name == 'push' }}" in workflow
     assert "GIT_SHA=${{ github.sha }}" in workflow

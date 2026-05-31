@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Treasuri">
+  <title>Treasuri</title>
+  <rect width="512" height="512" rx="96" fill="#eef7f4"/>
+  <circle cx="256" cy="256" r="154" fill="#0f766e"/>
+  <path d="M168 178h176v48h-62v144h-52V226h-62z" fill="#fbfbf8"/>
+</svg>

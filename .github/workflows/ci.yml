@@ -47,12 +47,54 @@ jobs:
   image:
     runs-on: ubuntu-latest
     needs: checks
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: treasuri
+          POSTGRES_USER: treasuri
+          POSTGRES_PASSWORD: treasuri
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U treasuri -d treasuri"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Build smoke image
+        run: docker build --build-arg GIT_SHA=${{ github.sha }} -t treasuri:ci .
+
+      - name: Smoke image commands
+        env:
+          DATABASE_URL: postgresql://treasuri:treasuri@127.0.0.1:5432/treasuri
+          OIDC_ENABLED: "false"
+          OIDC_TESTING_PROFILE_JSON: '{"sub":"ci-user","nickname":"ci-user","email":"ci-user@example.test"}'
+          ALLOWED_EMAILS: ci-user@example.test
+          SECRET_KEY: ci-secret-change-me
+          BANK_PROVIDER: fake
+          ABN_ACCOUNT_IBAN: NL00FAKE0123456789
+        run: |
+          docker run --rm --network host \
+            -e DATABASE_URL -e OIDC_ENABLED -e SECRET_KEY \
+            treasuri:ci npm run migrate
+          docker run --rm --network host \
+            -e DATABASE_URL -e OIDC_ENABLED -e OIDC_TESTING_PROFILE_JSON \
+            -e ALLOWED_EMAILS -e SECRET_KEY -e BANK_PROVIDER -e ABN_ACCOUNT_IBAN \
+            treasuri:ci npm run admin -- load-sample-data
+          docker run --rm --network host \
+            -e DATABASE_URL -e OIDC_ENABLED -e OIDC_TESTING_PROFILE_JSON \
+            -e ALLOWED_EMAILS -e SECRET_KEY -e HTTP_PORT=5500 \
+            treasuri:ci sh -lc 'npm run start & pid=$!; ok=0; for i in 1 2 3 4 5; do node -e "fetch(\"http://127.0.0.1:5500/healthz\").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" && ok=1 && break || sleep 1; done; kill "$pid"; test "$ok" -eq 1'
+          docker run --rm --network host \
+            -e DATABASE_URL -e OIDC_ENABLED -e SECRET_KEY -e BANK_PROVIDER -e ABN_ACCOUNT_IBAN \
+            treasuri:ci sh -lc 'timeout 12s npm run worker || test "$?" -eq 124'
 
       - name: Log in to GHCR
         if: github.event_name == 'push'
