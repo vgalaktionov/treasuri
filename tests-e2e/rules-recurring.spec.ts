@@ -31,13 +31,24 @@ test("rules workspace previews, creates, edits, and toggles rules", async ({ pag
 });
 
 test("recurring workspace edits assumptions and disables detected commitments", async ({ page }) => {
-  await page.goto("/recurring");
+  await page.goto("/recurring?seriesId=2");
 
   await expect(page.getByRole("heading", { name: "Recurring" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Sample Streaming" })).toBeVisible();
   await page.getByRole("button", { name: /Sample Streaming/ }).click();
+  await expect(page).toHaveURL(/\/recurring\?seriesId=2$/);
   await expect(page.getByRole("heading", { name: "Linked transactions" })).toBeVisible();
   await expect(page.getByText("Monthly streaming sample")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Monthly streaming sample/ })).toHaveAttribute(
+    "href",
+    "/transactions?transactionId=8",
+  );
+  await page.getByRole("link", { name: /Monthly streaming sample/ }).click();
+  await expect(page).toHaveURL(/\/transactions\?transactionId=8$/);
+  await expect(page.getByRole("heading", { name: "Sample Streaming" })).toBeVisible();
+
+  await page.goto("/recurring?seriesId=2");
+  await expect(page.getByRole("heading", { name: "Sample Streaming" })).toBeVisible();
   await page.getByLabel("Expected amount").fill("19.99");
   await page.getByLabel("Expected day").fill("16");
   await page.getByLabel("Next expected").fill("2026-06-16");

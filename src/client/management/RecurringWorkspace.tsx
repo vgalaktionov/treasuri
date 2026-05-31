@@ -19,7 +19,7 @@ type RecurringFormState = {
 export function RecurringWorkspace() {
   const queryClient = useQueryClient();
   const recurring = useQuery({ queryFn: fetchRecurring, queryKey: ["recurring"] });
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(readRecurringActiveIdFromUrl);
   const [message, setMessage] = useState<string | null>(null);
   const confirm = useMutation({
     mutationFn: confirmRecurring,
@@ -57,10 +57,20 @@ export function RecurringWorkspace() {
       setActiveId(null);
       return;
     }
+    const requestedId = readRecurringActiveIdFromUrl();
+    if (requestedId && series.some((item) => item.id === requestedId)) {
+      setActiveId(requestedId);
+      return;
+    }
     if (!activeId || !series.some((item) => item.id === activeId)) {
       setActiveId(preferredSeries(series)?.id ?? null);
     }
   }, [activeId, series]);
+
+  function selectSeries(id: number) {
+    setActiveId(id);
+    window.history.replaceState(null, "", recurringUrl(id));
+  }
 
   if (recurring.isLoading) {
     return <p className="text-treasuri-muted">Loading recurring payments...</p>;
@@ -98,7 +108,7 @@ export function RecurringWorkspace() {
         <RecurringList
           activeId={activeSeries?.id ?? null}
           className="order-2 xl:order-1"
-          onSelect={setActiveId}
+          onSelect={selectSeries}
           series={series}
         />
         <RecurringInspector
@@ -364,8 +374,9 @@ function RecurringInspector({
             </div>
             <div className="divide-y divide-treasuri-line">
               {series.linkedTransactions.map((transaction) => (
-                <div
+                <a
                   className="grid gap-1 px-2 py-2 text-xs lg:grid-cols-[5.5rem_minmax(0,1fr)_7rem_7rem] lg:gap-2"
+                  href={transactionUrl(transaction.id)}
                   key={transaction.id}
                 >
                   <time
@@ -390,7 +401,7 @@ function RecurringInspector({
                   >
                     EUR {transaction.amount}
                   </span>
-                </div>
+                </a>
               ))}
             </div>
           </div>
@@ -498,4 +509,24 @@ function preferredSeries(series: RecurringSeries[]): RecurringSeries | null {
 
 function amountClass(amount: string): string {
   return Number(amount) < 0 ? "text-red-700" : "text-emerald-700";
+}
+
+function readRecurringActiveIdFromUrl(): number | null {
+  const value = new URLSearchParams(window.location.search).get("seriesId");
+  if (!value) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function recurringUrl(seriesId: number | null): string {
+  if (!seriesId) {
+    return "/recurring";
+  }
+  return `/recurring?${new URLSearchParams({ seriesId: String(seriesId) }).toString()}`;
+}
+
+function transactionUrl(transactionId: number): string {
+  return `/transactions?${new URLSearchParams({ transactionId: String(transactionId) }).toString()}`;
 }
