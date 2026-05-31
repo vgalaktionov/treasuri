@@ -26,6 +26,16 @@ export const currentBalanceSchema = z.object({
   source: z.string(),
 });
 
+export const dashboardTransactionSchema = z.object({
+  amount: z.string(),
+  bookingDate: z.string(),
+  categoryName: z.string().nullable(),
+  flags: z.array(z.string()).default([]),
+  id: z.number(),
+  merchant: z.string(),
+  needsReview: z.boolean(),
+});
+
 export const monthProgressSchema = z.object({
   elapsedDays: z.number(),
   label: z.string(),
@@ -46,7 +56,9 @@ export const dashboardResponseSchema = z.object({
   monthProgress: monthProgressSchema,
   paceSummary: z.string(),
   projectedSavings: z.string(),
+  recentTransactions: z.array(dashboardTransactionSchema),
   reviewCount: z.number(),
+  reviewBlockers: z.array(dashboardTransactionSchema),
   reviewImpact: z.string(),
   safeToday: z.string(),
   safePerDay: z.string(),

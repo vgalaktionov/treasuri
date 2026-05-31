@@ -10,6 +10,8 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
   await expect(page.locator("dt:visible").filter({ hasText: "Income status" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Uncategorized impact" })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "Synced balance" })).toBeVisible();
+  await expect(page.getByText("Review blockers")).toBeVisible();
+  await expect(page.getByText("Unknown Sample Merchant")).toBeVisible();
   await page.getByRole("tab", { name: "After review" }).click();
   await expect(page.getByRole("heading", { name: /EUR 56\.35/ })).toBeVisible();
   await expect(page.locator("dt:visible").filter({ hasText: "After review impact" })).toBeVisible();
@@ -19,7 +21,9 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
 
   await page.getByRole("tab", { name: "Month" }).click();
   await expect(page.locator("h2:visible").filter({ hasText: "Category pace" })).toBeVisible();
+  await expect(page.locator("h2:visible").filter({ hasText: "Month movement" })).toBeVisible();
   await expect(page.locator("p:visible").filter({ hasText: "Groceries" })).toBeVisible();
+  await expect(page.getByText("Sample Supermarket")).toBeVisible();
 
   await page.getByRole("tab", { name: "Explain" }).click();
   await expect(page.locator("p:visible").filter({ hasText: "Forecast explanation" })).toBeVisible();

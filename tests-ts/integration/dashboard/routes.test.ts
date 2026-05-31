@@ -35,6 +35,27 @@ describe("dashboard API", () => {
         totalDays: expect.any(Number),
       });
       expect(response.body.reviewCount).toBe(1);
+      expect(response.body.reviewBlockers).toEqual([
+        expect.objectContaining({
+          amount: "-42.10",
+          merchant: "Unknown Sample Merchant",
+          needsReview: true,
+        }),
+      ]);
+      expect(response.body.recentTransactions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            amount: "-42.10",
+            merchant: "Unknown Sample Merchant",
+            needsReview: true,
+          }),
+          expect.objectContaining({
+            amount: "-64.35",
+            merchant: "Sample Supermarket",
+            needsReview: false,
+          }),
+        ]),
+      );
       expect(response.body.monthFacts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ label: "Fixed costs" }),

@@ -7,6 +7,8 @@ import {
   daysLeftInMonth,
   formatMoney,
 } from "../forecast/calculator.ts";
+import type { TransactionRow } from "../management/transactions.ts";
+import { transactionRow } from "../management/transactions.ts";
 
 export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<DashboardResponse> {
   const forecast = await readLatestForecast(pool);
@@ -39,6 +41,7 @@ export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<D
   const totalDays = daysInMonth(asOf);
   const remainingDays = daysLeftInMonth(asOf);
   const elapsedDays = Math.min(asOf.getUTCDate(), totalDays);
+  const reviewBlockers = await readReviewBlockers(pool, forecast.year_month);
 
   return {
     categoryPace: await readCategoryPace(pool, forecast.year_month),
@@ -79,7 +82,9 @@ export async function loadDashboard(pool: pg.Pool, asOf = new Date()): Promise<D
     },
     paceSummary: paceSummary(explanation),
     projectedSavings,
+    recentTransactions: await readRecentTransactions(pool, forecast.year_month),
     reviewCount: review.count,
+    reviewBlockers,
     reviewImpact: formatMoney(review.amount),
     safeToday: calculated.safePerDay,
     safePerDay: calculated.safePerDay,
@@ -155,7 +160,47 @@ export function sampleDashboard(): DashboardResponse {
     },
     paceSummary: "Variable pace is tracking the sample forecast.",
     projectedSavings: "1098.45",
+    recentTransactions: [
+      {
+        amount: "-42.10",
+        bookingDate: "2026-05-27",
+        categoryName: "Unknown",
+        flags: [],
+        id: 7,
+        merchant: "Unknown Sample Merchant",
+        needsReview: true,
+      },
+      {
+        amount: "-64.35",
+        bookingDate: "2026-05-26",
+        categoryName: "Groceries",
+        flags: [],
+        id: 3,
+        merchant: "Sample Supermarket",
+        needsReview: false,
+      },
+      {
+        amount: "5258.00",
+        bookingDate: "2026-05-24",
+        categoryName: "Income",
+        flags: ["income"],
+        id: 1,
+        merchant: "Sample Employer",
+        needsReview: false,
+      },
+    ],
     reviewCount: 1,
+    reviewBlockers: [
+      {
+        amount: "-42.10",
+        bookingDate: "2026-05-27",
+        categoryName: "Unknown",
+        flags: [],
+        id: 7,
+        merchant: "Unknown Sample Merchant",
+        needsReview: true,
+      },
+    ],
     reviewImpact: "42.10",
     safeToday: "16.41",
     safePerDay: "16.41",
@@ -323,6 +368,34 @@ async function readReviewImpact(
   return { amount: result.rows[0]?.amount ?? "0.00", count: Number(result.rows[0]?.count ?? 0) };
 }
 
+async function readReviewBlockers(pool: pg.Pool, yearMonth: string) {
+  const result = await pool.query<TransactionRow>(
+    `
+      ${dashboardTransactionSelect()}
+      WHERE enriched_transactions.needs_review = true
+        AND to_char(raw_transactions.booking_date, 'YYYY-MM') = $1
+      ORDER BY abs(raw_transactions.amount) DESC, raw_transactions.booking_date DESC,
+        enriched_transactions.id DESC
+      LIMIT 4
+    `,
+    [yearMonth],
+  );
+  return result.rows.map(dashboardTransactionRow);
+}
+
+async function readRecentTransactions(pool: pg.Pool, yearMonth: string) {
+  const result = await pool.query<TransactionRow>(
+    `
+      ${dashboardTransactionSelect()}
+      WHERE to_char(raw_transactions.booking_date, 'YYYY-MM') = $1
+      ORDER BY raw_transactions.booking_date DESC, enriched_transactions.id DESC
+      LIMIT 6
+    `,
+    [yearMonth],
+  );
+  return result.rows.map(dashboardTransactionRow);
+}
+
 async function readTopCategorySpend(pool: pg.Pool, yearMonth: string) {
   const result = await pool.query<{ amount: string; category: string }>(
     `
@@ -343,6 +416,45 @@ async function readTopCategorySpend(pool: pg.Pool, yearMonth: string) {
     label: row.category,
     value: `EUR ${formatMoney(row.amount)}`,
   }));
+}
+
+function dashboardTransactionSelect(): string {
+  return `
+    SELECT
+      enriched_transactions.id,
+      raw_transactions.booking_date::text,
+      raw_transactions.amount::text,
+      COALESCE(merchants.name, raw_transactions.counterparty_name, 'Unknown') AS merchant,
+      raw_transactions.description,
+      categories.id::text AS category_id,
+      categories.name AS category_name,
+      COALESCE(enriched_transactions.classification_method, 'none') AS classification_method,
+      enriched_transactions.needs_review,
+      enriched_transactions.is_income,
+      enriched_transactions.is_transfer,
+      enriched_transactions.is_savings,
+      enriched_transactions.is_fixed_cost,
+      enriched_transactions.is_recurring,
+      enriched_transactions.is_one_off,
+      enriched_transactions.is_excluded_from_budget
+    FROM enriched_transactions
+    JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+    LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+    LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+  `;
+}
+
+function dashboardTransactionRow(row: TransactionRow) {
+  const transaction = transactionRow(row);
+  return {
+    amount: formatMoney(transaction.amount),
+    bookingDate: transaction.bookingDate,
+    categoryName: transaction.categoryName,
+    flags: transaction.flags,
+    id: transaction.id,
+    merchant: transaction.merchant,
+    needsReview: transaction.needsReview,
+  };
 }
 
 function incomeStatus(incomeReceived: string, expectedIncomeRemaining: string): string {

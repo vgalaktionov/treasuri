@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CalendarDays, ChevronRight, Gauge, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  ChevronRight,
+  Gauge,
+  ReceiptText,
+  Wallet,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -267,6 +274,12 @@ function NowWorkspace({
             />
           ))}
         </dl>
+        <TransactionMiniList
+          emptyText="No open review blockers in this forecast."
+          items={data.reviewBlockers}
+          linkPrefix="/review"
+          title="Review blockers"
+        />
       </article>
     </div>
   );
@@ -320,11 +333,108 @@ function MonthWorkspace({ data }: { data: DashboardResponse }) {
     <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <CategoryPace rows={data.categoryPace} />
       <div className="grid gap-2">
+        <RecentTransactionsPanel data={data} />
         <Panel title="Top category spend" rows={data.topVariances} />
         <Panel title="Upcoming fixed costs" rows={data.upcomingFixedCosts} />
       </div>
     </div>
   );
+}
+
+function RecentTransactionsPanel({ data }: { data: DashboardResponse }) {
+  return (
+    <article className="rounded-md border border-treasuri-line bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-sm">Month movement</h2>
+          <p className="mt-1 text-treasuri-muted text-xs">
+            Latest transactions in {data.yearMonth}.
+          </p>
+        </div>
+        <a
+          className="inline-flex min-h-7 items-center gap-1 rounded-md border border-treasuri-line px-2 font-semibold text-treasuri-muted text-xs hover:bg-treasuri-panel"
+          href={`/transactions?month=${data.yearMonth}`}
+        >
+          <ReceiptText aria-hidden="true" className="size-3.5" />
+          Open
+        </a>
+      </div>
+      <TransactionMiniList
+        emptyText="No transactions imported for this month yet."
+        items={data.recentTransactions}
+        linkPrefix={`/transactions?month=${data.yearMonth}`}
+      />
+    </article>
+  );
+}
+
+function TransactionMiniList({
+  emptyText,
+  items,
+  linkPrefix,
+  title,
+}: {
+  emptyText: string;
+  items: DashboardResponse["recentTransactions"];
+  linkPrefix: string;
+  title?: string;
+}) {
+  const href = linkPrefix.includes("?") ? `${linkPrefix}&needsReview=true` : linkPrefix;
+
+  return (
+    <div className={title ? "mt-3 border-t border-treasuri-line pt-3" : "mt-2"}>
+      {title ? <p className="font-semibold text-sm">{title}</p> : null}
+      {items.length === 0 ? (
+        <p className="mt-2 rounded-md border border-treasuri-line bg-treasuri-panel p-2 text-treasuri-muted text-xs">
+          {emptyText}
+        </p>
+      ) : (
+        <div className="mt-2 divide-y divide-treasuri-line">
+          {items.map((transaction) => (
+            <a
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-2 first:pt-0 last:pb-0 hover:text-treasuri-action"
+              href={transaction.needsReview ? href : transactionHref(linkPrefix, transaction)}
+              key={transaction.id}
+            >
+              <span className="min-w-0">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-medium text-sm">{transaction.merchant}</span>
+                  {transaction.needsReview ? <Badge label="review" /> : null}
+                </span>
+                <span className="mt-0.5 block truncate text-treasuri-muted text-xs">
+                  {transaction.bookingDate} - {transaction.categoryName ?? "Uncategorized"}
+                  {transaction.flags.length > 0 ? ` - ${transaction.flags.join(", ")}` : ""}
+                </span>
+              </span>
+              <span className={`font-semibold text-sm ${amountClass(transaction.amount)}`}>
+                EUR {transaction.amount}
+              </span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Badge({ label }: { label: string }) {
+  return (
+    <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 font-semibold text-[0.62rem] text-amber-800">
+      {label}
+    </span>
+  );
+}
+
+function transactionHref(
+  linkPrefix: string,
+  transaction: DashboardResponse["recentTransactions"][number],
+): string {
+  const separator = linkPrefix.includes("?") ? "&" : "?";
+  return `${linkPrefix}${separator}query=${encodeURIComponent(transaction.merchant)}`;
+}
+
+function amountClass(amount: string): string {
+  return amount.startsWith("-") ? "text-treasuri-ink" : "text-emerald-700";
 }
 
 function ExplainWorkspace({ data }: { data: DashboardResponse }) {
