@@ -9,6 +9,10 @@ test("review actions update the inbox without leaving the page", async ({ page }
   await expect(page.getByText("EUR 42.10")).toBeVisible();
   await expect(page).toHaveURL(/\/review\?transactionId=4$/);
   await expect(page.getByRole("heading", { name: "Unknown Sample Merchant" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open transaction" })).toHaveAttribute(
+    "href",
+    "/transactions?transactionId=4",
+  );
   const accept = page.getByRole("button", { name: "Accept" });
   if ((await accept.count()) > 0) {
     await expect(page.getByText("1 to review")).toBeVisible();
@@ -41,6 +45,10 @@ test("review correction supports merchant flags and rule preview", async ({ page
   await expect(page.getByText("EUR 0.00")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Preview matches" })).toBeVisible();
   await expect(page.getByText("Needs review sample")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Needs review sample/ })).toHaveAttribute(
+    "href",
+    "/transactions?transactionId=4",
+  );
   await page.getByRole("button", { name: "Create rule" }).click();
   await expect(page.getByText(/Rule \d+ created/)).toBeVisible();
 });

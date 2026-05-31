@@ -1,5 +1,5 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, EyeOff, ListPlus, Save, Search } from "lucide-react";
+import { Check, ExternalLink, EyeOff, ListPlus, Save, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { RuleEditorRequest, RulePreviewResponse } from "../../shared/management.ts";
@@ -315,9 +315,18 @@ function ActiveReviewPanel({
           </div>
           <h2 className="mt-1 font-semibold text-base">{transaction.merchantName}</h2>
           <p className="mt-1 text-treasuri-muted text-sm">{transaction.description}</p>
-          {transaction.counterpartyName ? (
-            <p className="mt-1 text-treasuri-muted text-xs">{transaction.counterpartyName}</p>
-          ) : null}
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {transaction.counterpartyName ? (
+              <p className="text-treasuri-muted text-xs">{transaction.counterpartyName}</p>
+            ) : null}
+            <a
+              className="inline-flex items-center gap-1 font-medium text-treasuri-action text-xs"
+              href={transactionUrl(transaction.id)}
+            >
+              <ExternalLink aria-hidden="true" className="size-3" />
+              Open transaction
+            </a>
+          </div>
         </div>
         <p className="font-semibold text-base">
           {transaction.currency} {transaction.amount}
@@ -581,8 +590,9 @@ function PreviewMatches({ matches }: { matches: RulePreviewResponse["matches"] }
       </div>
       <div className="mt-2 divide-y divide-treasuri-line overflow-hidden rounded-md border border-treasuri-line bg-white">
         {matches.slice(0, 5).map((match) => (
-          <div
+          <a
             className="grid gap-1 px-2 py-2 text-xs sm:grid-cols-[5.5rem_minmax(0,1fr)_7rem_6rem] sm:gap-2"
+            href={transactionUrl(match.id)}
             key={match.id}
           >
             <time className="font-medium text-treasuri-muted" dateTime={match.bookingDate}>
@@ -596,11 +606,15 @@ function PreviewMatches({ matches }: { matches: RulePreviewResponse["matches"] }
               {match.categoryName ?? "Uncategorized"}
             </span>
             <span className="font-semibold sm:text-right">EUR {match.amount}</span>
-          </div>
+          </a>
         ))}
       </div>
     </section>
   );
+}
+
+function transactionUrl(transactionId: number): string {
+  return `/transactions?${new URLSearchParams({ transactionId: String(transactionId) }).toString()}`;
 }
 
 function Flag({
