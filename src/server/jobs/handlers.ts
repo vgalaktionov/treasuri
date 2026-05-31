@@ -2,6 +2,7 @@ import type pg from "pg";
 
 import { createDefaultBankProvider } from "../bank/fake.ts";
 import { syncBankTransactions } from "../bank/sync.ts";
+import { classifyPendingTransactions } from "../classify/service.ts";
 import { calculateSafeToSpend, daysLeftInMonth, formatMoney } from "../forecast/calculator.ts";
 import { applyRule } from "../management/rules.ts";
 import { createXlsxExport } from "../operations/exportService.ts";
@@ -20,7 +21,7 @@ export async function runJob(pool: pg.Pool, name: JobName, payload: unknown) {
       return normalizeTransactions(pool);
     case "classify_transactions":
       jobPayloadSchemas.classify_transactions.parse(payload);
-      return applyActiveRules(pool);
+      return classifyPendingTransactions(pool);
     case "detect_recurring":
       jobPayloadSchemas.detect_recurring.parse(payload);
       return detectRecurringCandidates(pool);
@@ -45,44 +46,6 @@ async function normalizeTransactions(pool: pg.Pool) {
   } finally {
     client.release();
   }
-}
-
-async function applyActiveRules(pool: pg.Pool) {
-  const result = await pool.query<{ id: string }>(`
-    WITH matches AS (
-      SELECT DISTINCT ON (enriched_transactions.id)
-        enriched_transactions.id,
-        categorization_rules.id AS rule_id,
-        categorization_rules.category_id,
-        categorization_rules.merchant_id
-      FROM enriched_transactions
-      JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
-      JOIN categorization_rules ON categorization_rules.is_active = true
-      LEFT JOIN manual_overrides ON manual_overrides.enriched_transaction_id = enriched_transactions.id
-      WHERE manual_overrides.id IS NULL
-        AND categorization_rules.operator = 'contains'
-        AND (
-          (categorization_rules.field = 'description'
-            AND raw_transactions.description ILIKE '%' || categorization_rules.pattern || '%')
-          OR (categorization_rules.field = 'counterparty_name'
-            AND raw_transactions.counterparty_name ILIKE '%' || categorization_rules.pattern || '%')
-        )
-      ORDER BY enriched_transactions.id, categorization_rules.priority, categorization_rules.id
-    )
-    UPDATE enriched_transactions
-    SET category_id = COALESCE(matches.category_id, enriched_transactions.category_id),
-        merchant_id = COALESCE(matches.merchant_id, enriched_transactions.merchant_id),
-        needs_review = false,
-        classification_method = 'rule',
-        classification_confidence = 1,
-        classification_reason = 'Classified by background rule job.',
-        rule_id = matches.rule_id,
-        updated_at = now()
-    FROM matches
-    WHERE enriched_transactions.id = matches.id
-    RETURNING enriched_transactions.id
-  `);
-  return { classifiedCount: result.rowCount ?? 0 };
 }
 
 async function detectRecurringCandidates(pool: pg.Pool) {
