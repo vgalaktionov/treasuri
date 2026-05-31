@@ -1,5 +1,5 @@
 const CACHE_NAME = "treasuri-v2-shell";
-const SAFE_ASSETS = ["/offline.html", "/manifest.webmanifest", "/icons/icon.svg"];
+const SAFE_ASSETS = ["/offline.html", "/offline-summary.js", "/manifest.webmanifest", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SAFE_ASSETS)));
@@ -37,6 +37,7 @@ self.addEventListener("fetch", (event) => {
   if (
     url.pathname.startsWith("/assets/") ||
     url.pathname === "/manifest.webmanifest" ||
+    url.pathname === "/offline-summary.js" ||
     url.pathname === "/icons/icon.svg" ||
     url.pathname === "/offline.html"
   ) {

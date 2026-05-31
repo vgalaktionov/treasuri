@@ -18,16 +18,75 @@
         display: grid;
         min-height: 100dvh;
         place-items: center;
-        padding: 24px;
+        padding: 32px 20px;
       }
 
       section {
-        max-width: 34rem;
+        width: min(100%, 34rem);
       }
 
       p {
         color: #5a675f;
         line-height: 1.6;
+      }
+
+      h1 {
+        margin: 8px 0 18px;
+        font-size: clamp(2rem, 8vw, 2.5rem);
+        line-height: 1.05;
+      }
+
+      h2 {
+        margin: 0 0 18px;
+        font-size: 1.35rem;
+        line-height: 1.15;
+      }
+
+      article {
+        margin-top: 24px;
+        border-top: 1px solid #d8ded7;
+        padding-top: 22px;
+      }
+
+      dl {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+      }
+
+      dl div {
+        display: grid;
+        grid-template-columns: minmax(8rem, 1fr) minmax(0, 1.4fr);
+        gap: 16px;
+        align-items: baseline;
+      }
+
+      dt {
+        color: #5a675f;
+        font-size: 0.9rem;
+      }
+
+      dd {
+        margin: 0;
+        font-weight: 650;
+      }
+
+      @media (max-width: 520px) {
+        main {
+          place-items: start;
+          padding-top: 56px;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+
+        dl div {
+          grid-template-columns: 1fr;
+          gap: 2px;
+          border-bottom: 1px solid #edf0ec;
+          padding-bottom: 9px;
+        }
       }
     </style>
   </head>
@@ -36,8 +95,47 @@
       <section aria-labelledby="offline-title">
         <p>Offline</p>
         <h1 id="offline-title">Treasuri cannot reach the server.</h1>
-        <p>Reconnect to view your dashboard, transactions, exports, and settings.</p>
+        <p data-offline-empty>Reconnect to view your dashboard, transactions, exports, and settings.</p>
+        <article data-offline-summary hidden>
+          <h2>Last known dashboard summary</h2>
+          <dl>
+            <div>
+              <dt>Month</dt>
+              <dd data-offline-field="month"></dd>
+            </div>
+            <div>
+              <dt>Safe to spend</dt>
+              <dd data-offline-field="safe_to_spend"></dd>
+            </div>
+            <div>
+              <dt>Safe per day</dt>
+              <dd data-offline-field="safe_per_day"></dd>
+            </div>
+            <div>
+              <dt>Projected savings</dt>
+              <dd data-offline-field="projected_savings"></dd>
+            </div>
+            <div>
+              <dt>Target savings</dt>
+              <dd data-offline-field="target_savings"></dd>
+            </div>
+            <div>
+              <dt>Confidence</dt>
+              <dd><span data-offline-field="confidence"></span> <span data-offline-field="confidence_note"></span></dd>
+            </div>
+            <div>
+              <dt>Review</dt>
+              <dd><span data-offline-field="review_count"></span> transaction(s) need review</dd>
+            </div>
+            <div>
+              <dt>Balance as of</dt>
+              <dd data-offline-field="balance_as_of"></dd>
+            </div>
+          </dl>
+          <p>Stored on this device after the dashboard loaded successfully.</p>
+        </article>
       </section>
     </main>
+    <script defer src="/offline-summary.js"></script>
   </body>
 </html>

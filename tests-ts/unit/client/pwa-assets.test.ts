@@ -19,6 +19,8 @@ describe("PWA assets", () => {
     const offline = read("public/offline.html").toLowerCase();
 
     expect(offline).toContain("reconnect");
+    expect(offline).toContain("last known dashboard summary");
+    expect(offline).toContain("data-offline-summary");
     expect(offline).not.toContain("transaction history");
     expect(offline).not.toContain("jumbo");
     expect(offline).not.toContain("iban");
@@ -29,8 +31,19 @@ describe("PWA assets", () => {
 
     expect(serviceWorker).toContain('url.pathname.startsWith("/api/")');
     expect(serviceWorker).toContain("/offline.html");
+    expect(serviceWorker).toContain("/offline-summary.js");
     expect(serviceWorker).not.toContain("/api/dashboard");
     expect(serviceWorker).not.toContain("/api/transactions");
+  });
+
+  it("renders only summary fields in the offline script", () => {
+    const script = read("public/offline-summary.js");
+
+    expect(script).toContain("treasuri:last-dashboard-summary");
+    expect(script).toContain("safe_to_spend");
+    expect(script).toContain("target_savings");
+    expect(script).not.toContain("merchant");
+    expect(script).not.toContain("iban");
   });
 });
 

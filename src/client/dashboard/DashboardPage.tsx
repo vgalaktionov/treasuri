@@ -9,7 +9,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { DashboardResponse } from "../../shared/dashboard.ts";
 import { fetchDashboard } from "../lib/api.ts";
@@ -21,6 +21,12 @@ export function DashboardPage() {
   const dashboard = useQuery({ queryFn: fetchDashboard, queryKey: ["dashboard"] });
   const [mode, setMode] = useState<DashboardMode>("now");
   const [guardrailMode, setGuardrailMode] = useState<GuardrailMode>("base");
+
+  useEffect(() => {
+    if (dashboard.data) {
+      storeOfflineDashboardSummary(dashboard.data);
+    }
+  }, [dashboard.data]);
 
   if (dashboard.isLoading) {
     return <p className="text-treasuri-muted">Loading dashboard...</p>;
@@ -754,4 +760,28 @@ function monthLabel(yearMonth: string): string {
 
 function titleCase(value: string): string {
   return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
+}
+
+const offlineSummaryStorageKey = "treasuri:last-dashboard-summary";
+
+function storeOfflineDashboardSummary(data: DashboardResponse): void {
+  try {
+    localStorage.setItem(
+      offlineSummaryStorageKey,
+      JSON.stringify({
+        balance_as_of: data.currentBalance?.asOf ?? "unknown",
+        confidence: data.confidence,
+        confidence_note: data.confidenceNote,
+        month: data.yearMonth,
+        projected_savings: `EUR ${data.projectedSavings}`,
+        review_count: data.reviewCount,
+        safe_per_day: `EUR ${data.safePerDay}`,
+        safe_to_spend: `EUR ${data.safeToSpend}`,
+        saved_at: new Date().toISOString(),
+        target_savings: `EUR ${explanationValue(data, "target_savings_remaining")}`,
+      }),
+    );
+  } catch {
+    // Private browsing or locked-down storage should not affect the live dashboard.
+  }
 }
