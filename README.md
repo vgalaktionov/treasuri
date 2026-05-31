@@ -71,6 +71,6 @@ Every vertical slice should leave the repo runnable and tested:
 - Testcontainers-backed Postgres coverage.
 - Playwright E2E coverage for user-visible workflows.
 - Real local Docker Compose verification.
-- Docker image command smoke coverage in CI before GHCR publish.
+- Docker image command smoke coverage in CI before GHCR publish on `v*` tags.
 
 Generated XLSX exports are stored in Postgres `bytea` and streamed from Postgres on download. Durable container filesystem state is not part of the product contract.
