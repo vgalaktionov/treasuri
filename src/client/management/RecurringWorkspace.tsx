@@ -207,6 +207,7 @@ function RecurringInspector({
   series: RecurringSeries | null;
 }) {
   const [form, setForm] = useState<RecurringFormState>(() => formFromSeries(series));
+  const impact = useMemo(() => recurringImpact(series, form), [series, form]);
 
   useEffect(() => {
     setForm(formFromSeries(series));
@@ -338,6 +339,7 @@ function RecurringInspector({
             />
           </label>
         </div>
+        <RecurringImpactPreview impact={impact} />
         <button
           className="mt-3 inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-xs text-white disabled:opacity-60 sm:text-sm"
           disabled={disabled}
@@ -438,6 +440,39 @@ function RecurringInspector({
   );
 }
 
+function RecurringImpactPreview({
+  impact,
+}: {
+  impact: {
+    amountDelta: number;
+    hasUnsavedChanges: boolean;
+    nextExpectedDate: string;
+    safeToSpendDelta: number;
+  };
+}) {
+  return (
+    <section className="mt-3 rounded-md border border-treasuri-line bg-treasuri-panel p-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="font-semibold text-sm">Forecast impact</h4>
+        <span
+          className={`rounded border px-2 py-1 font-semibold text-[0.68rem] ${
+            impact.hasUnsavedChanges
+              ? "border-amber-200 bg-amber-50 text-amber-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          {impact.hasUnsavedChanges ? "Unsaved changes" : "Matches saved assumptions"}
+        </span>
+      </div>
+      <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
+        <Fact label="fixed-cost delta" value={formatSignedEuro(impact.amountDelta)} />
+        <Fact label="safe-to-spend effect" value={formatSignedEuro(impact.safeToSpendDelta)} />
+        <Fact label="next expected" value={impact.nextExpectedDate || "unknown"} />
+      </dl>
+    </section>
+  );
+}
+
 function Badge({ label, tone = "default" }: { label: string; tone?: "default" | "warn" }) {
   return (
     <span
@@ -469,6 +504,34 @@ function formFromSeries(series: RecurringSeries | null): RecurringFormState {
     name: series?.name ?? "",
     nextExpectedDate: series?.nextExpectedDate ?? "",
   };
+}
+
+function recurringImpact(series: RecurringSeries | null, form: RecurringFormState) {
+  const saved = formFromSeries(series);
+  const savedAmount = Number.parseFloat(saved.expectedAmount || "0");
+  const draftAmount = Number.parseFloat(form.expectedAmount || "0");
+  const amountDelta = roundMoney((Number.isFinite(draftAmount) ? draftAmount : 0) - savedAmount);
+  return {
+    amountDelta,
+    hasUnsavedChanges:
+      saved.categoryId !== form.categoryId ||
+      saved.expectedAmount !== form.expectedAmount ||
+      saved.expectedDayOfMonth !== form.expectedDayOfMonth ||
+      saved.name !== form.name ||
+      saved.nextExpectedDate !== form.nextExpectedDate,
+    nextExpectedDate: form.nextExpectedDate,
+    safeToSpendDelta: roundMoney(-amountDelta),
+  };
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function formatSignedEuro(value: number): string {
+  const normalized = Object.is(value, -0) ? 0 : value;
+  const prefix = normalized < 0 ? "-EUR " : normalized > 0 ? "+EUR " : "EUR ";
+  return `${prefix}${Math.abs(normalized).toFixed(2)}`;
 }
 
 function inputFromForm(form: RecurringFormState): RecurringUpdateRequest {

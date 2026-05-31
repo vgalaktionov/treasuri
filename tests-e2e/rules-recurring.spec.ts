@@ -53,11 +53,16 @@ test("recurring workspace edits assumptions and disables detected commitments", 
 
   await page.goto("/recurring?seriesId=2");
   await expect(page.getByRole("heading", { name: "Sample Streaming" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast impact" })).toBeVisible();
+  await expect(page.getByText("Matches saved assumptions")).toBeVisible();
   await page.getByLabel("Expected amount").fill("19.99");
+  await expect(page.getByText("Unsaved changes")).toBeVisible();
+  await expect(page.getByText("-EUR 5.00")).toBeVisible();
   await page.getByLabel("Expected day").fill("16");
   await page.getByLabel("Next expected").fill("2026-06-16");
   await page.getByRole("button", { exact: true, name: "Save assumptions" }).click();
   await expect(page.getByText("Recurring assumptions saved.")).toBeVisible();
+  await expect(page.getByText("Matches saved assumptions")).toBeVisible();
   await expect(page.getByText("EUR 19.99").first()).toBeVisible();
   await expect(page.getByText("Next expected 2026-06-16")).toBeVisible();
   await expect(page.getByRole("button", { exact: true, name: "Confirm" })).toHaveCount(0);
