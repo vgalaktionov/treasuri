@@ -354,6 +354,16 @@ function sampleRecurring(): RecurringResponse {
         id: 1,
         isConfirmed: true,
         lastBookingDate: "2026-05-01",
+        linkedTransactions: [
+          {
+            amount: "-1450.00",
+            bookingDate: "2026-05-01",
+            categoryName: "Rent / Mortgage",
+            description: "Monthly rent sample",
+            id: 2,
+            merchant: "Sample Housing",
+          },
+        ],
         maxAmount: "1450.00",
         minAmount: "1450.00",
         name: "Sample Rent",
@@ -370,6 +380,16 @@ function sampleRecurring(): RecurringResponse {
         id: 2,
         isConfirmed: false,
         lastBookingDate: "2026-05-15",
+        linkedTransactions: [
+          {
+            amount: "-14.99",
+            bookingDate: "2026-05-15",
+            categoryName: "Subscriptions",
+            description: "Monthly streaming sample",
+            id: 8,
+            merchant: "Sample Streaming",
+          },
+        ],
         maxAmount: "14.99",
         minAmount: "14.99",
         name: "Sample Streaming",

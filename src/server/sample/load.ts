@@ -177,6 +177,16 @@ async function upsertBalanceSnapshot(
 }
 
 async function replaceSampleRecurringSeries(client: pg.PoolClient): Promise<void> {
+  await client.query(`
+    UPDATE enriched_transactions
+    SET
+      is_recurring = false,
+      recurring_series_id = NULL,
+      updated_at = now()
+    FROM recurring_series
+    WHERE recurring_series.name LIKE 'Sample %'
+      AND enriched_transactions.recurring_series_id = recurring_series.id
+  `);
   await client.query("DELETE FROM recurring_series WHERE name LIKE 'Sample %'");
   await client.query(`
     INSERT INTO recurring_series (
@@ -192,6 +202,17 @@ async function replaceSampleRecurringSeries(client: pg.PoolClient): Promise<void
         'Sample Streaming', 'monthly', 'fixed', 14.99, 0, 15, '2026-06-15', 0.80, false, true,
         (SELECT id FROM categories WHERE name = 'Subscriptions')
       )
+  `);
+  await client.query(`
+    UPDATE enriched_transactions
+    SET
+      is_recurring = true,
+      recurring_series_id = recurring_series.id,
+      updated_at = now()
+    FROM recurring_series
+    JOIN raw_transactions ON raw_transactions.source_hash = 'sample-rent-2026-05'
+    WHERE recurring_series.name = 'Sample Rent'
+      AND enriched_transactions.raw_transaction_id = raw_transactions.id
   `);
 }
 

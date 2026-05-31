@@ -10,6 +10,15 @@ type RecurringCandidate = {
   transactionIds: number[];
 };
 
+type LinkedRecurringTransaction = {
+  amount: string;
+  bookingDate: string;
+  categoryName: string | null;
+  description: string;
+  id: number;
+  merchant: string;
+};
+
 export async function listRecurring(pool: pg.Pool) {
   const result = await pool.query<{
     amount_tolerance: string | null;
@@ -21,6 +30,7 @@ export async function listRecurring(pool: pg.Pool) {
     id: string;
     is_confirmed: boolean;
     last_booking_date: string | null;
+    linked_transactions: unknown;
     max_amount: string | null;
     min_amount: string | null;
     name: string;
@@ -39,7 +49,8 @@ export async function listRecurring(pool: pg.Pool) {
       categories.name AS category_name,
       activity.min_amount::text,
       activity.max_amount::text,
-      activity.last_booking_date::text
+      activity.last_booking_date::text,
+      evidence.linked_transactions
     FROM recurring_series
     LEFT JOIN categories ON categories.id = recurring_series.category_id
     LEFT JOIN LATERAL (
@@ -51,6 +62,38 @@ export async function listRecurring(pool: pg.Pool) {
       JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
       WHERE enriched_transactions.recurring_series_id = recurring_series.id
     ) AS activity ON true
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', linked.id,
+            'bookingDate', linked.booking_date,
+            'amount', linked.amount,
+            'merchant', linked.merchant,
+            'description', linked.description,
+            'categoryName', linked.category_name
+          )
+          ORDER BY linked.booking_date DESC, linked.id DESC
+        ),
+        '[]'::jsonb
+      ) AS linked_transactions
+      FROM (
+        SELECT
+          enriched_transactions.id,
+          raw_transactions.booking_date::text AS booking_date,
+          raw_transactions.amount::text AS amount,
+          COALESCE(merchants.name, raw_transactions.counterparty_name, 'Unknown') AS merchant,
+          raw_transactions.description,
+          categories.name AS category_name
+        FROM enriched_transactions
+        JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+        LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+        LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+        WHERE enriched_transactions.recurring_series_id = recurring_series.id
+        ORDER BY raw_transactions.booking_date DESC, enriched_transactions.id DESC
+        LIMIT 6
+      ) AS linked
+    ) AS evidence ON true
     WHERE recurring_series.is_active = true
     ORDER BY recurring_series.next_expected_date NULLS LAST, recurring_series.name
   `);
@@ -65,6 +108,7 @@ export async function listRecurring(pool: pg.Pool) {
       id: Number(row.id),
       isConfirmed: row.is_confirmed,
       lastBookingDate: row.last_booking_date,
+      linkedTransactions: parseLinkedTransactions(row.linked_transactions),
       maxAmount: row.max_amount,
       minAmount: row.min_amount,
       name: row.name,
@@ -72,6 +116,46 @@ export async function listRecurring(pool: pg.Pool) {
       warnings: recurringWarnings(row),
     })),
   };
+}
+
+function parseLinkedTransactions(value: unknown): LinkedRecurringTransaction[] {
+  let rows: unknown;
+  try {
+    rows = typeof value === "string" ? JSON.parse(value) : value;
+  } catch {
+    rows = [];
+  }
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows.flatMap((row) => {
+    if (!row || typeof row !== "object") {
+      return [];
+    }
+    const candidate = row as Partial<LinkedRecurringTransaction>;
+    if (
+      typeof candidate.amount !== "string" ||
+      typeof candidate.bookingDate !== "string" ||
+      typeof candidate.description !== "string" ||
+      typeof candidate.id !== "number" ||
+      typeof candidate.merchant !== "string"
+    ) {
+      return [];
+    }
+    return [
+      {
+        amount: candidate.amount,
+        bookingDate: candidate.bookingDate,
+        categoryName:
+          typeof candidate.categoryName === "string" || candidate.categoryName === null
+            ? candidate.categoryName
+            : null,
+        description: candidate.description,
+        id: candidate.id,
+        merchant: candidate.merchant,
+      },
+    ];
+  });
 }
 
 export async function detectRecurringCandidates(pool: pg.Pool) {

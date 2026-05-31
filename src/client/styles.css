@@ -8,6 +8,10 @@
   --color-treasuri-action: #0f766e;
 }
 
+html {
+  font-size: 13px;
+}
+
 body {
   margin: 0;
   min-width: 320px;

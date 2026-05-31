@@ -260,6 +260,13 @@ describe("management API", () => {
       );
 
       expect(recurring.body.series[0].confidence).toBeDefined();
+      expect(recurring.body.series[0].linkedTransactions).toBeInstanceOf(Array);
+      expect(
+        recurring.body.series.some(
+          (series: { linkedTransactions: unknown[]; name: string }) =>
+            series.name === "Sample Rent" && series.linkedTransactions.length > 0,
+        ),
+      ).toBe(true);
       await agent
         .post(`/api/recurring/${detected.id}/confirm`)
         .set("x-csrf-token", csrf)

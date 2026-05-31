@@ -180,6 +180,7 @@ function RecurringInspector({
       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm lg:grid-cols-3">
         <Fact label="confidence" value={series.confidence ?? "0.00"} />
         <Fact label="last seen" value={series.lastBookingDate ?? "unknown"} />
+        <Fact label="evidence" value={`${series.linkedTransactions.length} tx`} />
         <Fact
           label="day"
           value={series.expectedDayOfMonth ? String(series.expectedDayOfMonth) : "unknown"}
@@ -199,6 +200,58 @@ function RecurringInspector({
           </ul>
         </div>
       ) : null}
+
+      <section className="mt-4 border-t border-treasuri-line pt-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-semibold text-sm">Linked transactions</h3>
+          <span className="text-treasuri-muted text-xs">{series.linkedTransactions.length}</span>
+        </div>
+        {series.linkedTransactions.length > 0 ? (
+          <div className="mt-2 overflow-hidden rounded-md border border-treasuri-line">
+            <div className="hidden grid-cols-[5.5rem_minmax(0,1fr)_7rem_7rem] gap-2 bg-treasuri-panel px-2 py-1.5 font-semibold text-treasuri-muted text-xs lg:grid">
+              <span>Date</span>
+              <span>Merchant</span>
+              <span>Category</span>
+              <span className="text-right">Amount</span>
+            </div>
+            <div className="divide-y divide-treasuri-line">
+              {series.linkedTransactions.map((transaction) => (
+                <div
+                  className="grid gap-1 px-2 py-2 text-xs lg:grid-cols-[5.5rem_minmax(0,1fr)_7rem_7rem] lg:gap-2"
+                  key={transaction.id}
+                >
+                  <time
+                    className="font-medium text-treasuri-muted"
+                    dateTime={transaction.bookingDate}
+                  >
+                    {transaction.bookingDate}
+                  </time>
+                  <p className="min-w-0">
+                    <span className="block truncate font-semibold text-sm">
+                      {transaction.merchant}
+                    </span>
+                    <span className="block truncate text-treasuri-muted">
+                      {transaction.description}
+                    </span>
+                  </p>
+                  <span className="truncate text-treasuri-muted">
+                    {transaction.categoryName ?? "Unknown"}
+                  </span>
+                  <span
+                    className={`font-semibold lg:text-right ${amountClass(transaction.amount)}`}
+                  >
+                    EUR {transaction.amount}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 rounded-md border border-treasuri-line bg-treasuri-panel p-2 text-treasuri-muted text-xs">
+            No linked transaction evidence yet. Run sync and recurring detection to attach history.
+          </p>
+        )}
+      </section>
 
       <div className="mt-4 grid grid-cols-2 gap-2 border-t border-treasuri-line pt-3 sm:flex sm:flex-wrap">
         {!series.isConfirmed ? (
@@ -263,4 +316,8 @@ function recurringSummary(series: RecurringSeries[]) {
 
 function preferredSeries(series: RecurringSeries[]): RecurringSeries | null {
   return series.find((item) => item.warnings.length > 0 || !item.isConfirmed) ?? series[0] ?? null;
+}
+
+function amountClass(amount: string): string {
+  return Number(amount) < 0 ? "text-red-700" : "text-emerald-700";
 }

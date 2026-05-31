@@ -209,6 +209,18 @@ export const recurringResponseSchema = z.object({
       id: z.number(),
       isConfirmed: z.boolean(),
       lastBookingDate: z.string().nullable().default(null),
+      linkedTransactions: z
+        .array(
+          z.object({
+            amount: z.string(),
+            bookingDate: z.string(),
+            categoryName: z.string().nullable(),
+            description: z.string(),
+            id: z.number(),
+            merchant: z.string(),
+          }),
+        )
+        .default([]),
       maxAmount: z.string().nullable().default(null),
       minAmount: z.string().nullable().default(null),
       name: z.string(),
