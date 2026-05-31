@@ -539,8 +539,9 @@ function RulePreviewPanel({ preview }: { preview: RulePreviewResponse }) {
       {preview.matches.length > 0 ? (
         <div className="mt-3 divide-y divide-treasuri-line rounded-md border border-treasuri-line bg-white">
           {preview.matches.slice(0, 6).map((match) => (
-            <div
+            <a
               className="grid gap-2 px-2 py-2 text-xs sm:grid-cols-[5.5rem_minmax(0,1fr)_7rem_6rem]"
+              href={transactionHref(match.id)}
               key={match.id}
             >
               <span className="font-medium text-treasuri-muted">{match.bookingDate}</span>
@@ -550,7 +551,7 @@ function RulePreviewPanel({ preview }: { preview: RulePreviewResponse }) {
               </span>
               <span>{match.categoryName ?? "Uncategorized"}</span>
               <span className="font-semibold sm:text-right">EUR {match.amount}</span>
-            </div>
+            </a>
           ))}
         </div>
       ) : (
@@ -633,4 +634,8 @@ function ruleToRequest(rule: RuleItem, fallbackCategoryId: number): RuleEditorRe
     pattern: rule.pattern,
     priority: rule.priority,
   };
+}
+
+function transactionHref(transactionId: number): string {
+  return `/transactions?${new URLSearchParams({ transactionId: String(transactionId) }).toString()}`;
 }

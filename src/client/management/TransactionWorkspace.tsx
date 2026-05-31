@@ -671,8 +671,9 @@ function PreviewMatches({ matches }: { matches: TransactionsResponse["transactio
       </div>
       <div className="mt-2 divide-y divide-treasuri-line overflow-hidden rounded-md border border-treasuri-line bg-white">
         {matches.slice(0, 5).map((match) => (
-          <div
+          <a
             className="grid gap-1 px-2 py-2 text-xs sm:grid-cols-[5.5rem_minmax(0,1fr)_7rem_6rem] sm:gap-2"
+            href={transactionUrl(match.id)}
             key={match.id}
           >
             <time className="font-medium text-treasuri-muted" dateTime={match.bookingDate}>
@@ -688,7 +689,7 @@ function PreviewMatches({ matches }: { matches: TransactionsResponse["transactio
             <span className={`font-semibold sm:text-right ${amountClass(match)}`}>
               EUR {match.amount}
             </span>
-          </div>
+          </a>
         ))}
       </div>
     </section>
@@ -778,4 +779,8 @@ function urlForFilters(filters: TransactionFilters, transactionId?: number | nul
   }
   const query = params.toString();
   return query ? `/transactions?${query}` : "/transactions";
+}
+
+function transactionUrl(transactionId: number): string {
+  return `/transactions?${new URLSearchParams({ transactionId: String(transactionId) }).toString()}`;
 }

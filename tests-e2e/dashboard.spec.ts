@@ -35,6 +35,10 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
     "/categories?category=Groceries",
   );
   await expect(page.getByText("Sample Supermarket")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Unknown Sample Merchant review/ })).toHaveAttribute(
+    "href",
+    "/transactions?month=2026-05&transactionId=4",
+  );
 
   await page.getByRole("tab", { name: "Explain" }).click();
   await expect(page.locator("p:visible").filter({ hasText: "Forecast equation" })).toBeVisible();

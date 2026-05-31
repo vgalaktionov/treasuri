@@ -18,6 +18,10 @@ test("transaction filters preserve context and edits stay in place", async ({ pa
   await expect(page.getByText("Classify Sample Pet Care")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Preview matches" })).toBeVisible();
   await expect(page.getByText("Sample Pet Care").last()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Dog food sample/ })).toHaveAttribute(
+    "href",
+    "/transactions?transactionId=1",
+  );
   await page.getByRole("button", { name: "Create rule" }).click();
   await expect(page.getByText(/Rule \d+ created/)).toBeVisible();
   await page.getByLabel("Category for Dog food sample").selectOption({ label: "Groceries" });
