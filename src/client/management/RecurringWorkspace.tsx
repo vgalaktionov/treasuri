@@ -11,9 +11,21 @@ export function RecurringWorkspace() {
   const queryClient = useQueryClient();
   const recurring = useQuery({ queryFn: fetchRecurring, queryKey: ["recurring"] });
   const [activeId, setActiveId] = useState<number | null>(null);
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["recurring"] });
-  const confirm = useMutation({ mutationFn: confirmRecurring, onSuccess: invalidate });
-  const disable = useMutation({ mutationFn: disableRecurring, onSuccess: invalidate });
+  const [message, setMessage] = useState<string | null>(null);
+  const confirm = useMutation({
+    mutationFn: confirmRecurring,
+    onSuccess: () => {
+      setMessage("Recurring series confirmed.");
+      invalidateFinanceWorkspaces(queryClient);
+    },
+  });
+  const disable = useMutation({
+    mutationFn: disableRecurring,
+    onSuccess: () => {
+      setMessage("Recurring series disabled.");
+      invalidateFinanceWorkspaces(queryClient);
+    },
+  });
   const series = recurring.data?.series ?? [];
   const activeSeries = series.find((item) => item.id === activeId) ?? preferredSeries(series);
   const summary = useMemo(() => recurringSummary(series), [series]);
@@ -51,6 +63,15 @@ export function RecurringWorkspace() {
         </dl>
       </header>
 
+      {message ? (
+        <p
+          aria-live="polite"
+          className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-emerald-800 text-sm"
+        >
+          {message}
+        </p>
+      ) : null}
+
       <div className="grid gap-3 xl:grid-cols-[minmax(17rem,0.65fr)_minmax(0,1fr)]">
         <RecurringList
           activeId={activeSeries?.id ?? null}
@@ -68,6 +89,19 @@ export function RecurringWorkspace() {
       </div>
     </section>
   );
+}
+
+function invalidateFinanceWorkspaces(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const queryKey of [
+    ["category-budgets"],
+    ["dashboard"],
+    ["recurring"],
+    ["review-inbox"],
+    ["rules"],
+    ["transactions"],
+  ]) {
+    queryClient.invalidateQueries({ queryKey });
+  }
 }
 
 function RecurringList({
