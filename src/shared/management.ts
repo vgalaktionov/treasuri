@@ -44,9 +44,21 @@ export const transactionListItemSchema = z.object({
   needsReview: z.boolean(),
 });
 
+export const transactionSummarySchema = z.object({
+  excludedTotal: z.string(),
+  firstDate: z.string().nullable(),
+  incomeTotal: z.string(),
+  lastDate: z.string().nullable(),
+  netTotal: z.string(),
+  outflowTotal: z.string(),
+  reviewCount: z.number(),
+  totalCount: z.number(),
+});
+
 export const transactionsResponseSchema = z.object({
   categories: z.array(managementCategorySchema),
   merchants: z.array(z.string()).default([]),
+  summary: transactionSummarySchema,
   transactions: z.array(transactionListItemSchema),
 });
 

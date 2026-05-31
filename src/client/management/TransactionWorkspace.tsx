@@ -78,7 +78,7 @@ export function TransactionWorkspace() {
         </div>
         {transactions.data ? (
           <p className="font-semibold text-treasuri-muted text-sm">
-            {items.length} shown / {transactions.data.merchants.length} merchants
+            {items.length} shown / {transactions.data.summary.totalCount} matched
           </p>
         ) : null}
       </header>
@@ -90,6 +90,7 @@ export function TransactionWorkspace() {
         onClear={clearFilters}
         onSubmit={submit}
       />
+      {transactions.data ? <TransactionSummary summary={transactions.data.summary} /> : null}
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.72fr)]">
         <TransactionLedger
@@ -109,6 +110,50 @@ export function TransactionWorkspace() {
         />
       </div>
     </section>
+  );
+}
+
+function TransactionSummary({ summary }: { summary: TransactionsResponse["summary"] }) {
+  const period =
+    summary.firstDate && summary.lastDate
+      ? `${summary.firstDate} to ${summary.lastDate}`
+      : "No transaction dates";
+
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
+      <SummaryCard detail={period} label="Filtered net" value={`EUR ${summary.netTotal}`} />
+      <SummaryCard label="Outflow" value={`EUR ${summary.outflowTotal}`} />
+      <SummaryCard label="Income" tone="positive" value={`EUR ${summary.incomeTotal}`} />
+      <SummaryCard
+        detail={`EUR ${summary.excludedTotal} excluded`}
+        label="Needs review"
+        tone={summary.reviewCount > 0 ? "warn" : "default"}
+        value={String(summary.reviewCount)}
+      />
+    </div>
+  );
+}
+
+function SummaryCard({
+  detail,
+  label,
+  tone = "default",
+  value,
+}: {
+  detail?: string;
+  label: string;
+  tone?: "default" | "positive" | "warn";
+  value: string;
+}) {
+  const valueClass =
+    tone === "positive" ? "text-emerald-700" : tone === "warn" ? "text-amber-700" : "";
+
+  return (
+    <article className="rounded-md border border-treasuri-line bg-white p-2">
+      <p className="font-medium text-treasuri-muted text-xs">{label}</p>
+      <p className={`mt-1 font-semibold text-sm ${valueClass}`}>{value}</p>
+      {detail ? <p className="mt-1 truncate text-treasuri-muted text-xs">{detail}</p> : null}
+    </article>
   );
 }
 

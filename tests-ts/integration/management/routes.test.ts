@@ -21,6 +21,14 @@ describe("management API", () => {
       );
 
       expect(filtered.body.transactions).toHaveLength(1);
+      expect(filtered.body.summary).toMatchObject({
+        excludedTotal: "0.00",
+        incomeTotal: "0.00",
+        netTotal: "-89.95",
+        outflowTotal: "89.95",
+        reviewCount: 0,
+        totalCount: 1,
+      });
       expect(transaction.description).toBe("Dog food sample");
       await agent
         .patch(`/api/transactions/${transaction.id}`)

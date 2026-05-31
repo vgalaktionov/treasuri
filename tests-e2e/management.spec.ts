@@ -10,6 +10,10 @@ test("transaction filters preserve context and edits stay in place", async ({ pa
   await expect(page.getByText("Dog food sample").first()).toBeVisible();
   await expect(page.getByText("Groceries sample")).toHaveCount(0);
   await expect(page.getByText("1 shown")).toBeVisible();
+  await expect(page.getByText("Filtered net")).toBeVisible();
+  await expect(
+    page.locator("article").filter({ hasText: "Filtered net" }).getByText("EUR -89.95"),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Preview rule" }).click();
   await expect(page.getByText("Classify Sample Pet Care")).toBeVisible();
   await expect(page.getByText("matches")).toBeVisible();
@@ -32,6 +36,7 @@ test("transaction workspace exposes advanced filters and raw details", async ({ 
   await expect(page).toHaveURL(/kind=savings/);
   await expect(page.getByText("Savings transfer sample").first()).toBeVisible();
   await expect(page.getByText("1 shown")).toBeVisible();
+  await expect(page.getByText("Outflow")).toBeVisible();
   await page.getByRole("button", { name: "Raw data" }).click();
   await expect(page.getByText("Sample current account")).toBeVisible();
   await expect(page.getByText('"source": "sample"')).toBeVisible();

@@ -241,8 +241,48 @@ export function sampleTransactions(filters: TransactionFilters): TransactionsRes
   return {
     categories: sampleCategories,
     merchants: [...new Set(transactions.map((transaction) => transaction.merchant))],
+    summary: summarizeSampleTransactions(transactions),
     transactions,
   };
+}
+
+function summarizeSampleTransactions(
+  transactions: TransactionsResponse["transactions"],
+): TransactionsResponse["summary"] {
+  const amounts = transactions.map((transaction) => Number(transaction.amount));
+  const outflow = transactions
+    .filter(
+      (transaction) =>
+        Number(transaction.amount) < 0 &&
+        !transaction.flags.includes("transfer") &&
+        !transaction.flags.includes("savings") &&
+        !transaction.flags.includes("excluded"),
+    )
+    .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+  const income = transactions
+    .filter((transaction) => Number(transaction.amount) > 0)
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+  const excluded = transactions
+    .filter(
+      (transaction) => Number(transaction.amount) < 0 && transaction.flags.includes("excluded"),
+    )
+    .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+  const dates = transactions.map((transaction) => transaction.bookingDate).sort();
+
+  return {
+    excludedTotal: money(excluded),
+    firstDate: dates[0] ?? null,
+    incomeTotal: money(income),
+    lastDate: dates.at(-1) ?? null,
+    netTotal: money(amounts.reduce((total, amount) => total + amount, 0)),
+    outflowTotal: money(outflow),
+    reviewCount: transactions.filter((transaction) => transaction.needsReview).length,
+    totalCount: transactions.length,
+  };
+}
+
+function money(value: number): string {
+  return value.toFixed(2);
 }
 
 export function sampleRawDetails(id: number) {

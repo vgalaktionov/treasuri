@@ -7,6 +7,7 @@ import type {
   TransactionUpdateRequest,
 } from "../../shared/management.ts";
 import { sql, toQuery } from "../db/sql.ts";
+import { formatMoney } from "../forecast/calculator.ts";
 import { listCategories } from "./service.ts";
 
 export type TransactionRow = {
@@ -34,14 +35,26 @@ export type TransactionMatchRow = TransactionRow & {
   merchant_matches: boolean;
 };
 
+type TransactionSummaryRow = {
+  excluded_total: string;
+  first_date: string | null;
+  income_total: string;
+  last_date: string | null;
+  net_total: string;
+  outflow_total: string;
+  review_count: string;
+  total_count: string;
+};
+
 export async function listTransactions(
   pool: pg.Pool,
   filters: TransactionFilters = {},
 ): Promise<TransactionsResponse> {
   const where = buildTransactionWhere(filters);
-  const [categories, merchants, transactions] = await Promise.all([
+  const [categories, merchants, summary, transactions] = await Promise.all([
     listCategories(pool),
     listMerchantNames(pool),
+    readTransactionSummary(pool, where),
     pool.query<TransactionRow>(
       `
         SELECT
@@ -76,7 +89,54 @@ export async function listTransactions(
   return {
     categories,
     merchants,
+    summary,
     transactions: transactions.rows.map(transactionRow),
+  };
+}
+
+async function readTransactionSummary(
+  pool: pg.Pool,
+  where: { clause: string; values: unknown[] },
+): Promise<TransactionsResponse["summary"]> {
+  const result = await pool.query<TransactionSummaryRow>(
+    `
+      SELECT
+        count(*)::text AS total_count,
+        count(*) FILTER (WHERE enriched_transactions.needs_review = true)::text AS review_count,
+        COALESCE(sum(raw_transactions.amount), 0)::text AS net_total,
+        COALESCE(sum(raw_transactions.amount) FILTER (
+          WHERE raw_transactions.amount > 0
+        ), 0)::text AS income_total,
+        COALESCE(sum(abs(raw_transactions.amount)) FILTER (
+          WHERE raw_transactions.amount < 0
+            AND enriched_transactions.is_transfer = false
+            AND enriched_transactions.is_savings = false
+            AND enriched_transactions.is_excluded_from_budget = false
+        ), 0)::text AS outflow_total,
+        COALESCE(sum(abs(raw_transactions.amount)) FILTER (
+          WHERE raw_transactions.amount < 0
+            AND enriched_transactions.is_excluded_from_budget = true
+        ), 0)::text AS excluded_total,
+        min(raw_transactions.booking_date)::text AS first_date,
+        max(raw_transactions.booking_date)::text AS last_date
+      FROM enriched_transactions
+      JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+      LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+      LEFT JOIN categories ON categories.id = enriched_transactions.category_id
+      ${where.clause}
+    `,
+    where.values,
+  );
+  const row = result.rows[0];
+  return {
+    excludedTotal: formatMoney(row?.excluded_total ?? "0"),
+    firstDate: row?.first_date ?? null,
+    incomeTotal: formatMoney(row?.income_total ?? "0"),
+    lastDate: row?.last_date ?? null,
+    netTotal: formatMoney(row?.net_total ?? "0"),
+    outflowTotal: formatMoney(row?.outflow_total ?? "0"),
+    reviewCount: Number(row?.review_count ?? 0),
+    totalCount: Number(row?.total_count ?? 0),
   };
 }
 
