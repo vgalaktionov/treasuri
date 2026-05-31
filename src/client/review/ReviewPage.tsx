@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { RuleEditorRequest, RulePreviewResponse } from "../../shared/management.ts";
 import type { ReviewInboxResponse } from "../../shared/review.ts";
 import { applyReviewAction, createRule, fetchReviewInbox, previewRule } from "../lib/api.ts";
+import { invalidateFinanceWorkspaces } from "../lib/invalidation.ts";
 
 type ReviewTransaction = ReviewInboxResponse["transactions"][number];
 
@@ -140,19 +141,6 @@ export function ReviewPage() {
       )}
     </section>
   );
-}
-
-function invalidateFinanceWorkspaces(queryClient: ReturnType<typeof useQueryClient>) {
-  for (const queryKey of [
-    ["category-budgets"],
-    ["dashboard"],
-    ["recurring"],
-    ["review-inbox"],
-    ["rules"],
-    ["transactions"],
-  ]) {
-    queryClient.invalidateQueries({ queryKey });
-  }
 }
 
 function ReviewQueue({

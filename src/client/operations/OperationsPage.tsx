@@ -29,6 +29,7 @@ import {
   saveSettings,
   syncNow,
 } from "../lib/api.ts";
+import { invalidateFinanceWorkspaces } from "../lib/invalidation.ts";
 
 type OperationsSection = "export" | "settings" | "status";
 type ExportRun = ExportsResponse["exports"][number];
@@ -52,9 +53,8 @@ export function OperationsPage({ section }: { section: OperationsSection }) {
   const sync = useMutation({
     mutationFn: syncNow,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["status"] });
+      invalidateFinanceWorkspaces(queryClient);
       queryClient.invalidateQueries({ queryKey: ["settings"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
   const create = useMutation({
@@ -318,8 +318,7 @@ function SettingsPanel({ settings }: { settings: SettingsResponse | undefined })
     onSuccess: (saved) => {
       setForm(settingsUpdateFromResponse(saved));
       queryClient.setQueryData(["settings"], saved);
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["status"] });
+      invalidateFinanceWorkspaces(queryClient);
     },
   });
   const monthlyGuardrail =

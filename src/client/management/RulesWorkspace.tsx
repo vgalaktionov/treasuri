@@ -15,6 +15,7 @@ import {
   setRuleActive,
   updateRule,
 } from "../lib/api.ts";
+import { invalidateFinanceWorkspaces } from "../lib/invalidation.ts";
 
 type RuleItem = RulesResponse["rules"][number];
 type EditorMode = { kind: "new" } | { id: number; kind: "edit" };
@@ -172,19 +173,6 @@ export function RulesWorkspace() {
       </div>
     </section>
   );
-}
-
-function invalidateFinanceWorkspaces(queryClient: ReturnType<typeof useQueryClient>) {
-  for (const queryKey of [
-    ["category-budgets"],
-    ["dashboard"],
-    ["recurring"],
-    ["review-inbox"],
-    ["rules"],
-    ["transactions"],
-  ]) {
-    queryClient.invalidateQueries({ queryKey });
-  }
 }
 
 function RuleList({

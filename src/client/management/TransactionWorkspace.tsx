@@ -15,6 +15,7 @@ import {
   fetchTransactions,
   updateTransaction,
 } from "../lib/api.ts";
+import { invalidateFinanceWorkspaces } from "../lib/invalidation.ts";
 
 type TransactionItem = TransactionsResponse["transactions"][number];
 
@@ -123,19 +124,6 @@ export function TransactionWorkspace() {
       </div>
     </section>
   );
-}
-
-function invalidateFinanceWorkspaces(queryClient: ReturnType<typeof useQueryClient>) {
-  for (const queryKey of [
-    ["category-budgets"],
-    ["dashboard"],
-    ["recurring"],
-    ["review-inbox"],
-    ["rules"],
-    ["transactions"],
-  ]) {
-    queryClient.invalidateQueries({ queryKey });
-  }
 }
 
 function TransactionSummary({ summary }: { summary: TransactionsResponse["summary"] }) {

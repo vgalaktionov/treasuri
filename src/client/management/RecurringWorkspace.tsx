@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { RecurringResponse } from "../../shared/management.ts";
 import { confirmRecurring, disableRecurring, fetchRecurring } from "../lib/api.ts";
+import { invalidateFinanceWorkspaces } from "../lib/invalidation.ts";
 
 type RecurringSeries = RecurringResponse["series"][number];
 
@@ -89,19 +90,6 @@ export function RecurringWorkspace() {
       </div>
     </section>
   );
-}
-
-function invalidateFinanceWorkspaces(queryClient: ReturnType<typeof useQueryClient>) {
-  for (const queryKey of [
-    ["category-budgets"],
-    ["dashboard"],
-    ["recurring"],
-    ["review-inbox"],
-    ["rules"],
-    ["transactions"],
-  ]) {
-    queryClient.invalidateQueries({ queryKey });
-  }
 }
 
 function RecurringList({
