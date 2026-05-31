@@ -4,6 +4,7 @@ test("review actions update the inbox without leaving the page", async ({ page }
   await page.goto("/review");
 
   await expect(page.getByRole("heading", { name: "Review inbox" })).toBeVisible();
+  await expect(page.getByText("Queue")).toBeVisible();
   const accept = page.getByRole("button", { name: "Accept" });
   if ((await accept.count()) > 0) {
     await expect(page.getByText("1 to review")).toBeVisible();
@@ -19,6 +20,7 @@ test("review correction supports merchant flags and rule preview", async ({ page
   await page.goto("/review");
 
   await expect(page.getByRole("heading", { name: "Review inbox" })).toBeVisible();
+  await expect(page.getByText("Queue")).toBeVisible();
   await page.getByLabel("Category for Needs review sample").selectOption({ label: "Dog" });
   await page.getByLabel("Merchant for Needs review sample").fill("Sample Pet Care");
   await page.getByLabel("Remember merchant").check();
