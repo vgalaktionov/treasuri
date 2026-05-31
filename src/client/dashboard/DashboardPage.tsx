@@ -30,19 +30,19 @@ export function DashboardPage() {
           <p className="font-medium text-treasuri-muted text-xs">{monthLabel(data.yearMonth)}</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h1
-              className={`font-semibold text-2xl leading-tight ${safeToSpendClass}`}
+              className={`font-semibold text-xl leading-tight ${safeToSpendClass}`}
               id="dashboard-heading"
             >
               EUR {data.safeToSpend}
             </h1>
-            <p className="font-medium text-treasuri-muted text-sm">safe to spend</p>
+            <p className="font-medium text-treasuri-muted text-sm">safe to spend this month</p>
           </div>
           <p className="mt-1 max-w-3xl text-treasuri-muted text-xs">{data.paceSummary}</p>
         </div>
 
         <div
           aria-label="Dashboard view"
-          className="inline-grid grid-cols-3 rounded-md border border-treasuri-line bg-white p-1 text-xs"
+          className="inline-grid grid-cols-3 rounded-md border border-treasuri-line bg-white p-1 text-xs lg:hidden"
           role="tablist"
         >
           {[
@@ -96,14 +96,28 @@ export function DashboardPage() {
 
           <NextActions className="lg:hidden" data={data} />
 
-          {mode === "now" ? <NowWorkspace data={data} reviewClass={reviewClass} /> : null}
-          {mode === "month" ? <MonthWorkspace data={data} /> : null}
-          {mode === "explain" ? <ExplainWorkspace data={data} /> : null}
+          <div className="lg:hidden">
+            {mode === "now" ? <NowWorkspace data={data} reviewClass={reviewClass} /> : null}
+            {mode === "month" ? <MonthWorkspace data={data} /> : null}
+            {mode === "explain" ? <ExplainWorkspace data={data} /> : null}
+          </div>
+
+          <DesktopWorkspace data={data} reviewClass={reviewClass} />
         </div>
 
         <NextActions className="hidden lg:block" data={data} />
       </section>
     </section>
+  );
+}
+
+function DesktopWorkspace({ data, reviewClass }: { data: DashboardResponse; reviewClass: string }) {
+  return (
+    <div className="hidden gap-2 lg:grid">
+      <NowWorkspace data={data} reviewClass={reviewClass} />
+      <MonthWorkspace data={data} />
+      <ExplainWorkspace data={data} />
+    </div>
   );
 }
 
@@ -187,7 +201,7 @@ function ExplainWorkspace({ data }: { data: DashboardResponse }) {
       </div>
       <dl className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {Object.entries(data.explanation).map(([label, value]) => (
-          <InlineMetric key={label} label={label.replaceAll("_", " ")} value={value} />
+          <ExplanationMetric key={label} label={label.replaceAll("_", " ")} value={value} />
         ))}
       </dl>
     </article>
@@ -204,7 +218,7 @@ function CategoryPace({ rows }: { rows: DashboardResponse["categoryPace"] }) {
         <div className="mt-2 divide-y divide-treasuri-line">
           {rows.map((row) => (
             <div
-              className="grid gap-2 py-2 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_11rem]"
+              className="grid gap-2 py-2 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_13rem]"
               key={row.category}
             >
               <div>
@@ -219,7 +233,7 @@ function CategoryPace({ rows }: { rows: DashboardResponse["categoryPace"] }) {
                   />
                 </div>
               </div>
-              <dl className="grid grid-cols-2 gap-2 text-xs">
+              <dl className="grid grid-cols-2 gap-2 text-right text-xs">
                 <InlineMetric label="Spent" value={`EUR ${row.currentMonth}`} />
                 <InlineMetric label="Usual" value={`EUR ${row.suggestedBudget}`} />
               </dl>
@@ -321,6 +335,25 @@ function InlineMetric({ detail, label, value }: { detail?: string; label: string
       <dt className="font-medium text-treasuri-muted text-xs">{label}</dt>
       <dd className="mt-0.5 font-semibold text-sm">{value}</dd>
       {detail ? <dd className="mt-0.5 text-treasuri-muted text-xs">{detail}</dd> : null}
+    </div>
+  );
+}
+
+function ExplanationMetric({ label, value }: { label: string; value: string }) {
+  const isFormula = label === "formula";
+
+  return (
+    <div className={isFormula ? "sm:col-span-2" : undefined}>
+      <dt className="font-medium text-treasuri-muted text-xs">{label}</dt>
+      <dd
+        className={`mt-0.5 ${
+          isFormula
+            ? "max-w-2xl whitespace-pre-wrap break-words font-mono text-treasuri-ink text-xs leading-snug"
+            : "font-semibold text-sm"
+        }`}
+      >
+        {isFormula ? value.replaceAll(" - ", "\n- ").replaceAll(" + ", "\n+ ") : value}
+      </dd>
     </div>
   );
 }

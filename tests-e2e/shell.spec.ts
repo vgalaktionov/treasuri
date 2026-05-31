@@ -8,7 +8,7 @@ test("shell shows the correct navigation for the viewport", async ({ page }, tes
   if (testInfo.project.name === "desktop") {
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Transactions" })).toBeVisible();
+    await expect(page.getByRole("link", { exact: true, name: "Transactions" })).toBeVisible();
     return;
   }
 
