@@ -10,12 +10,12 @@ export function App() {
   const currentPath = window.location.pathname;
 
   return (
-    <div className="min-h-dvh pb-20 lg:grid lg:grid-cols-[17rem_1fr] lg:pb-0">
-      <aside className="hidden border-treasuri-line border-r bg-white px-5 py-6 lg:block">
-        <a className="mb-8 block font-semibold text-2xl" href="/">
+    <div className="min-h-dvh pb-16 lg:grid lg:grid-cols-[15rem_1fr] lg:pb-0">
+      <aside className="hidden border-treasuri-line border-r bg-white px-4 py-4 lg:block">
+        <a className="mb-6 block font-semibold text-base" href="/">
           Treasuri
         </a>
-        <nav aria-label="Primary" className="space-y-7">
+        <nav aria-label="Primary" className="space-y-5">
           {navGroups.map((group) => (
             <section key={group.label} aria-labelledby={`nav-${group.label}`}>
               <h2
@@ -44,7 +44,7 @@ export function App() {
         </nav>
       </aside>
 
-      <main className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+      <main className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-5 lg:px-6 lg:py-5">
         {renderPage(currentPath)}
       </main>
 
@@ -54,7 +54,7 @@ export function App() {
       >
         {primaryMobileNav.map((item) => (
           <a
-            className={`min-h-16 px-2 py-2 text-center font-medium text-xs ${
+            className={`min-h-14 px-2 py-2 text-center font-medium text-xs ${
               isCurrentPath(item.href, currentPath) ? "text-treasuri-action" : "text-treasuri-muted"
             }`}
             href={item.href}
@@ -105,7 +105,7 @@ function isCurrentPath(href: string, currentPath: string): boolean {
 }
 
 function MobileNavIcon({ item }: { item: MobileNavItem }) {
-  const className = "mx-auto mb-1 size-5";
+  const className = "mx-auto mb-1 size-4";
 
   switch (item.icon) {
     case "home":

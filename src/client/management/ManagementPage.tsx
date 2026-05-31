@@ -34,8 +34,8 @@ export function ManagementPage({
   return (
     <section>
       <p className="font-medium text-sm text-treasuri-muted">Management</p>
-      <h1 className="mt-1 font-semibold text-3xl">{title(section)}</h1>
-      <p className="mt-3 text-treasuri-muted">
+      <h1 className="mt-1 font-semibold text-xl">{title(section)}</h1>
+      <p className="mt-2 text-sm text-treasuri-muted">
         This workspace is backed by the same API used by transactions and rules.
       </p>
     </section>
@@ -47,8 +47,8 @@ function CategoriesPage() {
   return (
     <section>
       <p className="font-medium text-sm text-treasuri-muted">Taxonomy</p>
-      <h1 className="mt-1 font-semibold text-3xl">Categories</h1>
-      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+      <h1 className="mt-1 font-semibold text-xl">Categories</h1>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
         {categories.data?.map((category) => (
           <article
             className="rounded-md border border-treasuri-line bg-white p-3"
@@ -67,8 +67,8 @@ function RecurringPage() {
   return (
     <section>
       <p className="font-medium text-sm text-treasuri-muted">Commitments</p>
-      <h1 className="mt-1 font-semibold text-3xl">Recurring</h1>
-      <div className="mt-5 space-y-2">
+      <h1 className="mt-1 font-semibold text-xl">Recurring</h1>
+      <div className="mt-4 space-y-2">
         {recurring.data?.series.map((series) => (
           <article className="rounded-md border border-treasuri-line bg-white p-3" key={series.id}>
             <p className="font-semibold">{series.name}</p>
@@ -110,11 +110,11 @@ function TransactionsPage() {
 
   return (
     <section>
-      <header className="mb-5">
+      <header className="mb-4">
         <p className="font-medium text-sm text-treasuri-muted">History</p>
-        <h1 className="mt-1 font-semibold text-3xl">Transactions</h1>
+        <h1 className="mt-1 font-semibold text-xl">Transactions</h1>
       </header>
-      <form className="mb-4 flex gap-2" onSubmit={submitFilter}>
+      <form className="mb-3 flex gap-2" onSubmit={submitFilter}>
         <label className="relative block flex-1">
           <Search
             aria-hidden="true"
@@ -122,25 +122,25 @@ function TransactionsPage() {
           />
           <input
             aria-label="Search transactions"
-            className="min-h-11 w-full rounded-md border border-treasuri-line bg-white pr-3 pl-10"
+            className="min-h-9 w-full rounded-md border border-treasuri-line bg-white pr-3 pl-9 text-sm"
             onChange={(event) => setQuery(event.target.value)}
             value={query}
           />
         </label>
         <button
-          className="rounded-md bg-treasuri-action px-4 font-semibold text-white"
+          className="rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white"
           type="submit"
         >
           Search
         </button>
       </form>
-      <div className="space-y-3">
+      <div className="space-y-2">
         {transactions.data?.transactions.map((transaction) => (
           <article
-            className="rounded-lg border border-treasuri-line bg-white p-4"
+            className="rounded-md border border-treasuri-line bg-white p-3"
             key={transaction.id}
           >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-semibold">{transaction.merchant}</p>
                 <p className="text-sm text-treasuri-muted">{transaction.description}</p>
@@ -151,7 +151,7 @@ function TransactionsPage() {
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <select
                 aria-label={`Category for ${transaction.description}`}
-                className="min-h-10 rounded-md border border-treasuri-line bg-white px-3"
+                className="min-h-9 rounded-md border border-treasuri-line bg-white px-3 text-sm"
                 defaultValue={transaction.categoryId ?? ""}
                 onChange={(event) =>
                   updateCategory.mutate({
@@ -207,30 +207,30 @@ function RulesPage() {
 
   return (
     <section>
-      <header className="mb-5">
+      <header className="mb-4">
         <p className="font-medium text-sm text-treasuri-muted">Deterministic classification</p>
-        <h1 className="mt-1 font-semibold text-3xl">Rules</h1>
+        <h1 className="mt-1 font-semibold text-xl">Rules</h1>
       </header>
-      <div className="rounded-lg border border-treasuri-line bg-white p-4">
+      <div className="rounded-md border border-treasuri-line bg-white p-3">
         <label className="block font-medium text-sm" htmlFor="rule-pattern">
           Description contains
         </label>
         <input
-          className="mt-2 min-h-10 w-full rounded-md border border-treasuri-line px-3"
+          className="mt-2 min-h-9 w-full rounded-md border border-treasuri-line px-3 text-sm"
           id="rule-pattern"
           onChange={(event) => setPattern(event.target.value)}
           value={pattern}
         />
         <div className="mt-3 flex gap-2">
           <button
-            className="rounded-md border border-treasuri-line px-3 font-semibold"
+            className="min-h-9 rounded-md border border-treasuri-line px-3 font-semibold text-sm"
             onClick={() => preview.mutate()}
             type="button"
           >
             Preview
           </button>
           <button
-            className="rounded-md bg-treasuri-action px-3 font-semibold text-white"
+            className="min-h-9 rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white"
             onClick={() => create.mutate()}
             type="button"
           >

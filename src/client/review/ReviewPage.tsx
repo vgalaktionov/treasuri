@@ -37,10 +37,10 @@ export function ReviewPage() {
 
   return (
     <section aria-labelledby="review-heading">
-      <header className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-medium text-sm text-treasuri-muted">Transactions needing attention</p>
-          <h1 className="mt-1 font-semibold text-3xl" id="review-heading">
+          <h1 className="mt-1 font-semibold text-xl" id="review-heading">
             Review inbox
           </h1>
         </div>
@@ -50,14 +50,14 @@ export function ReviewPage() {
       </header>
 
       {data.transactions.length === 0 ? (
-        <div className="rounded-lg border border-treasuri-line bg-white p-5">
+        <div className="rounded-md border border-treasuri-line bg-white p-3">
           <p className="font-medium">Review inbox is clear.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {data.transactions.map((transaction) => (
             <article
-              className="rounded-lg border border-treasuri-line bg-white p-4"
+              className="rounded-md border border-treasuri-line bg-white p-3"
               key={transaction.id}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -70,7 +70,7 @@ export function ReviewPage() {
                     {transaction.bookingDate} - {transaction.categoryName ?? "Uncategorized"}
                   </p>
                 </div>
-                <p className="font-semibold text-lg">
+                <p className="font-semibold">
                   {transaction.currency} {transaction.amount}
                 </p>
               </div>
@@ -105,9 +105,9 @@ function ReviewActions({
   const [categoryId, setCategoryId] = useState(selectedCategoryId ?? categories[0]?.id ?? 0);
 
   return (
-    <div className="mt-4 flex flex-wrap gap-2">
+    <div className="mt-3 flex flex-wrap gap-2">
       <button
-        className="inline-flex min-h-10 items-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white disabled:opacity-60"
+        className="inline-flex min-h-9 items-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white disabled:opacity-60"
         disabled={disabled}
         onClick={() => onAction("accept")}
         type="button"
@@ -117,7 +117,7 @@ function ReviewActions({
       </button>
       <select
         aria-label="Review category"
-        className="min-h-10 rounded-md border border-treasuri-line bg-white px-3 text-sm"
+        className="min-h-9 rounded-md border border-treasuri-line bg-white px-3 text-sm"
         onChange={(event) => setCategoryId(Number(event.target.value))}
         value={categoryId}
       >
@@ -128,7 +128,7 @@ function ReviewActions({
         ))}
       </select>
       <button
-        className="inline-flex min-h-10 items-center gap-2 rounded-md border border-treasuri-line bg-white px-3 font-semibold text-sm disabled:opacity-60"
+        className="inline-flex min-h-9 items-center gap-2 rounded-md border border-treasuri-line bg-white px-3 font-semibold text-sm disabled:opacity-60"
         disabled={disabled || categoryId === 0}
         onClick={() => onAction("change", categoryId)}
         type="button"
@@ -137,7 +137,7 @@ function ReviewActions({
         Change
       </button>
       <button
-        className="inline-flex min-h-10 items-center gap-2 rounded-md border border-treasuri-line bg-white px-3 font-semibold text-sm disabled:opacity-60"
+        className="inline-flex min-h-9 items-center gap-2 rounded-md border border-treasuri-line bg-white px-3 font-semibold text-sm disabled:opacity-60"
         disabled={disabled}
         onClick={() => onAction("exclude")}
         type="button"

@@ -17,14 +17,14 @@ export function DashboardPage() {
 
   return (
     <>
-      <header className="mb-6">
+      <header className="mb-4">
         <p className="font-medium text-sm text-treasuri-muted">
           {monthLabel(data.yearMonth)} status
         </p>
-        <h1 className={`mt-1 font-semibold text-4xl ${safeToSpendClass}`}>
+        <h1 className={`mt-1 font-semibold text-2xl ${safeToSpendClass}`}>
           EUR {data.safeToSpend}
         </h1>
-        <p className="mt-2 max-w-2xl text-treasuri-muted">
+        <p className="mt-1 max-w-2xl text-sm text-treasuri-muted">
           Safe to spend this month, based on synced current balance and remaining forecast inputs.
         </p>
       </header>
@@ -32,20 +32,20 @@ export function DashboardPage() {
       <section aria-label="Monthly summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {data.metrics.map((metric) => (
           <article
-            className="rounded-lg border border-treasuri-line bg-white p-4"
+            className="rounded-md border border-treasuri-line bg-white p-3"
             key={metric.label}
           >
             <p className="font-medium text-sm text-treasuri-muted">{metric.label}</p>
-            <p className="mt-3 font-semibold text-2xl">{metric.value}</p>
+            <p className="mt-2 font-semibold text-base">{metric.value}</p>
           </article>
         ))}
       </section>
 
-      <section className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="rounded-lg border border-treasuri-line bg-white p-4">
-          <h2 className="font-semibold text-lg">Current balance</h2>
+      <section className="mt-4 grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+        <article className="rounded-md border border-treasuri-line bg-white p-3">
+          <h2 className="font-semibold">Current balance</h2>
           {data.currentBalance ? (
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+            <dl className="mt-3 grid gap-2 sm:grid-cols-2">
               <Metric label="Amount" value={`EUR ${data.currentBalance.amount}`} />
               <Metric label="Source" value={data.currentBalance.source} />
               <Metric label="As of" value={data.currentBalance.asOf} />
@@ -56,22 +56,22 @@ export function DashboardPage() {
           )}
         </article>
 
-        <article className="rounded-lg border border-treasuri-line bg-white p-4">
-          <h2 className="font-semibold text-lg">Review impact</h2>
-          <p className="mt-4 text-treasuri-muted">
+        <article className="rounded-md border border-treasuri-line bg-white p-3">
+          <h2 className="font-semibold">Review impact</h2>
+          <p className="mt-3 text-sm text-treasuri-muted">
             {data.reviewCount} transactions need review, covering EUR {data.reviewImpact}.
           </p>
         </article>
       </section>
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-2">
+      <section className="mt-4 grid gap-3 lg:grid-cols-2">
         <Panel title="Top category spend" rows={data.topVariances} />
         <Panel title="Upcoming fixed costs" rows={data.upcomingFixedCosts} />
       </section>
 
-      <details className="mt-6 rounded-lg border border-treasuri-line bg-white p-4">
+      <details className="mt-4 rounded-md border border-treasuri-line bg-white p-3">
         <summary className="cursor-pointer font-semibold">Forecast explanation</summary>
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
           {Object.entries(data.explanation).map(([label, value]) => (
             <Metric key={label} label={label.replaceAll("_", " ")} value={value} />
           ))}
@@ -89,12 +89,12 @@ function Panel({
   title: string;
 }) {
   return (
-    <article className="rounded-lg border border-treasuri-line bg-white p-4">
-      <h2 className="font-semibold text-lg">{title}</h2>
+    <article className="rounded-md border border-treasuri-line bg-white p-3">
+      <h2 className="font-semibold">{title}</h2>
       {rows.length === 0 ? (
         <p className="mt-3 text-treasuri-muted">Nothing to show yet.</p>
       ) : (
-        <dl className="mt-4 space-y-3">
+        <dl className="mt-3 space-y-2 text-sm">
           {rows.map((row) => (
             <div className="flex items-center justify-between gap-4" key={row.label}>
               <dt className="text-treasuri-muted">{row.label}</dt>

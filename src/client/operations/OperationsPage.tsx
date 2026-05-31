@@ -32,13 +32,13 @@ function ExportPage() {
 
   return (
     <section>
-      <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-medium text-sm text-treasuri-muted">Files</p>
-          <h1 className="mt-1 font-semibold text-3xl">Export</h1>
+          <h1 className="mt-1 font-semibold text-xl">Export</h1>
         </div>
         <button
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-treasuri-action px-4 font-semibold text-white disabled:opacity-60"
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white disabled:opacity-60"
           disabled={create.isPending}
           onClick={() => create.mutate()}
           type="button"
@@ -60,13 +60,13 @@ function ExportPage() {
         </p>
       ) : null}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {exports.data?.exports.map((exportRun) => (
           <article
-            className="rounded-md border border-treasuri-line bg-white p-4"
+            className="rounded-md border border-treasuri-line bg-white p-3"
             key={exportRun.id}
           >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-semibold">Export {exportRun.id}</p>
                 <p className="text-sm text-treasuri-muted">
@@ -75,7 +75,7 @@ function ExportPage() {
               </div>
               {exportRun.fileId ? (
                 <a
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-treasuri-line px-3 font-semibold"
+                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-treasuri-line px-3 font-semibold text-sm"
                   href={`/api/exports/${exportRun.fileId}/download`}
                 >
                   <Download aria-hidden="true" className="size-4" />
@@ -119,18 +119,18 @@ function SettingsPage() {
 
   return (
     <section>
-      <header className="mb-5">
+      <header className="mb-4">
         <p className="font-medium text-sm text-treasuri-muted">Assumptions</p>
-        <h1 className="mt-1 font-semibold text-3xl">Settings</h1>
+        <h1 className="mt-1 font-semibold text-xl">Settings</h1>
       </header>
       <form
-        className="grid gap-4 rounded-md border border-treasuri-line bg-white p-4"
+        className="grid gap-3 rounded-md border border-treasuri-line bg-white p-3"
         onSubmit={submit}
       >
         <label className="grid gap-2 font-medium text-sm">
           Target monthly savings
           <input
-            className="min-h-11 rounded-md border border-treasuri-line px-3 font-normal"
+            className="min-h-9 rounded-md border border-treasuri-line px-3 font-normal"
             inputMode="decimal"
             onChange={(event) => setForm({ ...form, targetMonthlySavings: event.target.value })}
             value={form.targetMonthlySavings}
@@ -139,7 +139,7 @@ function SettingsPage() {
         <label className="grid gap-2 font-medium text-sm">
           Safety buffer
           <input
-            className="min-h-11 rounded-md border border-treasuri-line px-3 font-normal"
+            className="min-h-9 rounded-md border border-treasuri-line px-3 font-normal"
             inputMode="decimal"
             onChange={(event) => setForm({ ...form, safetyBuffer: event.target.value })}
             value={form.safetyBuffer}
@@ -148,7 +148,7 @@ function SettingsPage() {
         <label className="grid gap-2 font-medium text-sm">
           Baseline months
           <input
-            className="min-h-11 rounded-md border border-treasuri-line px-3 font-normal"
+            className="min-h-9 rounded-md border border-treasuri-line px-3 font-normal"
             min="1"
             onChange={(event) => setForm({ ...form, baselineMonths: Number(event.target.value) })}
             type="number"
@@ -156,7 +156,7 @@ function SettingsPage() {
           />
         </label>
         <button
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-treasuri-action px-4 font-semibold text-white disabled:opacity-60 sm:w-fit"
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-treasuri-action px-3 font-semibold text-sm text-white disabled:opacity-60 sm:w-fit"
           disabled={save.isPending}
           type="submit"
         >
@@ -176,17 +176,17 @@ function StatusPage() {
 
   return (
     <section>
-      <header className="mb-5">
+      <header className="mb-4">
         <p className="font-medium text-sm text-treasuri-muted">Runtime</p>
-        <h1 className="mt-1 font-semibold text-3xl">Status</h1>
+        <h1 className="mt-1 font-semibold text-xl">Status</h1>
       </header>
       <div className="grid gap-3 sm:grid-cols-3">
         <StatusTile label="Database" value={status.data?.database ?? "loading"} />
         <StatusTile label="Latest sync" value={status.data?.latestSync?.status ?? "none"} />
         <StatusTile label="Secrets" value={status.data?.secrets ?? "redacted"} />
       </div>
-      <section className="mt-5">
-        <h2 className="font-semibold text-xl">Failed jobs</h2>
+      <section className="mt-4">
+        <h2 className="font-semibold">Failed jobs</h2>
         <div className="mt-3 space-y-2">
           {status.data?.failedJobs.length ? (
             status.data.failedJobs.map((job) => (
@@ -212,9 +212,9 @@ function StatusPage() {
 
 function StatusTile({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-md border border-treasuri-line bg-white p-4">
+    <article className="rounded-md border border-treasuri-line bg-white p-3">
       <p className="text-sm text-treasuri-muted">{label}</p>
-      <p className="mt-1 font-semibold text-xl">{value}</p>
+      <p className="mt-1 font-semibold text-base">{value}</p>
     </article>
   );
 }
