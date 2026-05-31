@@ -31,3 +31,13 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
     page.locator("dt:visible").filter({ hasText: "synced current liquid balance" }),
   ).toBeVisible();
 });
+
+test("dashboard month movement opens the selected transaction", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("tab", { name: "Month" }).click();
+  await page.getByRole("link", { name: /Sample Supermarket/ }).click();
+
+  await expect(page).toHaveURL(/\/transactions\?month=2026-05&transactionId=2/);
+  await expect(page.getByRole("heading", { name: "Sample Supermarket" })).toBeVisible();
+});

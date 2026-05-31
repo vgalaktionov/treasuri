@@ -430,7 +430,7 @@ function transactionHref(
   transaction: DashboardResponse["recentTransactions"][number],
 ): string {
   const separator = linkPrefix.includes("?") ? "&" : "?";
-  return `${linkPrefix}${separator}query=${encodeURIComponent(transaction.merchant)}`;
+  return `${linkPrefix}${separator}transactionId=${transaction.id}`;
 }
 
 function amountClass(amount: string): string {

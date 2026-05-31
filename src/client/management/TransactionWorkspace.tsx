@@ -35,7 +35,7 @@ const kindOptions = [
 export function TransactionWorkspace() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState(readFiltersFromUrl);
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(readActiveIdFromUrl);
   const [message, setMessage] = useState<string | null>(null);
   const transactions = useQuery({
     queryFn: () => fetchTransactions(filters),
@@ -54,6 +54,9 @@ export function TransactionWorkspace() {
     items.find((transaction) => transaction.id === activeId) ?? items[0] ?? null;
 
   useEffect(() => {
+    if (!transactions.data) {
+      return;
+    }
     if (items.length === 0) {
       setActiveId(null);
       return;
@@ -61,7 +64,7 @@ export function TransactionWorkspace() {
     if (!activeId || !items.some((transaction) => transaction.id === activeId)) {
       setActiveId(items[0]?.id ?? null);
     }
-  }, [activeId, items]);
+  }, [activeId, items, transactions.data]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -72,6 +75,11 @@ export function TransactionWorkspace() {
   function clearFilters() {
     setFilters({});
     window.history.replaceState(null, "", "/transactions");
+  }
+
+  function selectTransaction(id: number) {
+    setActiveId(id);
+    window.history.replaceState(null, "", urlForFilters(filters, id));
   }
 
   return (
@@ -110,7 +118,7 @@ export function TransactionWorkspace() {
           activeId={activeTransaction?.id ?? null}
           className="order-2 xl:order-1"
           isLoading={transactions.isLoading}
-          onSelect={setActiveId}
+          onSelect={selectTransaction}
           transactions={items}
         />
         <TransactionInspector
@@ -752,12 +760,21 @@ function readFiltersFromUrl(): TransactionFilters {
   };
 }
 
-function urlForFilters(filters: TransactionFilters): string {
+function readActiveIdFromUrl(): number | null {
+  const value = new URLSearchParams(window.location.search).get("transactionId");
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function urlForFilters(filters: TransactionFilters, transactionId?: number | null): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && value !== "" && value !== false) {
       params.set(key, String(value));
     }
+  }
+  if (transactionId) {
+    params.set("transactionId", String(transactionId));
   }
   const query = params.toString();
   return query ? `/transactions?${query}` : "/transactions";
