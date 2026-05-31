@@ -1,5 +1,15 @@
 import type pg from "pg";
 
+type RecurringCandidate = {
+  categoryId: number | null;
+  expectedAmount: string;
+  expectedDayOfMonth: number;
+  lastSeenDate: string;
+  merchantId: number | null;
+  name: string;
+  transactionIds: number[];
+};
+
 export async function listRecurring(pool: pg.Pool) {
   const result = await pool.query<{
     amount_tolerance: string | null;
@@ -64,6 +74,28 @@ export async function listRecurring(pool: pg.Pool) {
   };
 }
 
+export async function detectRecurringCandidates(pool: pg.Pool) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const candidates = await findMonthlyCandidates(client);
+    let linkedTransactionCount = 0;
+
+    for (const candidate of candidates) {
+      const seriesId = await upsertRecurringSeries(client, candidate);
+      linkedTransactionCount += await linkRecurringTransactions(client, seriesId, candidate);
+    }
+
+    await client.query("COMMIT");
+    return { detectedCount: candidates.length, linkedTransactionCount };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function confirmRecurring(pool: pg.Pool, seriesId: number): Promise<boolean> {
   const result = await pool.query(
     `
@@ -106,6 +138,145 @@ export async function disableRecurring(pool: pg.Pool, seriesId: number): Promise
   } finally {
     client.release();
   }
+}
+
+async function findMonthlyCandidates(client: pg.PoolClient): Promise<RecurringCandidate[]> {
+  const result = await client.query<{
+    category_id: string | null;
+    expected_amount: string;
+    expected_day_of_month: number;
+    last_seen_date: string;
+    merchant_id: string | null;
+    name: string;
+    transaction_ids: number[];
+  }>(`
+    SELECT
+      enriched_transactions.merchant_id::text,
+      enriched_transactions.category_id::text,
+      COALESCE(merchants.name, raw_transactions.counterparty_name, 'Recurring candidate') AS name,
+      round(avg(abs(raw_transactions.amount)), 2)::text AS expected_amount,
+      round(avg(extract(day from raw_transactions.booking_date)))::int AS expected_day_of_month,
+      max(raw_transactions.booking_date)::text AS last_seen_date,
+      array_agg(enriched_transactions.id ORDER BY raw_transactions.booking_date) AS transaction_ids,
+      count(DISTINCT to_char(raw_transactions.booking_date, 'YYYY-MM')) AS month_count
+    FROM enriched_transactions
+    JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
+    LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
+    WHERE raw_transactions.amount < 0
+      AND enriched_transactions.is_income = false
+      AND enriched_transactions.is_transfer = false
+      AND enriched_transactions.is_excluded_from_budget = false
+      AND COALESCE(merchants.name, raw_transactions.counterparty_name) IS NOT NULL
+    GROUP BY
+      enriched_transactions.merchant_id,
+      enriched_transactions.category_id,
+      COALESCE(merchants.name, raw_transactions.counterparty_name, 'Recurring candidate')
+    HAVING count(DISTINCT to_char(raw_transactions.booking_date, 'YYYY-MM')) >= 2
+  `);
+
+  return result.rows.map((row) => ({
+    categoryId: row.category_id ? Number(row.category_id) : null,
+    expectedAmount: row.expected_amount,
+    expectedDayOfMonth: row.expected_day_of_month,
+    lastSeenDate: row.last_seen_date,
+    merchantId: row.merchant_id ? Number(row.merchant_id) : null,
+    name: row.name,
+    transactionIds: row.transaction_ids.map(Number),
+  }));
+}
+
+async function upsertRecurringSeries(
+  client: pg.PoolClient,
+  candidate: RecurringCandidate,
+): Promise<number> {
+  const nextExpectedDate = nextMonthDate(candidate.lastSeenDate, candidate.expectedDayOfMonth);
+  const existing = await client.query<{ id: string }>(
+    `
+      SELECT id::text
+      FROM recurring_series
+      WHERE name = $1 AND cadence = 'monthly' AND is_active = true
+      LIMIT 1
+    `,
+    [candidate.name],
+  );
+
+  if (existing.rows[0]) {
+    await client.query(
+      `
+        UPDATE recurring_series
+        SET merchant_id = $2,
+          category_id = $3,
+          expected_amount = $4,
+          amount_tolerance = COALESCE(amount_tolerance, 2.00),
+          expected_day_of_month = $5,
+          next_expected_date = $6,
+          confidence = greatest(confidence, 0.80),
+          updated_at = now()
+        WHERE id = $1
+      `,
+      [
+        existing.rows[0].id,
+        candidate.merchantId,
+        candidate.categoryId,
+        candidate.expectedAmount,
+        candidate.expectedDayOfMonth,
+        nextExpectedDate,
+      ],
+    );
+    return Number(existing.rows[0].id);
+  }
+
+  const inserted = await client.query<{ id: string }>(
+    `
+      INSERT INTO recurring_series (
+        merchant_id, category_id, name, cadence, amount_mode, expected_amount,
+        amount_tolerance, expected_day_of_month, next_expected_date, confidence, is_confirmed
+      )
+      VALUES ($1, $2, $3, 'monthly', 'fixed', $4, 2.00, $5, $6, 0.80, false)
+      RETURNING id::text
+    `,
+    [
+      candidate.merchantId,
+      candidate.categoryId,
+      candidate.name,
+      candidate.expectedAmount,
+      candidate.expectedDayOfMonth,
+      nextExpectedDate,
+    ],
+  );
+  const row = inserted.rows[0];
+  if (!row) {
+    throw new Error("Recurring series insert did not return an id");
+  }
+  return Number(row.id);
+}
+
+async function linkRecurringTransactions(
+  client: pg.PoolClient,
+  seriesId: number,
+  candidate: RecurringCandidate,
+): Promise<number> {
+  const result = await client.query(
+    `
+      UPDATE enriched_transactions
+      SET recurring_series_id = $1,
+        is_recurring = true,
+        is_fixed_cost = true,
+        is_variable_cost = false,
+        updated_at = now()
+      WHERE id = ANY($2::bigint[])
+    `,
+    [seriesId, candidate.transactionIds],
+  );
+  return result.rowCount ?? 0;
+}
+
+function nextMonthDate(lastSeenDate: string, expectedDayOfMonth: number): string {
+  const lastSeen = new Date(`${lastSeenDate}T00:00:00.000Z`);
+  const nextMonth = new Date(Date.UTC(lastSeen.getUTCFullYear(), lastSeen.getUTCMonth() + 1, 1));
+  const cappedDay = Math.min(expectedDayOfMonth, 28);
+  nextMonth.setUTCDate(cappedDay);
+  return nextMonth.toISOString().slice(0, 10);
 }
 
 function recurringWarnings(row: {

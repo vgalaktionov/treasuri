@@ -4,6 +4,7 @@ import { createDefaultBankProvider } from "../bank/fake.ts";
 import { syncBankTransactions } from "../bank/sync.ts";
 import { classifyPendingTransactions } from "../classify/service.ts";
 import { calculateSafeToSpend, daysLeftInMonth, formatMoney } from "../forecast/calculator.ts";
+import { detectRecurringCandidates } from "../management/recurring.ts";
 import { applyRule } from "../management/rules.ts";
 import { createXlsxExport } from "../operations/exportService.ts";
 import { normalizePendingTransactions } from "../transactions/normalize.ts";
@@ -46,38 +47,6 @@ async function normalizeTransactions(pool: pg.Pool) {
   } finally {
     client.release();
   }
-}
-
-async function detectRecurringCandidates(pool: pg.Pool) {
-  const result = await pool.query<{ id: string }>(`
-    INSERT INTO recurring_series (
-      merchant_id, category_id, name, cadence, amount_mode, expected_amount,
-      confidence, is_confirmed, next_expected_date
-    )
-    SELECT
-      enriched_transactions.merchant_id,
-      enriched_transactions.category_id,
-      COALESCE(merchants.name, raw_transactions.counterparty_name, 'Recurring candidate'),
-      'monthly',
-      'fixed',
-      round(avg(abs(raw_transactions.amount)), 2),
-      0.6,
-      false,
-      (date_trunc('month', max(raw_transactions.booking_date)) + interval '1 month')::date
-    FROM enriched_transactions
-    JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
-    LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
-    WHERE raw_transactions.amount < 0
-    GROUP BY enriched_transactions.merchant_id, enriched_transactions.category_id, merchants.name,
-      raw_transactions.counterparty_name
-    HAVING count(*) >= 2
-      AND NOT EXISTS (
-        SELECT 1 FROM recurring_series
-        WHERE recurring_series.name = COALESCE(merchants.name, raw_transactions.counterparty_name, 'Recurring candidate')
-      )
-    RETURNING id
-  `);
-  return { recurringCount: result.rowCount ?? 0 };
 }
 
 async function updateMonthlyForecast(pool: pg.Pool, asOf = new Date()) {
