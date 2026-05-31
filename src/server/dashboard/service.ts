@@ -214,7 +214,9 @@ export function sampleDashboard(): DashboardResponse {
       { label: "One-off / Large purchase", value: "EUR 320.00" },
       { label: "Dog", value: "EUR 89.95" },
     ],
-    upcomingFixedCosts: [{ label: "Sample Rent", value: "EUR 1450.00 on 2026-06-01" }],
+    upcomingFixedCosts: [
+      { href: "/recurring?seriesId=1", label: "Sample Rent", value: "EUR 1450.00 on 2026-06-01" },
+    ],
     yearMonth: "2026-05",
   };
 }
@@ -525,10 +527,11 @@ function categoryPaceLabel(current: number, suggested: number): string {
 async function readUpcomingFixedCosts(pool: pg.Pool) {
   const result = await pool.query<{
     expected_amount: string | null;
+    id: string;
     name: string;
     next_expected_date: string;
   }>(`
-    SELECT name, expected_amount::text, next_expected_date::text
+    SELECT id::text, name, expected_amount::text, next_expected_date::text
     FROM recurring_series
     WHERE is_active = true
       AND is_confirmed = true
@@ -537,6 +540,7 @@ async function readUpcomingFixedCosts(pool: pg.Pool) {
     LIMIT 3
   `);
   return result.rows.map((row) => ({
+    href: `/recurring?${new URLSearchParams({ seriesId: row.id }).toString()}`,
     label: row.name,
     value: `EUR ${formatMoney(row.expected_amount ?? "0")} on ${row.next_expected_date}`,
   }));

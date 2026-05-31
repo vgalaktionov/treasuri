@@ -597,7 +597,7 @@ function Panel({
   rows,
   title,
 }: {
-  rows: readonly { label: string; value: string }[];
+  rows: readonly { href?: string | undefined; label: string; value: string }[];
   title: string;
 }) {
   return (
@@ -609,7 +609,15 @@ function Panel({
         <dl className="mt-2 space-y-2 text-xs">
           {rows.map((row) => (
             <div className="flex items-center justify-between gap-4" key={row.label}>
-              <dt className="text-treasuri-muted">{row.label}</dt>
+              <dt className="text-treasuri-muted">
+                {row.href ? (
+                  <a className="font-medium hover:text-treasuri-action" href={row.href}>
+                    {row.label}
+                  </a>
+                ) : (
+                  row.label
+                )}
+              </dt>
               <dd className="font-semibold">{row.value}</dd>
             </div>
           ))}

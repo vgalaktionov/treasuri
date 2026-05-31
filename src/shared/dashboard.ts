@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const dashboardMetricSchema = z.object({
+  href: z.string().optional(),
   label: z.string(),
   value: z.string(),
 });
