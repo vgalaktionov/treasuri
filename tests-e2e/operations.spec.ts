@@ -36,8 +36,8 @@ test("operations workspace covers settings, status, and exports", async ({ page 
 
   await page.goto("/export");
   await expect(page.getByRole("heading", { exact: true, name: "Export" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /treasuri-export\.xlsx/ })).toBeVisible();
-  await expect(page.getByText("budget", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /budget-averages-2026-05\.xlsx/ })).toBeVisible();
+  await expect(page.getByText("budget_averages", { exact: true })).toBeVisible();
   await expect(page.getByText("Selected export")).toBeVisible();
   await page.getByRole("button", { name: "Generate XLSX" }).click();
   await expect(page.getByText(/Export \d+ generated/)).toBeVisible();

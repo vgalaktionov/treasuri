@@ -1,4 +1,5 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
+import ExcelJS from "exceljs";
 import { PgBoss } from "pg-boss";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
@@ -64,21 +65,37 @@ describe("operations API", () => {
       const downloaded = await agent
         .get(`/api/exports/${created.body.fileId}/download`)
         .expect(200);
-      const storedBytes = await withPool(databaseUrl, async (pool) => {
-        const result = await pool.query<{ bytes: number }>(
-          "SELECT octet_length(content) AS bytes FROM export_files WHERE id = $1",
+      const stored = await withPool(databaseUrl, async (pool) => {
+        const result = await pool.query<{ bytes: number; content: Buffer }>(
+          "SELECT octet_length(content) AS bytes, content FROM export_files WHERE id = $1",
           [created.body.fileId],
         );
-        return result.rows[0]?.bytes ?? 0;
+        return result.rows[0];
       });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(Uint8Array.from(stored?.content ?? Buffer.alloc(0)).buffer);
 
       expect(created.body.fileId).toBeGreaterThan(0);
-      expect(listed.body.exports[0].exportType).toBe("budget");
-      expect(listed.body.exports[0].filename).toBe("treasuri-export.xlsx");
+      expect(listed.body.exports[0].exportType).toBe("budget_averages");
+      expect(listed.body.exports[0].filename).toBe("budget-averages-2026-05.xlsx");
       expect(listed.body.exports[0].status).toBe("completed");
       expect(listed.body.exports[0].sizeBytes).toBeGreaterThan(1000);
       expect(downloaded.headers["content-type"]).toContain("spreadsheetml.sheet");
-      expect(storedBytes).toBeGreaterThan(1000);
+      expect(stored?.bytes).toBeGreaterThan(1000);
+      expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+        "Summary",
+        "Category averages",
+        "Monthly history",
+        "Recurring expenses",
+        "Excluded one-offs",
+        "Raw transactions",
+        "Rules",
+        "Forecast assumptions",
+      ]);
+      expect(workbook.getWorksheet("Summary")?.getCell("B2").value).toBe("2026-05");
+      expect(workbook.getWorksheet("Raw transactions")?.rowCount).toBeGreaterThan(1);
+      expect(workbook.getWorksheet("Excluded one-offs")?.rowCount).toBeGreaterThan(1);
+      expect(workbook.getWorksheet("Recurring expenses")?.rowCount).toBeGreaterThan(1);
     } finally {
       await restore();
       await container.stop();

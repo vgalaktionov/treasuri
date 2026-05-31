@@ -1,32 +1,29 @@
 import crypto from "node:crypto";
-import ExcelJS from "exceljs";
 import type pg from "pg";
 
+import { workbookBuffer } from "./exportWorkbook.ts";
+
+const xlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 export async function createXlsxExport(pool: pg.Pool, createdBy: string | null = null) {
   const client = await pool.connect();
+  const yearMonth = await latestYearMonth(client);
+  const periodStart = `${yearMonth}-01`;
+  const periodEnd = periodEndDate(periodStart);
+  const runId = await createExportRun(client, periodStart, periodEnd, createdBy);
+
   try {
-    await client.query("BEGIN");
-    const run = await client.query<{ id: string }>(
-      "INSERT INTO export_runs (export_type, period_start, period_end, status, started_at, created_by) VALUES ('budget', current_date, current_date, 'running', now(), $1) RETURNING id",
-      [createdBy],
-    );
-    const runId = Number(run.rows[0]?.id);
-    const content = await workbookBuffer(client);
+    const content = await workbookBuffer(client, yearMonth);
     const sha256 = crypto.createHash("sha256").update(content).digest("hex");
+    const filename = `budget-averages-${yearMonth}.xlsx`;
+
+    await client.query("BEGIN");
     const file = await client.query<{ id: string }>(
       `
         INSERT INTO export_files (export_run_id, filename, content_type, content, size_bytes, sha256)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
       `,
-      [
-        runId,
-        "treasuri-export.xlsx",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        content,
-        content.length,
-        sha256,
-      ],
+      [runId, filename, xlsxContentType, content, content.length, sha256],
     );
     await client.query(
       "UPDATE export_runs SET status = 'completed', finished_at = now() WHERE id = $1",
@@ -35,7 +32,11 @@ export async function createXlsxExport(pool: pg.Pool, createdBy: string | null =
     await client.query("COMMIT");
     return { exportRunId: runId, fileId: Number(file.rows[0]?.id) };
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query("ROLLBACK").catch(() => undefined);
+    await client.query(
+      "UPDATE export_runs SET status = 'failed', finished_at = now(), error_message = $2 WHERE id = $1",
+      [runId, sanitizeError(error)],
+    );
     throw error;
   } finally {
     client.release();
@@ -88,34 +89,40 @@ export async function getExportFile(pool: pg.Pool, fileId: number) {
   return result.rows[0] ?? null;
 }
 
-async function workbookBuffer(client: pg.PoolClient): Promise<Buffer> {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Transactions");
-  sheet.addRow(["Date", "Amount", "Merchant", "Description", "Category"]);
-  const rows = await client.query<{
-    amount: string;
-    booking_date: string;
-    category: string | null;
-    description: string;
-    merchant: string | null;
-  }>(`
-    SELECT raw_transactions.booking_date::text, raw_transactions.amount::text,
-      COALESCE(merchants.name, raw_transactions.counterparty_name) AS merchant,
-      raw_transactions.description, categories.name AS category
-    FROM enriched_transactions
-    JOIN raw_transactions ON raw_transactions.id = enriched_transactions.raw_transaction_id
-    LEFT JOIN merchants ON merchants.id = enriched_transactions.merchant_id
-    LEFT JOIN categories ON categories.id = enriched_transactions.category_id
-    ORDER BY raw_transactions.booking_date
-  `);
-  for (const row of rows.rows) {
-    sheet.addRow([
-      row.booking_date,
-      row.amount,
-      row.merchant ?? "",
-      row.description,
-      row.category ?? "",
-    ]);
-  }
-  return Buffer.from(await workbook.xlsx.writeBuffer());
+async function createExportRun(
+  client: pg.PoolClient,
+  periodStart: string,
+  periodEnd: string,
+  createdBy: string | null,
+): Promise<number> {
+  const run = await client.query<{ id: string }>(
+    `
+      INSERT INTO export_runs (
+        export_type, period_start, period_end, status, started_at, created_by, metadata_json
+      )
+      VALUES ('budget_averages', $1, $2, 'running', now(), $3, '{}'::jsonb)
+      RETURNING id
+    `,
+    [periodStart, periodEnd, createdBy],
+  );
+  return Number(run.rows[0]?.id);
+}
+
+async function latestYearMonth(client: pg.PoolClient): Promise<string> {
+  const result = await client.query<{ year_month: string }>(
+    "SELECT year_month FROM monthly_forecasts ORDER BY year_month DESC LIMIT 1",
+  );
+  return result.rows[0]?.year_month ?? new Date().toISOString().slice(0, 7);
+}
+
+function periodEndDate(periodStart: string): string {
+  const start = new Date(`${periodStart}T00:00:00Z`);
+  return new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0))
+    .toISOString()
+    .slice(0, 10);
+}
+
+function sanitizeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/(token|secret|password|authorization|credential)=\S+/gi, "$1=[redacted]");
 }

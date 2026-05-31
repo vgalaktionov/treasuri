@@ -116,9 +116,9 @@ export function registerOperationsRoutes(
               {
                 createdAt: "2026-05-28 08:00:00+00",
                 errorMessage: null,
-                exportType: "budget",
+                exportType: "budget_averages",
                 fileId: 1,
-                filename: "treasuri-export.xlsx",
+                filename: "budget-averages-2026-05.xlsx",
                 id: 1,
                 sizeBytes: 2048,
                 status: "completed",
