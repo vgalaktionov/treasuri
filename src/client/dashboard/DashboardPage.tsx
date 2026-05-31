@@ -548,7 +548,12 @@ function CategoryPace({ rows }: { rows: DashboardResponse["categoryPace"] }) {
             >
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium text-sm">{row.category}</p>
+                  <a
+                    className="font-medium text-sm hover:text-treasuri-action"
+                    href={categoryHref(row.category)}
+                  >
+                    {row.category}
+                  </a>
                   <p className={`text-xs ${paceClass(row.status)}`}>{row.paceLabel}</p>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded bg-treasuri-panel">
@@ -556,6 +561,20 @@ function CategoryPace({ rows }: { rows: DashboardResponse["categoryPace"] }) {
                     className={`h-full rounded ${paceBarClass(row.status)}`}
                     style={{ width: paceWidth(row) }}
                   />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <a
+                    className="font-semibold text-treasuri-action"
+                    href={categoryHref(row.category)}
+                  >
+                    Inspect
+                  </a>
+                  <a
+                    className="font-semibold text-treasuri-muted hover:text-treasuri-action"
+                    href={categoryTransactionsHref(row.category)}
+                  >
+                    Transactions
+                  </a>
                 </div>
               </div>
               <dl className="grid grid-cols-2 gap-2 text-right text-xs">
@@ -710,6 +729,14 @@ function paceWidth(row: DashboardResponse["categoryPace"][number]): string {
     return "0%";
   }
   return `${Math.min(100, Math.round((current / suggested) * 100))}%`;
+}
+
+function categoryHref(category: string): string {
+  return `/categories?${new URLSearchParams({ category }).toString()}`;
+}
+
+function categoryTransactionsHref(category: string): string {
+  return `/transactions?${new URLSearchParams({ category }).toString()}`;
 }
 
 function monthLabel(yearMonth: string): string {

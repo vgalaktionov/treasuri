@@ -38,7 +38,9 @@ export function ManagementPage({
 function CategoriesPage() {
   const budgets = useQuery({ queryFn: fetchCategoryBudgets, queryKey: ["category-budgets"] });
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
-  const [filter, setFilter] = useState<"all" | "included" | "attention" | "excluded">("included");
+  const [filter, setFilter] = useState<"all" | "included" | "attention" | "excluded">(() =>
+    readCategoryNameFromUrl() ? "all" : "included",
+  );
   const [query, setQuery] = useState("");
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -60,10 +62,23 @@ function CategoriesPage() {
       setActiveCategoryId(null);
       return;
     }
+    const requestedCategory = readCategoryNameFromUrl();
+    const deepLinked = requestedCategory
+      ? rows.find((category) => category.name === requestedCategory)
+      : null;
+    if (deepLinked && deepLinked.id !== activeCategoryId) {
+      setActiveCategoryId(deepLinked.id);
+      return;
+    }
     if (!activeCategoryId || !rows.some((category) => category.id === activeCategoryId)) {
       setActiveCategoryId(rows[0]?.id ?? null);
     }
   }, [activeCategoryId, rows]);
+
+  function inspectCategory(category: CategoryBudgetResponse["categories"][number]) {
+    setActiveCategoryId(category.id);
+    window.history.replaceState(null, "", categoriesUrl(category.name));
+  }
 
   if (budgets.isLoading) {
     return <p className="text-treasuri-muted">Loading category budgets...</p>;
@@ -148,7 +163,7 @@ function CategoriesPage() {
                   category={category}
                   isActive={category.id === activeCategory?.id}
                   key={category.id}
-                  onInspect={setActiveCategoryId}
+                  onInspect={inspectCategory}
                 />
               ))}
             </div>
@@ -167,7 +182,7 @@ function CategoryRow({
 }: {
   category: CategoryBudgetResponse["categories"][number];
   isActive: boolean;
-  onInspect: (id: number) => void;
+  onInspect: (category: CategoryBudgetResponse["categories"][number]) => void;
 }) {
   const percent = budgetPercent(category.currentMonth, category.suggestedBudget);
   return (
@@ -187,7 +202,7 @@ function CategoryRow({
           <button
             aria-label={`Inspect ${category.name}`}
             className="rounded-sm border border-treasuri-line bg-white px-1.5 py-0.5 font-semibold text-[0.68rem] text-treasuri-action"
-            onClick={() => onInspect(category.id)}
+            onClick={() => onInspect(category)}
             type="button"
           >
             Inspect
@@ -403,6 +418,14 @@ function transactionsUrl(category: string, yearMonth?: string): string {
     params.set("month", yearMonth);
   }
   return `/transactions?${params.toString()}`;
+}
+
+function categoriesUrl(category: string): string {
+  return `/categories?${new URLSearchParams({ category }).toString()}`;
+}
+
+function readCategoryNameFromUrl(): string | null {
+  return new URLSearchParams(window.location.search).get("category");
 }
 
 function monthLabel(yearMonth: string): string {

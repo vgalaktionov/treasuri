@@ -45,7 +45,7 @@ test("transaction workspace exposes advanced filters and raw details", async ({ 
 });
 
 test("category workspace shows budget averages and filters", async ({ page }) => {
-  await page.goto("/categories");
+  await page.goto("/categories?category=Dog");
 
   await expect(page.getByRole("heading", { name: "Categories" })).toBeVisible();
   await expect(page.getByText("Current spend")).toBeVisible();
@@ -53,7 +53,6 @@ test("category workspace shows budget averages and filters", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Inspect Dog" })).toBeVisible();
   await expect(page.getByText("Groceries")).toBeVisible();
   await expect(page.getByText("EUR 0.05 left").first()).toBeVisible();
-  await page.getByRole("button", { name: "Inspect Dog" }).click();
   const inspector = page.getByRole("complementary").filter({ hasText: "Category inspector" });
   await expect(inspector.getByRole("heading", { name: "Dog" })).toBeVisible();
   await expect(inspector.getByText("Category inspector")).toBeVisible();
@@ -62,6 +61,9 @@ test("category workspace shows budget averages and filters", async ({ page }) =>
     "href",
     "/transactions?category=Dog&month=2026-05",
   );
+  await page.getByRole("button", { name: "Inspect Groceries" }).click();
+  await expect(page).toHaveURL(/\/categories\?category=Groceries$/);
+  await expect(inspector.getByRole("heading", { name: "Groceries" })).toBeVisible();
 
   await page.getByRole("button", { name: "Excluded" }).click();
   await expect(page.getByRole("button", { name: "Inspect Savings" })).toBeVisible();

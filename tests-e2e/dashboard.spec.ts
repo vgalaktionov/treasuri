@@ -24,7 +24,12 @@ test("dashboard shows safe-to-spend and an accessible forecast explanation", asy
   await page.getByRole("tab", { name: "Month" }).click();
   await expect(page.locator("h2:visible").filter({ hasText: "Category pace" })).toBeVisible();
   await expect(page.locator("h2:visible").filter({ hasText: "Month movement" })).toBeVisible();
-  await expect(page.locator("p:visible").filter({ hasText: "Groceries" })).toBeVisible();
+  const groceriesCategoryLink = page.getByRole("link", { exact: true, name: "Groceries" });
+  await expect(groceriesCategoryLink).toBeVisible();
+  await expect(groceriesCategoryLink).toHaveAttribute(
+    "href",
+    "/categories?category=Groceries",
+  );
   await expect(page.getByText("Sample Supermarket")).toBeVisible();
 
   await page.getByRole("tab", { name: "Explain" }).click();
